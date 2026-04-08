@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+.env
+dist/
+build/
+V-Pack-Monitor.spec
+*.DS_Store
+recordings/
+*.zip
+InnoSetup/
+credentials.json

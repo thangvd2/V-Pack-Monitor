@@ -1,0 +1,31 @@
+# Lịch Sử Cập Nhật & Phát Hành (Release Notes)
+
+## [v1.3.0] - 2026-04-08 (Premium Release)
+
+Gói nâng cấp "Premium Features" tập trung nâng cao khả năng quản trị, phòng ngừa rủi ro và tăng cường tốc độ xử lý khiếu nại cho nhân viên đóng hàng.
+
+### 🚀 Những Thay Đổi Lớn (Major Features)
+- **Cảnh Báo Ổ Cứng Hết Chỗ (Disk Health Alerts)**: Hệ thống làm mới tự động quét dữ liệu thư mục ghi hình. Thanh Progress bar chuyển đỏ và nháy liên tục khi cảnh báo dung lượng thực tế trống dưới 10%, nhằm ngăn ngừa lỗi không thể ghi đè Video.
+- **Tích hợp Chatbot Telegram Trực Tiếp (Two-way Comms)**: Cấu hình linh hoạt qua UI Modal (Token, Chat ID). Phân luồng Cảnh báo "Lỗi đứt gãy Cloud Sync" tự động văng vào máy chủ. Hỗ trợ lệnh Listen Control trên Mobile Chat: gọi `/baocao` báo cáo năng suất ngày, gọi `/kiemtra` hiển thị danh sách thiết bị.
+- **Nâng Cấp Video Player Pro**: Trình xem lại vận đơn nhúng gọn gàng trong Modal (Pop-up), loại bỏ sự phiền phức mở Tab mới. Trang bị tốc độ tua nhanh 2.0x, và chế tạo công cụ "Chụp Hình - Snapshot", xuất khẩu bằng chứng khung hình thành JPG lưu nhanh chóng.
+
+### ✨ Cải Tiến (Improvements)
+- Hỗ trợ đầy đủ luồng Camera RTPS đến từ các thiết bị `Tenda`, `TP-Link Tapo`, `EzViz`, song hành với `Imou` và `Dahua` truyền thống.
+- **Production Build All-in-one**: Hỗ trợ xuất xưởng (Export) trực tiếp toàn bộ Backend + UI thành một file nhị phân duy nhất `.exe`/`.app` cực gọn với `PyInstaller` và Script kịch bản cài đặt `inno_setup`. Cạy mở sự hiện diện "như một phần mềm thực sự", không cần lệnh mở cmd.
+
+### 🧹 Code Hygiene (Dọn dẹp mã nguồn)
+- Chuẩn hoá toàn bộ Linter rules PEP8 (chặn Warning) qua các file lõi SQL và Backend.
+- Tối ưu luồng tiến trình (Daemon thread) để nhốt trình lắng nghe Telegram an toàn song song cạnh Event Loop WebSocket FastAPI.
+- Xóa bỏ rác Code và các comment lỗi thời.
+
+---
+
+## [v1.2.0] - 2026-04-05 (Cloud Sync Update)
+- Bổ sung luồng kết nối Google Drive & S3.
+- ...
+
+## [v1.1.0] - Giao Diện Barcode Scanner UI
+- Ra mắt công cụ quét mã vạch chuyên dụng và Trạm thu thập Multi-Station, phân chia logic xử lý nhiều Camera.
+
+## [v1.0.0] - Bản Nguyên Góc
+- MVP API Video MP4 bằng OpenCV. Hỗ trợ 1 Camera duy nhất.
