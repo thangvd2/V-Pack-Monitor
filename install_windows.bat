@@ -25,10 +25,23 @@ python --version >nul 2>&1
 if %errorLevel% == 0 (
     echo [1/5] Kiem tra Python... Hop le.
 ) else (
-    echo [1/5] Phat hien chua co PythonTren may.
-    echo Vui long truy cap trang chu https://www.python.org/downloads/ hoac mo Microsoft Store de cai dat Python 3 truoc!
-    pause
-    exit /b 1
+    py --version >nul 2>&1
+    if %errorLevel% == 0 (
+        echo [1/5] Phat hien Python qua lenh "py". Dang tao alias...
+        doskey python=py $*
+        set PYTHON_CMD=py
+    ) else (
+        echo [1/5] LOI: Khong tim thay Python tren may!
+        echo.
+        echo Vui long cai dat Python 3 tu:
+        echo   - https://www.python.org/downloads/
+        echo   - Hoac mo Microsoft Store tim "Python"
+        echo.
+        echo LUU Y: Khi cai dat, nho check "Add Python to PATH" o dau tien!
+        echo.
+        pause
+        exit /b 1
+    )
 )
 
 REM 2. TAI FFMPEG VA GIAI NEN NEN TRONG THU MUC BIN (LOCAL)
@@ -52,11 +65,39 @@ if not exist "bin\ffmpeg\bin\ffmpeg.exe" (
 REM 3. TAO MOI TRUONG AO VA CAI THU VIEN
 echo [3/5] Khoi tao Moi Truong Ao (Virtual Environment) va Cai dat Thu Vien...
 if not exist "venv" (
-    python -m venv venv
+    if defined PYTHON_CMD (
+        %PYTHON_CMD% -m venv venv
+    ) else (
+        python -m venv venv
+    )
+    if %errorLevel% neq 0 (
+        echo.
+        echo LOI: Khong tao duoc moi truong ao venv!
+        echo Thu xoa thu muc "venv" hien tai va chay lai.
+        echo.
+        pause
+        exit /b 1
+    )
 )
 call venv\Scripts\activate.bat
+if %errorLevel% neq 0 (
+    echo.
+    echo LOI: Khong kich hoat duoc venv!
+    echo Thu xoa thu muc "venv" va chay lai script nay.
+    echo.
+    pause
+    exit /b 1
+)
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+if %errorLevel% neq 0 (
+    echo.
+    echo LOI: Khong cai dat duoc thu vien Python!
+    echo Kiem tra ket noi Internet va thu lai.
+    echo.
+    pause
+    exit /b 1
+)
 
 REM 4. MO CONG TUONG LUA 8001
 echo [4/5] Cho phep cac thiet bi cung mang LAN truy cap den Server (Mo Tuong Lua qua Port 8001)...

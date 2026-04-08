@@ -2,6 +2,14 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v1.3.2] - 2026-04-08 (Windows Fix)
+
+### 🐛 Sửa Lỗi
+- **Windows install_windows.bat**: Cửa sổ chớp tắt khi `python` không trong PATH — thêm fallback sang `py` launcher, error handling + `pause` ở mọi nhánh lỗi.
+- **Windows start_windows.bat**: Thêm check venv tồn tại trước khi activate, thông báo lỗi rõ ràng nếu chưa cài đặt.
+
+---
+
 ## [v1.3.1] - 2026-04-08 (Auto-Discovery Update)
 
 ### 🚀 Tính Năng Mới
