@@ -6,6 +6,9 @@
 
 import os
 import sys
+
+os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
+os.environ["OPENCV_VIDEOIO_PRIORITY_MSMF"] = "0"
 import cv2
 import time
 import shutil
@@ -20,6 +23,7 @@ from pydantic import BaseModel
 import database
 from recorder import CameraRecorder
 import cloud_sync
+import network
 
 # --- Quản lý Trạng thái Ghi hình Đa Trạm ---
 # Dictionary ánh xạ station_id -> CameraRecorder object
@@ -32,17 +36,24 @@ stream_managers = {}
 # --- Quản lý Luồng Video (Background Thread) ---
 
 
+reconnect_status = {}
+
+
 class CameraStreamManager:
-    def __init__(self, url):
+    def __init__(self, url, station_id=None):
         self.url = url
+        self.station_id = station_id
         self.latest_frame = None
         self.is_running = False
         self.thread = None
         self.lock = threading.Lock()
+        self._fail_count = 0
+        self._reconnect_cooldown = 10
 
     def start(self):
         if not self.is_running and self.url:
             self.is_running = True
+            self._fail_count = 0
             self.thread = threading.Thread(target=self._update_frame, daemon=True)
             self.thread.start()
 
@@ -51,19 +62,62 @@ class CameraStreamManager:
         if self.thread:
             self.thread.join()
 
+    def _try_rediscover_camera(self):
+        if not self.station_id:
+            return None
+        station = database.get_station(self.station_id)
+        if not station or not station.get("mac_address"):
+            return None
+        mac = station.get("mac_address", "")
+        if not network.validate_mac(mac):
+            return None
+        new_ip = network.scan_lan_for_mac(mac)
+        if new_ip and new_ip != station["ip_camera_1"]:
+            database.update_station_ip(self.station_id, "ip_camera_1", new_ip)
+            brand = station.get("camera_brand", "imou")
+            code = station.get("safety_code", "")
+            new_url = get_rtsp_url(new_ip, code, channel=1, brand=brand)
+            self.url = new_url
+            reconnect_status[self.station_id] = {
+                "status": "found",
+                "new_ip": new_ip,
+                "old_ip": station["ip_camera_1"],
+            }
+            return new_ip
+        if new_ip:
+            reconnect_status[self.station_id] = {"status": "same_ip", "ip": new_ip}
+        return None
+
     def _update_frame(self):
         cap = cv2.VideoCapture(self.url)
         while self.is_running:
             if not cap.isOpened():
-                time.sleep(1)
+                self._fail_count += 1
+                if self._fail_count >= 5 and self._fail_count % 5 == 0:
+                    if self.station_id:
+                        reconnect_status[self.station_id] = {"status": "searching"}
+                    found = self._try_rediscover_camera()
+                    if found:
+                        cap.release()
+                        cap = cv2.VideoCapture(self.url)
+                        self._fail_count = 0
+                        time.sleep(2)
+                        continue
+                cooldown = min(self._reconnect_cooldown, 60)
+                time.sleep(cooldown)
                 cap = cv2.VideoCapture(self.url)
                 continue
 
             success, frame = cap.read()
             if not success:
+                self._fail_count += 1
                 cap.release()
                 time.sleep(1)
                 continue
+
+            self._fail_count = 0
+            if self.station_id in reconnect_status:
+                del reconnect_status[self.station_id]
 
             frame = cv2.resize(frame, (854, 480))
             ret, buffer = cv2.imencode(
@@ -118,7 +172,7 @@ async def lifespan(app: FastAPI):
             channel=1,
             brand=st.get("camera_brand", "imou"),
         )
-        manager = CameraStreamManager(url)
+        manager = CameraStreamManager(url, station_id=st["id"])
         stream_managers[st["id"]] = manager
         manager.start()
 
@@ -248,6 +302,7 @@ class StationPayload(BaseModel):
     safety_code: str
     camera_mode: str
     camera_brand: str = "imou"
+    mac_address: str = ""
 
 
 @app.get("/api/stations")
@@ -261,7 +316,7 @@ def create_station(payload: StationPayload):
     url = get_rtsp_url(
         payload.ip_camera_1, payload.safety_code, channel=1, brand=payload.camera_brand
     )
-    sm = CameraStreamManager(url)
+    sm = CameraStreamManager(url, station_id=new_id)
     stream_managers[new_id] = sm
     sm.start()
     return {"status": "success", "id": new_id}
@@ -291,7 +346,63 @@ def delete_station(station_id: int):
         active_recorders[station_id].stop_recording()
         del active_recorders[station_id]
         del active_waybills[station_id]
+    if station_id in reconnect_status:
+        del reconnect_status[station_id]
     return {"status": "success"}
+
+
+# --- CAMERA DISCOVERY API ---
+
+
+@app.get("/api/discover/{station_id}")
+def discover_camera(station_id: int):
+    station = database.get_station(station_id)
+    if not station:
+        return {"status": "error", "message": "Trạm không tồn tại"}
+
+    mac = station.get("mac_address", "")
+    if not mac or not network.validate_mac(mac):
+        return {
+            "status": "error",
+            "message": "Trạm chưa cấu hình MAC Address. Vui lòng nhập MAC trong phần Cài đặt.",
+        }
+
+    old_ip = station["ip_camera_1"]
+    new_ip = network.scan_lan_for_mac(mac)
+
+    if not new_ip:
+        return {
+            "status": "not_found",
+            "message": f"Không tìm thấy thiết bị có MAC {mac} trên mạng LAN.",
+        }
+
+    if new_ip == old_ip:
+        return {
+            "status": "same_ip",
+            "message": f"Camera đang ở đúng địa chỉ {old_ip}.",
+            "ip": old_ip,
+        }
+
+    database.update_station_ip(station_id, "ip_camera_1", new_ip)
+    brand = station.get("camera_brand", "imou")
+    code = station.get("safety_code", "")
+    new_url = get_rtsp_url(new_ip, code, channel=1, brand=brand)
+    if station_id in stream_managers:
+        stream_managers[station_id].update_url(new_url)
+
+    return {
+        "status": "found",
+        "message": f"Đã tìm thấy camera! IP mới: {new_ip} (cũ: {old_ip})",
+        "old_ip": old_ip,
+        "new_ip": new_ip,
+    }
+
+
+@app.get("/api/reconnect-status")
+def get_reconnect_status(station_id: int | None = None):
+    if station_id:
+        return {"data": reconnect_status.get(station_id, None)}
+    return {"data": reconnect_status}
 
 
 # --- SCAN API ---
@@ -346,6 +457,9 @@ def handle_scan(payload: ScanPayload):
 
     active_waybills[sid] = barcode
 
+    station = database.get_station(sid)
+    if not station:
+        return {"status": "error", "message": "Trạm không tồn tại"}
     ip1 = station["ip_camera_1"]
     ip2 = station["ip_camera_2"]
     code = station["safety_code"]
@@ -357,6 +471,18 @@ def handle_scan(payload: ScanPayload):
             "status": "error",
             "message": "Trạm chưa cấu hình IP Camera và Safety Code.",
         }
+
+    mac = station.get("mac_address", "")
+    if mac and network.validate_mac(mac):
+        discovered_ip = network.scan_lan_for_mac(mac)
+        if discovered_ip and discovered_ip != ip1:
+            ip1 = discovered_ip
+            database.update_station_ip(sid, "ip_camera_1", ip1)
+            brand = station.get("camera_brand", "imou")
+            code = station.get("safety_code", "")
+            new_url = get_rtsp_url(ip1, code, channel=1, brand=brand)
+            if sid in stream_managers:
+                stream_managers[sid].update_url(new_url)
 
     url1 = get_rtsp_url(ip1, code, channel=1, brand=brand)
     if c_mode in ["dual_file", "pip"]:

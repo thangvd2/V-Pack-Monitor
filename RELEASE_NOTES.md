@@ -2,6 +2,24 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v1.3.1] - 2026-04-08 (Auto-Discovery Update)
+
+### 🚀 Tính Năng Mới
+- **Tự Động Tìm Lại Camera (Auto-Discovery by MAC)**: Khi camera đổi IP do sự cố mạng/DHCP reset, hệ thống tự động quét LAN theo MAC Address, cập nhật IP mới và reconnect — không cần can thiệp tay.
+- **Nút "Quét IP" trong Cài Đặt**: Nhập MAC Address (in trên tem đáy camera) → bấm quét → tìm ngay IP mới.
+- **Badge trạng thái reconnect**: Hiển thị "Đang tìm lại Camera..." / "Đã tìm thấy IP mới" trên camera preview.
+- **Công cụ test RTSP** (`test_rtsp.py`): Script kiểm tra nhanh kết nối RTSP camera theo IP + Safety Code, hỗ trợ tất cả brand.
+
+### ✨ Cải Tiến
+- Upgrade Python runtime từ 3.9 → **3.14** (hiệu năng, bảo mật).
+- Sửa lỗi phát hiện subnet LAN (`192.168.5.x` thay vì fallback sai `192.168.1.x`).
+- Sửa lỗi parse MAC Address có octet thiếu số 0 (VD: `30:24:50:48:9:38`).
+- Tắt OpenCV warning spam khi camera offline.
+- `start.sh` cleanup: `kill -9` + signal trap, `source venv/bin/activate`.
+- Thêm `pyTelegramBotAPI` vào `requirements.txt`.
+
+---
+
 ## [v1.3.0] - 2026-04-08 (Premium Release)
 
 Gói nâng cấp "Premium Features" tập trung nâng cao khả năng quản trị, phòng ngừa rủi ro và tăng cường tốc độ xử lý khiếu nại cho nhân viên đóng hàng.

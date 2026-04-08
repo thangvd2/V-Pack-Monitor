@@ -33,6 +33,7 @@ function App() {
   const [showPinModal, setShowPinModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null); // 'setup' or {type: 'delete', id: ...}
   const [analytics, setAnalytics] = useState({ total_today: 0, station_today: 0 });
+  const [reconnectInfo, setReconnectInfo] = useState(null);
   const [previousStationId, setPreviousStationId] = useState(null);
   
   // Custom Video Player State
@@ -78,6 +79,33 @@ function App() {
       fetchStatus(activeStationId);
       fetchAnalytics(activeStationId);
     }
+  }, [activeStationId]);
+
+  useEffect(() => {
+    if (!activeStationId) return;
+    let active = true;
+    let intervalId = null;
+
+    const fetchReconnect = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/api/reconnect-status?station_id=${activeStationId}`);
+        if (!active) return;
+        const data = res.data.data;
+        setReconnectInfo(data);
+        if (data === null && intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+      } catch {
+        if (!active) return;
+        setReconnectInfo(null);
+        if (intervalId) { clearInterval(intervalId); intervalId = null; }
+      }
+    };
+
+    fetchReconnect();
+    intervalId = setInterval(fetchReconnect, 10000);
+    return () => { active = false; if (intervalId) clearInterval(intervalId); };
   }, [activeStationId]);
 
   const fetchAnalytics = async (sid) => {
@@ -441,6 +469,16 @@ function App() {
           <div className="relative group rounded-3xl overflow-hidden bg-zinc-900 border border-white/10 shadow-2xl shadow-blue-900/20 aspect-video flex items-center justify-center">
             {activeStationId ? (
                 <>
+                {reconnectInfo && reconnectInfo.status === 'searching' && (
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-amber-500/90 text-white text-xs font-semibold px-3 py-1 rounded-full animate-pulse">
+                    🔄 Đang tìm lại Camera...
+                  </div>
+                )}
+                {reconnectInfo && reconnectInfo.status === 'found' && (
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-emerald-500/90 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                    ✅ Đã tìm thấy IP mới: {reconnectInfo.new_ip}
+                  </div>
+                )}
                 {/* API MJPEG LIVE STREAM */}
                 <img 
                   key={`camera-stream-${activeStationId}`}

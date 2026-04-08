@@ -19,6 +19,9 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
   const [safetyCode, setSafetyCode] = useState(currentStation.safety_code || '');
   const [cameraBrand, setCameraBrand] = useState(currentStation.camera_brand || 'imou');
   const [cameraMode, setCameraMode] = useState(currentStation.camera_mode || 'single');
+  const [macAddress, setMacAddress] = useState(currentStation.mac_address || '');
+  const [discovering, setDiscovering] = useState(false);
+  const [discoverResult, setDiscoverResult] = useState('');
   const [keepDays, setKeepDays] = useState(initialSettings.RECORD_KEEP_DAYS || 7);
   
   // Cloud Sync Settings
@@ -77,7 +80,8 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
         ip_camera_2: ip2,
         safety_code: safetyCode,
         camera_mode: cameraMode,
-        camera_brand: cameraBrand
+        camera_brand: cameraBrand,
+        mac_address: macAddress
       };
 
       if (isNewStation) {
@@ -206,6 +210,58 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
                   onChange={(e) => setSafetyCode(e.target.value)}
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 "
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">MAC Address (Tự động tìm lại Camera khi đổi IP)</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="VD: AA:BB:CC:DD:EE:FF (in trên tem đáy Camera)" 
+                    value={macAddress}
+                    onChange={(e) => setMacAddress(e.target.value)}
+                    onBlur={(e) => {
+                      const raw = e.target.value.replace(/[\s:\-\.]/g, '').toUpperCase();
+                      if (raw.length === 12) {
+                        setMacAddress(raw.match(/.{2}/g).join(':'));
+                      }
+                    }}
+                    className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50"
+                  />
+                  {macAddress && currentStation.id && (
+                    <button 
+                      type="button"
+                      onClick={async () => {
+                        setDiscovering(true);
+                        setDiscoverResult('');
+                        try {
+                          const res = await axios.get(`${API_BASE}/api/discover/${currentStation.id}`);
+                          const data = res.data;
+                          if (data.status === 'found') {
+                            setDiscoverResult(`✅ Tìm thấy IP mới: ${data.new_ip}`);
+                            setIp1(data.new_ip);
+                          } else if (data.status === 'same_ip') {
+                            setDiscoverResult(`ℹ️ Camera đang ở đúng IP: ${data.ip}`);
+                          } else {
+                            setDiscoverResult(`❌ Không tìm thấy camera trên mạng.`);
+                          }
+                        } catch {
+                          setDiscoverResult('❌ Lỗi khi quét mạng.');
+                        } finally {
+                          setDiscovering(false);
+                        }
+                      }}
+                      disabled={discovering}
+                      className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {discovering ? '⏳ Đang quét...' : '🔍 Quét IP'}
+                    </button>
+                  )}
+                </div>
+                {discoverResult && (
+                  <p className="mt-1 text-xs text-slate-300">{discoverResult}</p>
+                )}
+                <p className="mt-1 text-xs text-slate-500">Để trống nếu không cần tự động tìm lại IP khi mạng thay đổi.</p>
               </div>
 
               <div>

@@ -64,6 +64,10 @@ def init_db():
             cursor.execute(
                 "ALTER TABLE stations ADD COLUMN camera_brand TEXT DEFAULT 'imou';"
             )
+        if "mac_address" not in st_cols:
+            cursor.execute(
+                "ALTER TABLE stations ADD COLUMN mac_address TEXT DEFAULT '';"
+            )
 
         # Migrate old settings to station 1 if stations table is empty
         cursor.execute("SELECT COUNT(*) FROM stations")
@@ -214,7 +218,7 @@ def get_stations():
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand FROM stations ORDER BY id ASC"
+            "SELECT id, name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand, mac_address FROM stations ORDER BY id ASC"
         )
         rows = cursor.fetchall()
         return [
@@ -226,6 +230,7 @@ def get_stations():
                 "safety_code": r[4],
                 "camera_mode": r[5],
                 "camera_brand": r[6],
+                "mac_address": r[7] if len(r) > 7 else "",
             }
             for r in rows
         ]
@@ -235,7 +240,7 @@ def get_station(station_id):
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand FROM stations WHERE id = ?",
+            "SELECT id, name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand, mac_address FROM stations WHERE id = ?",
             (station_id,),
         )
         row = cursor.fetchone()
@@ -248,6 +253,7 @@ def get_station(station_id):
                 "safety_code": row[4],
                 "camera_mode": row[5],
                 "camera_brand": row[6],
+                "mac_address": row[7] if len(row) > 7 else "",
             }
         return None
 
@@ -258,7 +264,7 @@ def update_station(station_id, data):
         cursor.execute(
             """
             UPDATE stations
-            SET name=?, ip_camera_1=?, ip_camera_2=?, safety_code=?, camera_mode=?, camera_brand=?
+            SET name=?, ip_camera_1=?, ip_camera_2=?, safety_code=?, camera_mode=?, camera_brand=?, mac_address=?
             WHERE id=?
         """,
             (
@@ -268,8 +274,19 @@ def update_station(station_id, data):
                 data["safety_code"],
                 data["camera_mode"],
                 data.get("camera_brand", "imou"),
+                data.get("mac_address", ""),
                 station_id,
             ),
+        )
+        conn.commit()
+
+
+def update_station_ip(station_id, field, new_ip):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"UPDATE stations SET {field} = ? WHERE id = ?",
+            (new_ip, station_id),
         )
         conn.commit()
 
@@ -279,8 +296,8 @@ def add_station(data):
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO stations (name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO stations (name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand, mac_address)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 data["name"],
@@ -289,6 +306,7 @@ def add_station(data):
                 data["safety_code"],
                 data["camera_mode"],
                 data.get("camera_brand", "imou"),
+                data.get("mac_address", ""),
             ),
         )
         conn.commit()
