@@ -1,65 +1,51 @@
-# 📦 V-Pack Monitor (CamDongHang) - v1.3.0
+# 📦 V-Pack Monitor (CamDongHang) - v1.3.2
 
 Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa cho nền tảng thương mại điện tử (Shopee, TikTok, Lazada). Giải pháp cung cấp hệ thống quản lý Camera trạm đóng gói, ghi hình chính xác theo kiện hàng và cung cấp bằng chứng "Thép" giúp xử lý khiếu nại trong 1 nốt nhạc.
 
 ![V-Pack Monitor Architecture](/placeholder.png "Mô phỏng Hệ thống")
 
-## 🌟 Chức năng nổi bật (v1.3.0 Premium)
+## 🌟 Chức năng nổi bật (v1.3.2)
 - 📹 **Record Đa Trạm (Multi-Station):** Hỗ trợ nhiều trạm đóng hàng, cấu hình riêng biệt cho từng bàn đóng với mã PIN/Safety Code. Hỗ trợ nhiều hãng Camera như Imou, Dahua, Tenda, Tapo, Ezviz, v.v.
-- 🎯 **Quét Mã Vạch (Smart Barcode):** Tự động bám theo vận đơn. Cục diện Camera chỉ Record khi bắt đầu gói mã kiện hàng, và tự kết thúc Video khi quét mã EXIT hoặc kiện tiếp theo.
-- ☁️ **Đồng Bộ Hoá Điện Toán Đám Mây (Cloud Sync):** Backup dữ liệu hàng ngày lên ổ đĩa Google Drive hoặc kho lưu trữ S3 (MinIO, AWS) nhằm tránh mọi mất mát rủi ro phần cứng ở kho.
-- 🤖 **Telegram Bot 2 Chiều:**
-  - *Báo Cáo Tức Thì:* Gửi cảnh báo về điện thoại ngay khi lưu trữ Cloud bị lỗi, hay ổ cứng SSD trong kho có nguy cơ sập báo đầy.
-  - *Chatbot Tra Cứu:* Gõ lệnh `/baocao` hoặc `/kiemtra` trên Telegram, Bot sẽ tự động trích xuất sản lượng gói hàng trong ngày kèm dung lượng ổ cứng rảnh.
-- 🎬 **Video Player Pro:** Khung xem Video hỗ trợ tua 0.5x, 1x, 1.5x, 2x nhanh chóng. Đặc biệt công cụ "Snapshot" bắt trọn vẹn khung hình rõ nét tải ngay tức khắc, giảm tải áp lực cho Call Center.
+- 🔄 **Tự Động Tìm Lại Camera (Auto-Discovery):** Khi camera đổi IP do DHCP, hệ thống tự quét LAN theo MAC Address, cập nhật IP mới và reconnect.
+- 🎯 **Quét Mã Vạch (Smart Barcode):** Tự động bám theo vận đơn. Camera chỉ Record khi bắt đầu gói mã kiện hàng, tự kết thúc Video khi quét mã EXIT hoặc kiện tiếp theo.
+- ☁️ **Đồng Bộ Hoá Đám Mây (Cloud Sync):** Backup dữ liệu hàng ngày lên Google Drive hoặc S3 (MinIO, AWS).
+- 🤖 **Telegram Bot 2 Chiều:** Cảnh báo tức thì + Chatbot tra cứu (`/baocao`, `/kiemtra`).
+- 🎬 **Video Player Pro:** Tua 0.5x-2x, Snapshot chụp khung hình JPG.
 
-## 🚀 Hướng Dẫn Cài Đặt (Dành cho Developer)
+## 🚀 Cài Đặt Nhanh
 
-**Yêu cầu hệ thống:** Python 3.9+ & Node.js 18+
-
-#### 1. Khởi động Giao diện (Frontend)
+### macOS
 ```bash
-cd web-ui
-npm install
-npm run dev
+chmod +x install_macos.sh
+./install_macos.sh
+./start.sh
 ```
 
-#### 2. Khởi động Máy chủ lõi (Backend)
+### Windows
+1. Click đúp `install_windows.bat` (chạy bằng Administrator)
+2. Click đúp biểu tượng **V-Pack Monitor** trên Desktop
+
+### Docker
 ```bash
-# Cài đặt môi trường ảo
+docker-compose up -d
+```
+
+## 🛠 Cài Đặt Thủ Công (Developer)
+
+**Yêu cầu:** Python 3.10+ & Node.js 18+
+
+```bash
+# Backend
 python3 -m venv venv
-source venv/bin/activate  # Hoặc venv\Scripts\activate.bat với Windows
-
+source venv/bin/activate        # macOS/Linux
 pip install -r requirements.txt
-python api.py
+
+# Frontend
+cd web-ui && npm install && npm run build && cd ..
+
+# Khởi động
+python -m uvicorn api:app --host 0.0.0.0 --port 8001
 ```
-> Trạm điều khiển API sẽ khởi chạy ở cổng `:8001`.
-
-> [!TIP]
-> **Dành riêng cho người dùng Windows:** Thư mục mã nguồn đã có sẵn các file tự động hoá. Bạn không cần gõ lệnh thủ công mà chỉ cần:
-> 1. Click đúp vào `install_windows.bat` ở lần đầu tiên để vòng lặp tự tải thư viện.
-> 2. Click đúp vào `start_windows.bat` cho các lần sử dụng hàng ngày để máy tự động mở Server Backend và Giao diện Web cùng lúc.
-
-## 📦 Biên dịch Ứng dụng Thành Phẩm (Production Executable)
-Nếu bạn muốn tạo file cài đặt cho máy tính Khách hàng (End-user) mà không cần cài Python/Node, vui lòng dùng công cụ `build.py`:
-```bash
-python build.py
-```
-*(Yêu cầu đã cài PyInstaller)*
-
-Kết quả sẽ sinh ra tệp `V-Pack-Monitor.exe` (Trên Windows) hoặc `V-Pack-Monitor` (Trên MacOS) chứa toàn khối Logic C++ và giao diện React bọc kin đáo. Để tạo bộ cài đặt chuyên sâu trên Windows, vui lòng nạp file `inno_setup.iss` vào phần mềm **Inno Setup**.
-
-## 👥 Cấu hình Lần Đầu (Onboarding)
-- **Truy cập web UI**: http://localhost:5173 (Môi trường Dev) hoặc mở giao diện app Exe (Môi trường Pro).
-- **Mã PIN quản trị viên:** `08012011`
-- **Kết nối Bot Telegram:** Vào mục cấu hình, nhập `Bot Token` và `Chat ID`. Mọi thông tin sẽ được mã hoá bảo mật.
-
-## 🛠 Troubleshooting (Các Lỗi Thường Gặp)
-**Q: Trình duyệt không load được API Camera RTSP?**
-A: Phải cấp luồng truy cập UDP (Port 554) ở Modem Wifi mạng nội bộ. Đồng thời kiểm tra *Safety Code* (mã an toàn ở vỏ đáy Camera) đã nhập đúng trên Web chưa.
-
-**Q: Cài đặt Cloud Google Drive đòi JSON, lấy ở đâu?**
-A: Đăng ký Google Cloud Console -> Tạo Service Account -> Export định dạng JSON.
 
 ## 📜 Giấy phép
 Copyright (c) 2024-2026 **VDT - Vũ Đức Thắng**. All rights reserved.

@@ -1,5 +1,5 @@
-# Sử dụng Python 3.10 mỏng nhẹ
-FROM python:3.10-slim
+# Sử dụng Python 3.14
+FROM python:3.14-slim
 
 LABEL maintainer="VDT - Vu Duc Thang <thangvd2>"
 LABEL org.opencontainers.image.title="V-Pack Monitor"

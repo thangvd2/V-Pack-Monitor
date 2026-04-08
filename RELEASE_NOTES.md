@@ -2,7 +2,16 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
-## [v1.3.2] - 2026-04-08 (Windows Fix)
+## [v1.3.2] - 2026-04-08 (macOS + Windows Fix)
+
+### 🚀 Tính Năng Mới
+- **macOS 1-click installer**: Double-click `Install V-Pack Monitor.command` → tự động cài tất cả. Double-click `Start V-Pack Monitor.command` → khởi động server + mở trình duyệt.
+- **`install_macos.sh`**: Script cài đặt tự động qua Terminal — check Python 3.10+, Node.js, tạo venv, pip install, build frontend.
+
+### ✨ Cải Tiến
+- **Dockerfile**: Python 3.10 → 3.14 (tương thích `str | None` syntax).
+- **README.md**: Version v1.3.2, thêm hướng dẫn macOS + Docker, fix lệnh `python api.py` → `uvicorn`.
+- **README_SETUP.md**: Version v1.3.2, thêm hướng dẫn macOS + Docker + MAC Address.
 
 ### 🐛 Sửa Lỗi
 - **Windows install_windows.bat**: Cửa sổ chớp tắt khi `python` không trong PATH — thêm fallback sang `py` launcher, error handling + `pause` ở mọi nhánh lỗi.
