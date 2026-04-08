@@ -1,6 +1,11 @@
 # Sử dụng Python 3.10 mỏng nhẹ
 FROM python:3.10-slim
 
+LABEL maintainer="VDT - Vu Duc Thang <thangvd2>"
+LABEL org.opencontainers.image.title="V-Pack Monitor"
+LABEL org.opencontainers.image.authors="VDT - Vu Duc Thang"
+LABEL org.opencontainers.image.source="https://github.com/thangvd2/V-Pack-Monitor"
+
 # Thiết lập thư mục làm việc
 WORKDIR /app
 

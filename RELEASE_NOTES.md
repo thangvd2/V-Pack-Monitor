@@ -1,5 +1,7 @@
 # Lịch Sử Cập Nhật & Phát Hành (Release Notes)
 
+> **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
+
 ## [v1.3.0] - 2026-04-08 (Premium Release)
 
 Gói nâng cấp "Premium Features" tập trung nâng cao khả năng quản trị, phòng ngừa rủi ro và tăng cường tốc độ xử lý khiếu nại cho nhân viên đóng hàng.

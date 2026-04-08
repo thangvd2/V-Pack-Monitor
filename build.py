@@ -1,3 +1,9 @@
+# =============================================================================
+# V-Pack Monitor - CamDongHang v1.3.0
+# Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
+# All rights reserved. Unauthorized copying or distribution is prohibited.
+# =============================================================================
+
 import os
 import sys
 import subprocess
@@ -24,18 +30,28 @@ except ImportError:
 print("\n[3/3] Running PyInstaller...")
 separator = ";" if os.name == "nt" else ":"
 command = [
-    sys.executable, "-m", "PyInstaller",
-    "--name", "V-Pack-Monitor",
-    "--add-data", f"web-ui/dist{separator}web-ui/dist",
-    "--hidden-import", "telebot",
-    "--hidden-import", "uvicorn",
-    "--hidden-import", "fastapi",
-    "--hidden-import", "urllib3",
-    "--hidden-import", "boto3",
-    "--hidden-import", "google",
+    sys.executable,
+    "-m",
+    "PyInstaller",
+    "--name",
+    "V-Pack-Monitor",
+    "--add-data",
+    f"web-ui/dist{separator}web-ui/dist",
+    "--hidden-import",
+    "telebot",
+    "--hidden-import",
+    "uvicorn",
+    "--hidden-import",
+    "fastapi",
+    "--hidden-import",
+    "urllib3",
+    "--hidden-import",
+    "boto3",
+    "--hidden-import",
+    "google",
     "--noconsole",
     "--onefile",
-    "api.py"
+    "api.py",
 ]
 
 subprocess.run(command, check=True)

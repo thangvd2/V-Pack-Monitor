@@ -1,3 +1,9 @@
+# =============================================================================
+# V-Pack Monitor - CamDongHang v1.3.0
+# Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
+# All rights reserved. Unauthorized copying or distribution is prohibited.
+# =============================================================================
+
 import os
 import zipfile
 import datetime
@@ -16,7 +22,7 @@ import boto3
 from botocore.exceptions import NoCredentialsError
 
 # Scope cho Google Drive
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
+SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 
 def get_unsynced_records():
@@ -24,8 +30,7 @@ def get_unsynced_records():
         cursor = conn.cursor()
         # Lấy file chua sync từ ngày hqua trở về trước (tuỳ ý, hoặc lấy hết).
         # Tạm thời lấy hết.
-        cursor.execute(
-            "SELECT id, video_paths FROM packing_video WHERE is_synced = 0")
+        cursor.execute("SELECT id, video_paths FROM packing_video WHERE is_synced = 0")
         return cursor.fetchall()
 
 
@@ -34,10 +39,11 @@ def mark_as_synced(record_ids):
         return
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
-        placeholders = ','.join('?' for _ in record_ids)
+        placeholders = ",".join("?" for _ in record_ids)
         cursor.execute(
             f"UPDATE packing_video SET is_synced = 1 WHERE id IN ({placeholders})",
-            record_ids)
+            record_ids,
+        )
         conn.commit()
 
 
@@ -53,10 +59,10 @@ def create_backup_zip():
     synced_ids = []
 
     # Compress
-    with zipfile.ZipFile(zip_filepath, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    with zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zipf:
         for r_id, video_paths in records:
             added_any = False
-            for path in video_paths.split(','):
+            for path in video_paths.split(","):
                 path = path.strip()
                 if os.path.exists(path):
                     zipf.write(path, arcname=os.path.basename(path))
@@ -73,23 +79,19 @@ def create_backup_zip():
 
 
 def upload_to_gdrive(file_path, folder_id=None):
-    creds_path = 'credentials.json'
+    creds_path = "credentials.json"
     if not os.path.exists(creds_path):
-        raise FileNotFoundError(
-            "Chưa cấu hình File credentials.json cho Google Drive!")
+        raise FileNotFoundError("Chưa cấu hình File credentials.json cho Google Drive!")
 
     creds = Credentials.from_service_account_file(creds_path, scopes=SCOPES)
-    service = build('drive', 'v3', credentials=creds)
+    service = build("drive", "v3", credentials=creds)
 
-    file_metadata = {'name': os.path.basename(file_path)}
+    file_metadata = {"name": os.path.basename(file_path)}
     if folder_id:
-        file_metadata['parents'] = [folder_id]
+        file_metadata["parents"] = [folder_id]
 
-    media = MediaFileUpload(
-        file_path,
-        mimetype='application/zip',
-        resumable=True)
-    request = service.files().create(body=file_metadata, media_body=media, fields='id')
+    media = MediaFileUpload(file_path, mimetype="application/zip", resumable=True)
+    request = service.files().create(body=file_metadata, media_body=media, fields="id")
 
     response = None
     while response is None:
@@ -104,10 +106,10 @@ def upload_to_gdrive(file_path, folder_id=None):
 
 def upload_to_s3(file_path, endpoint, access_key, secret_key, bucket_name):
     s3_client = boto3.client(
-        's3',
+        "s3",
         endpoint_url=endpoint,
         aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key
+        aws_secret_access_key=secret_key,
     )
     file_name = os.path.basename(file_path)
     try:
@@ -121,12 +123,13 @@ def upload_to_s3(file_path, endpoint, access_key, secret_key, bucket_name):
 
 
 def process_cloud_sync():
-    """ Được gọi thông qua API Thủ công """
-    provider = get_setting('CLOUD_PROVIDER', 'NONE')
+    """Được gọi thông qua API Thủ công"""
+    provider = get_setting("CLOUD_PROVIDER", "NONE")
 
-    if provider == 'NONE':
+    if provider == "NONE":
         raise Exception(
-            "Bạn chưa cấu hình Lát Cắt Đám Mây (Google Drive / S3) trong mục Cài Đặt!")
+            "Bạn chưa cấu hình Lát Cắt Đám Mây (Google Drive / S3) trong mục Cài Đặt!"
+        )
 
     zip_path, synced_ids = create_backup_zip()
 
@@ -134,14 +137,14 @@ def process_cloud_sync():
         return "Không có video mới nào cần Đồng Bộ!"
 
     try:
-        if provider == 'GDRIVE':
-            folder_id = get_setting('GDRIVE_FOLDER_ID')
+        if provider == "GDRIVE":
+            folder_id = get_setting("GDRIVE_FOLDER_ID")
             upload_to_gdrive(zip_path, folder_id)
-        elif provider == 'S3':
-            endpoint = get_setting('S3_ENDPOINT')
-            access = get_setting('S3_ACCESS_KEY')
-            secret = get_setting('S3_SECRET_KEY')
-            bucket = get_setting('S3_BUCKET_NAME')
+        elif provider == "S3":
+            endpoint = get_setting("S3_ENDPOINT")
+            access = get_setting("S3_ACCESS_KEY")
+            secret = get_setting("S3_SECRET_KEY")
+            bucket = get_setting("S3_BUCKET_NAME")
             if not all([endpoint, access, secret, bucket]):
                 raise Exception("Thiếu thông tin S3!")
             upload_to_s3(zip_path, endpoint, access, secret, bucket)
@@ -153,9 +156,12 @@ def process_cloud_sync():
         if os.path.exists(zip_path):
             os.remove(zip_path)
 
-        success_msg = f"Đã sao lưu {len(synced_ids)} video đơn hàng lên {provider} thành công!"
+        success_msg = (
+            f"Đã sao lưu {len(synced_ids)} video đơn hàng lên {provider} thành công!"
+        )
         telegram_bot.send_telegram_message(
-            f"✅ <b>Cloud Sync Hoàn Tất</b>\n{success_msg}")
+            f"✅ <b>Cloud Sync Hoàn Tất</b>\n{success_msg}"
+        )
         return success_msg
     except Exception as e:
         # Nếu thất bại, xóa zip và văng lỗi ra UI
@@ -163,5 +169,6 @@ def process_cloud_sync():
             os.remove(zip_path)
         err_msg = str(e)
         telegram_bot.send_telegram_message(
-            f"❌ <b>Cloud Sync Thất Bại</b>\nLỗi: {err_msg}")
+            f"❌ <b>Cloud Sync Thất Bại</b>\nLỗi: {err_msg}"
+        )
         raise e

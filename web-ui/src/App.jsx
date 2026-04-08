@@ -1,3 +1,9 @@
+/**
+ * V-Pack Monitor - CamDongHang v1.3.0
+ * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
+ * All rights reserved. Unauthorized copying or distribution is prohibited.
+ */
+
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Trash2, HardDrive, Plus, Monitor, ShieldCheck, BarChart3, CloudUpload } from 'lucide-react';

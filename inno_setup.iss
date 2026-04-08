@@ -1,6 +1,9 @@
 [Setup]
 AppName=V-Pack Monitor
 AppVersion=1.3.0
+AppPublisher=VDT - Vu Duc Thang
+AppPublisherURL=https://github.com/thangvd2
+AppSupportURL=https://github.com/thangvd2/V-Pack-Monitor
 DefaultDirName={sd}\V-Pack Monitor
 DefaultGroupName=V-Pack Monitor
 OutputDir=.\installer

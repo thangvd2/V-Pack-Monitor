@@ -1,3 +1,9 @@
+# =============================================================================
+# V-Pack Monitor - CamDongHang v1.3.0
+# Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
+# All rights reserved. Unauthorized copying or distribution is prohibited.
+# =============================================================================
+
 import os
 import sys
 import cv2
@@ -37,8 +43,7 @@ class CameraStreamManager:
     def start(self):
         if not self.is_running and self.url:
             self.is_running = True
-            self.thread = threading.Thread(
-                target=self._update_frame, daemon=True)
+            self.thread = threading.Thread(target=self._update_frame, daemon=True)
             self.thread.start()
 
     def stop(self):
@@ -62,7 +67,8 @@ class CameraStreamManager:
 
             frame = cv2.resize(frame, (854, 480))
             ret, buffer = cv2.imencode(
-                '.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
+                ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50]
+            )
             with self.lock:
                 self.latest_frame = buffer.tobytes()
 
@@ -80,14 +86,14 @@ class CameraStreamManager:
             return self.latest_frame
 
 
-def get_rtsp_url(ip, safety_code, channel=1, brand='imou'):
+def get_rtsp_url(ip, safety_code, channel=1, brand="imou"):
     if not ip or not safety_code:
         return ""
-    if brand == 'tenda':
+    if brand == "tenda":
         return f"rtsp://admin:{safety_code}@{ip}:554/ch={channel}&subtype=0"
-    elif brand == 'ezviz':
+    elif brand == "ezviz":
         return f"rtsp://admin:{safety_code}@{ip}:554/ch{channel}/main"
-    elif brand == 'tapo':
+    elif brand == "tapo":
         # Tapo doesn't use standard channel params, stream1 is Main, stream2 is
         # Sub.
         stream_id = 1 if channel == 1 else 2
@@ -100,25 +106,32 @@ def get_rtsp_url(ip, safety_code, channel=1, brand='imou'):
 import telebot
 import telegram_bot
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
     stations = database.get_stations()
     for st in stations:
-        url = get_rtsp_url(st['ip_camera_1'], st['safety_code'], channel=1, brand=st.get('camera_brand', 'imou'))
+        url = get_rtsp_url(
+            st["ip_camera_1"],
+            st["safety_code"],
+            channel=1,
+            brand=st.get("camera_brand", "imou"),
+        )
         manager = CameraStreamManager(url)
-        stream_managers[st['id']] = manager
+        stream_managers[st["id"]] = manager
         manager.start()
-        
+
     # Kích hoạt Telegram Bot 2 chiều (Lắng nghe)
     telegram_bot.start_polling()
-        
+
     yield
     for manager in stream_managers.values():
         manager.stop()
     for recorder in active_recorders.values():
         recorder.stop_recording()
     telegram_bot.stop_polling()
+
 
 app = FastAPI(title="CamDongHang API Multi-Station", lifespan=lifespan)
 
@@ -132,15 +145,11 @@ app.add_middleware(
 
 if not os.path.exists("recordings"):
     os.makedirs("recordings")
-app.mount(
-    "/recordings",
-    StaticFiles(
-        directory="recordings"),
-    name="recordings")
+app.mount("/recordings", StaticFiles(directory="recordings"), name="recordings")
 
 # Tự động dọn dẹp các video cũ
 try:
-    keep_days = int(database.get_setting('RECORD_KEEP_DAYS', 7))
+    keep_days = int(database.get_setting("RECORD_KEEP_DAYS", 7))
     database.cleanup_old_records(keep_days)
 except BaseException:
     pass
@@ -155,8 +164,9 @@ def get_disk_health():
         "total": total,
         "used": used,
         "free": free,
-        "percentage": round(used / total * 100, 2)
+        "percentage": round(used / total * 100, 2),
     }
+
 
 # --- SYSTEM SETTINGS API ---
 
@@ -181,14 +191,16 @@ def get_settings():
 @app.post("/api/settings")
 def update_settings(payload: SettingsUpdate):
     database.set_settings(payload.dict())
-    
+
     # Restart Telegram Bot polling if tokens change
     if payload.TELEGRAM_BOT_TOKEN and payload.TELEGRAM_CHAT_ID:
         # Import dynamic if not already
         import telegram_bot
+
         telegram_bot.start_polling()
-        
+
     return {"status": "success", "message": "Đã lưu cài đặt hệ thống."}
+
 
 # --- CLOUD BACKUP API ---
 
@@ -209,6 +221,7 @@ def trigger_cloud_sync():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+
 # --- SECURITY PIN API ---
 
 
@@ -223,6 +236,7 @@ def verify_pin(payload: PinPayload):
     if payload.pin == correct_pin:
         return {"status": "success"}
     return {"status": "error", "message": "Sai mã PIN quản trị viên."}
+
 
 # --- STATIONS CRUD API ---
 
@@ -245,10 +259,8 @@ def get_stations_api():
 def create_station(payload: StationPayload):
     new_id = database.add_station(payload.dict())
     url = get_rtsp_url(
-        payload.ip_camera_1,
-        payload.safety_code,
-        channel=1,
-        brand=payload.camera_brand)
+        payload.ip_camera_1, payload.safety_code, channel=1, brand=payload.camera_brand
+    )
     sm = CameraStreamManager(url)
     stream_managers[new_id] = sm
     sm.start()
@@ -263,7 +275,8 @@ def update_station(station_id: int, payload: StationPayload):
             payload.ip_camera_1,
             payload.safety_code,
             channel=1,
-            brand=payload.camera_brand)
+            brand=payload.camera_brand,
+        )
         stream_managers[station_id].update_url(url)
     return {"status": "success"}
 
@@ -279,6 +292,7 @@ def delete_station(station_id: int):
         del active_recorders[station_id]
         del active_waybills[station_id]
     return {"status": "success"}
+
 
 # --- SCAN API ---
 
@@ -303,27 +317,23 @@ def handle_scan(payload: ScanPayload):
     current_recorder = active_recorders.get(sid)
     current_waybill = active_waybills.get(sid)
 
-    if barcode == 'EXIT':
+    if barcode == "EXIT":
         if current_recorder:
             current_recorder.stop_recording()
             active_recorders.pop(sid, None)
             active_waybills.pop(sid, None)
         return {"status": "exit", "message": "Đã ngắt ghi hình."}
 
-    if barcode == 'STOP':
+    if barcode == "STOP":
         if current_recorder:
             saved_files = current_recorder.stop_recording()
             if saved_files:
                 database.save_record(
-                    sid,
-                    current_waybill,
-                    saved_files,
-                    current_recorder.record_mode)
+                    sid, current_waybill, saved_files, current_recorder.record_mode
+                )
             active_recorders.pop(sid, None)
             active_waybills.pop(sid, None)
-            return {
-                "status": "stopped",
-                "message": f"Đã lưu đơn hàng thành công!"}
+            return {"status": "stopped", "message": f"Đã lưu đơn hàng thành công!"}
         return {"status": "idle", "message": "Trạm đang nhàn rỗi."}
 
     # Chốt đơn cũ nếu có
@@ -331,28 +341,27 @@ def handle_scan(payload: ScanPayload):
         saved_files = current_recorder.stop_recording()
         if saved_files:
             database.save_record(
-                sid,
-                current_waybill,
-                saved_files,
-                current_recorder.record_mode)
+                sid, current_waybill, saved_files, current_recorder.record_mode
+            )
 
     active_waybills[sid] = barcode
 
-    ip1 = station['ip_camera_1']
-    ip2 = station['ip_camera_2']
-    code = station['safety_code']
-    c_mode = station['camera_mode']
-    brand = station.get('camera_brand', 'imou')
+    ip1 = station["ip_camera_1"]
+    ip2 = station["ip_camera_2"]
+    code = station["safety_code"]
+    c_mode = station["camera_mode"]
+    brand = station.get("camera_brand", "imou")
 
     if not ip1 or not code:
         return {
             "status": "error",
-            "message": "Trạm chưa cấu hình IP Camera và Safety Code."}
+            "message": "Trạm chưa cấu hình IP Camera và Safety Code.",
+        }
 
     url1 = get_rtsp_url(ip1, code, channel=1, brand=brand)
-    if c_mode in ['dual_file', 'pip']:
+    if c_mode in ["dual_file", "pip"]:
         url2 = get_rtsp_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
-    elif c_mode in ['dual_file_sim', 'pip_sim']:
+    elif c_mode in ["dual_file_sim", "pip_sim"]:
         url2 = get_rtsp_url(ip1, code, channel=1, brand=brand)
     else:
         url2 = url1
@@ -370,15 +379,17 @@ def handle_scan(payload: ScanPayload):
 
     return {
         "status": "recording",
-        "message": f"Bắt đầu ghi hình đơn {barcode} tại Trạm {sid}..."}
+        "message": f"Bắt đầu ghi hình đơn {barcode} tại Trạm {sid}...",
+    }
 
 
 @app.get("/api/status")
 def get_status(station_id: int):
     return {
         "status": "recording" if station_id in active_recorders else "idle",
-        "waybill": active_waybills.get(station_id, "")
+        "waybill": active_waybills.get(station_id, ""),
     }
+
 
 # --- RECORDS & STORAGE API ---
 
@@ -389,12 +400,16 @@ def get_records(station_id: int = None, search: str = ""):
     results = []
     for r in records:
         r_id, waybill_code, video_paths, record_mode, recorded_at, s_name = r
-        results.append({"id": r_id,
-                        "waybill_code": waybill_code,
-                        "video_paths": video_paths.split(','),
-                        "record_mode": record_mode,
-                        "recorded_at": recorded_at,
-                        "station_name": s_name})
+        results.append(
+            {
+                "id": r_id,
+                "waybill_code": waybill_code,
+                "video_paths": video_paths.split(","),
+                "record_mode": record_mode,
+                "recorded_at": recorded_at,
+                "station_name": s_name,
+            }
+        )
     return {"data": results}
 
 
@@ -410,12 +425,12 @@ def delete_record(record_id: int):
 @app.get("/api/storage/info")
 def get_storage_info():
     total_size = 0
-    dir_path = 'recordings'
+    dir_path = "recordings"
     file_count = 0
     if os.path.exists(dir_path):
         for f in os.listdir(dir_path):
             fp = os.path.join(dir_path, f)
-            if os.path.isfile(fp) and f.endswith('.mp4'):
+            if os.path.isfile(fp) and f.endswith(".mp4"):
                 total_size += os.path.getsize(fp)
                 file_count += 1
     size_mb = total_size / (1024 * 1024)
@@ -424,7 +439,10 @@ def get_storage_info():
         "data": {
             "size_str": size_str,
             "size_bytes": total_size,
-            "file_count": file_count}}
+            "file_count": file_count,
+        }
+    }
+
 
 # --- ANALYTICS DASHBOARD API ---
 
@@ -436,35 +454,32 @@ def get_analytics_today(station_id: int):
 
         # Đếm tổng đơn toàn hệ thống kho hôm nay (SQLite local time)
         cursor.execute(
-            "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at) = date('now', 'localtime')")
+            "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at) = date('now', 'localtime')"
+        )
         total_today = cursor.fetchone()[0]
 
         # Đếm số đơn riêng của trạm đang chọn
         cursor.execute(
             "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at) = date('now', 'localtime') AND station_id = ?",
-            (station_id,
-             ))
+            (station_id,),
+        )
         station_today = cursor.fetchone()[0]
 
-        return {
-            "data": {
-                "total_today": total_today,
-                "station_today": station_today
-            }
-        }
+        return {"data": {"total_today": total_today, "station_today": station_today}}
 
 
 def generate_frames(station_id: int):
     manager = stream_managers.get(station_id)
     if not manager:
-        yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n\r\n'
+        yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n\r\n"
         return
 
     while True:
         frame_bytes = manager.get_latest_frame()
         if frame_bytes is not None:
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            yield (
+                b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
+            )
         time.sleep(0.05)
 
 
@@ -472,12 +487,13 @@ def generate_frames(station_id: int):
 def live_preview(station_id: int):
     return StreamingResponse(
         generate_frames(station_id),
-        media_type="multipart/x-mixed-replace; boundary=frame")
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
 
 
 # --- SERVE FRONTEND (PRODUCTION BUILD) ---
 dist_dir = os.path.join(os.getcwd(), "web-ui", "dist")
-if getattr(sys, 'frozen', False):
+if getattr(sys, "frozen", False):
     dist_dir = os.path.join(sys._MEIPASS, "web-ui", "dist")
 
 if os.path.exists(dist_dir):
@@ -485,5 +501,6 @@ if os.path.exists(dist_dir):
 
 if __name__ == "__main__":
     import uvicorn
+
     # V-Pack Monitor Production Entry Point
     uvicorn.run(app, host="0.0.0.0", port=8001)
