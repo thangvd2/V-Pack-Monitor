@@ -2,6 +2,33 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v1.4.0] - 2026-04-09 (WebRTC + Recording Overhaul)
+
+### 🚀 Tính Năng Lớn
+- **WebRTC Live View qua MediaMTX:** Thay thế toàn bộ MJPEG/OpenCV pipeline bằng MediaMTX + WebRTC. Live view giờ dùng sub-stream H.264 (640x352) remux trực tiếp qua MediaMTX → browser decode bằng hardware. Độ trễ gần như thời gian thực (~200ms), CPU server gần như 0.
+- **MPEG-TS Safe Recording:** Ghi hình dưới dạng MPEG-TS (streamable, không corrupt khi mất điện/sập process). Khi dừng ghi, tự động convert sang MP4 với `-movflags +faststart`.
+- **GPU Hardware Transcode:** Auto-detect GPU encoder (Intel QSV, NVIDIA NVENC, AMD AMF, Apple VideoToolbox) để transcode HEVC→H.264 khi lưu video. Fallback `libx264 ultrafast` nếu không có GPU.
+- **Async Video Saving:** Quá trình lưu video chạy trên thread riêng, không block barcode scanning. Frontend hiển thị trạng thái "Đang lưu video..." và tự refresh khi xong.
+- **Double-stop Protection:** `_stop_lock` + `_stopping_recorders` dict ngăn race condition khi nhiều scan request trigger concurrent `stop_recording()`.
+
+### ✨ Cải Tiến
+- **Video Player Pro rewrite:** Progress bar với seek, time display, volume, playback speed (0.5x-2x), keyboard shortcuts (Space, arrows, Esc), auto-hide controls, snapshot, download.
+- **Frontend status badges:** Green (idle), red pulse (recording), amber pulse (saving).
+- **`install_windows.bat` rewrite:** Auto-install Python 3.13.3 + Node.js v22 LTS + FFmpeg + MediaMTX, tạo firewall rule, desktop shortcut. Dùng `goto` labels thay vì nested `if/else`.
+- **`start_windows.bat` rewrite:** Khởi động MediaMTX + Python server, mở Chrome Kiosk mode. Kill chính xác process (port-based), không kill tất cả python.exe.
+- **`start.sh` update (macOS):** Khởi động MediaMTX + FFmpeg PATH + proper cleanup.
+- **`.gitignore` update:** Thêm `bin/`, `hls/`, `install_log.txt`.
+
+### 🗑 Xóa Bỏ
+- Loại bỏ dependency OpenCV (`cv2`) khỏi backend — live view không còn dùng OpenCV.
+- Loại bỏ MJPEG multipart streaming pipeline.
+- Loại bỏ FLV.js, HLS.js (đã thử và không phù hợp bằng WebRTC).
+
+### 📋 Yêu cầu mới
+- **MediaMTX** (`bin/mediamtx/mediamtx.exe`): Media server proxy RTSP→WebRTC. Tự động download bởi `install_windows.bat`.
+
+---
+
 ## [v1.3.2] - 2026-04-08 (macOS + Windows Fix)
 
 ### 🚀 Tính Năng Mới

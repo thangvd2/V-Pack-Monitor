@@ -15,6 +15,8 @@ const API_BASE = window.location.hostname === 'localhost' && ['3000', '3001', '5
   ? 'http://localhost:8001' 
   : window.location.origin;
 
+const MTX_HOST = window.location.hostname;
+
 function App() {
   const [stations, setStations] = useState([]);
   const [activeStationId, setActiveStationId] = useState(1);
@@ -39,6 +41,21 @@ function App() {
   // Custom Video Player State
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState({ url: '', waybillCode: '' });
+
+  useEffect(() => {
+    if (recordingStatus !== 'saving') return;
+    const iv = setInterval(async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/api/status?station_id=${activeStationId}`);
+        if (res.data.status === 'idle') {
+          setRecordingStatus('idle');
+          setCurrentWaybill('');
+          fetchRecords(searchTerm, activeStationId);
+        }
+      } catch {}
+    }, 2000);
+    return () => clearInterval(iv);
+  }, [recordingStatus, activeStationId]);
 
   // Init fetch
   useEffect(() => {
@@ -180,12 +197,19 @@ function App() {
         station_id: activeStationId
       });
       if (res.data.status === 'recording') {
-        setRecordingStatus('recording');
-        setCurrentWaybill(finalBarcode);
+        if (recordingStatus === 'recording') {
+          alert(res.data.message);
+        } else {
+          setRecordingStatus('recording');
+          setCurrentWaybill(finalBarcode);
+        }
       } else if (res.data.status === 'stopped' || res.data.status === 'exit') {
         setRecordingStatus('idle');
         setCurrentWaybill('');
         fetchRecords(searchTerm, activeStationId); 
+      } else if (res.data.status === 'busy') {
+        setRecordingStatus('saving');
+        alert(res.data.message);
       }
     } catch (err) {
       console.error("Barcode Lỗi", err);
@@ -336,6 +360,13 @@ function App() {
         />
       )}
       
+      <VideoPlayerModal
+        isOpen={videoModalOpen}
+        videoUrl={selectedVideo.url}
+        waybillCode={selectedVideo.waybillCode}
+        onClose={() => setVideoModalOpen(false)}
+      />
+      
       {/* Header */}
       <header className="flex flex-col mb-8">
         <div className="flex flex-col md:flex-row items-center justify-between pb-6 border-b border-white/10">
@@ -479,12 +510,13 @@ function App() {
                     ✅ Đã tìm thấy IP mới: {reconnectInfo.new_ip}
                   </div>
                 )}
-                {/* API MJPEG LIVE STREAM */}
-                <img 
-                  key={`camera-stream-${activeStationId}`}
-                  src={`${API_BASE}/api/live?station_id=${activeStationId}`} 
-                  alt="Không kết nối được Camera" 
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                <iframe
+                  key={`live-${activeStationId}`}
+                  src={`http://${MTX_HOST}:8889/station_${activeStationId}?controls=false&muted=true&autoplay=true`}
+                  scrolling="no"
+                  className="w-full h-full object-cover"
+                  style={{ border: 'none', background: '#000' }}
+                  allow="autoplay"
                 />
                 {/* Glass Overlay status */}
                 <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
@@ -496,6 +528,18 @@ function App() {
                       <div className="px-3 py-1.5 rounded-full bg-red-600/90 backdrop-blur-md border border-red-400 text-xs font-bold text-white flex items-center gap-2 animate-pulse transition-all">
                         <div className="w-2 h-2 rounded-full bg-white"></div>
                         ĐANG GHI ĐƠN: {currentWaybill}
+                      </div>
+                    )}
+                    {recordingStatus === 'saving' && (
+                      <div className="px-3 py-1.5 rounded-full bg-amber-500/90 backdrop-blur-md border border-amber-300 text-xs font-bold text-white flex items-center gap-2 animate-pulse transition-all">
+                        <div className="w-2 h-2 rounded-full bg-white"></div>
+                        ĐANG LUU VIDEO CHO DON: {currentWaybill}
+                      </div>
+                    )}
+                    {recordingStatus === 'idle' && (
+                      <div className="px-3 py-1.5 rounded-full bg-emerald-600/90 backdrop-blur-md border border-emerald-400 text-xs font-bold text-white flex items-center gap-2 transition-all">
+                        <div className="w-2 h-2 rounded-full bg-white"></div>
+                        SAN SANG CHO DON HANG TIEP THEO
                       </div>
                     )}
                   </div>
@@ -615,7 +659,7 @@ function App() {
                   <div className="space-y-2">
                     {record.video_paths.map((path, idx) => {
                       const fileName = path.split('/').pop() || path.split('\\').pop();
-                      const videoUrl = `${API_BASE}/${path}`;
+                      const videoUrl = `${API_BASE}/${path.replace(/\\/g, '/')}`;
                       return (
                         <div 
                           key={idx}

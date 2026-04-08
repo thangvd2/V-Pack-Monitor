@@ -1,4 +1,4 @@
-# Hướng Dẫn Từng Bước (Cho Team Sales / Triển Khai) - V-Pack Monitor v1.3.2
+# Hướng Dẫn Từng Bước (Cho Team Sales / Triển Khai) - V-Pack Monitor v1.4.0
 
 Tài liệu dành cho nhân viên kinh doanh / kỹ thuật viên đem V-Pack Monitor đi cài đặt tại kho khách hàng.
 
@@ -12,12 +12,12 @@ Tài liệu dành cho nhân viên kinh doanh / kỹ thuật viên đem V-Pack Mo
 ## Bước 1: Cài Đặt Tự Động
 
 ### Trên Windows
-1. Tải và giải nén `V-Pack-Monitor-v1.3.2.zip` vào ổ đĩa (VD: `D:\V-Pack-Monitor`).
+1. Tải và giải nén `V-Pack-Monitor` vào ổ đĩa (VD: `E:\V-Pack-Monitor`).
 2. Nhấn chuột phải vào `install_windows.bat` → **Run as administrator**.
-3. Script tự động xử lý: tải FFmpeg, tạo venv, cài thư viện, mở port tường lửa, tạo shortcut Desktop.
+3. Script tự động xử lý: tải Python 3.13, Node.js 22, FFmpeg, MediaMTX, tạo venv, build frontend, mở port tường lửa, tạo shortcut Desktop.
 
 ### Trên macOS
-1. Tải và giải nén `V-Pack-Monitor-v1.3.2.zip`.
+1. Tải và giải nén `V-Pack-Monitor`.
 2. Mở Terminal, di chuyển vào thư mục vừa giải nén:
 ```bash
 chmod +x install_macos.sh
@@ -30,7 +30,9 @@ chmod +x install_macos.sh
 ## Bước 2: Khởi Động Phần Mềm
 
 ### Windows
-Nháy đúp vào biểu tượng **V-Pack Monitor** trên Desktop. Hoặc chạy `start_windows.bat`.
+Nháy đúp vào biểu tượng **V-Pack Monitor** trên Desktop. Hoặc chạy `start_windows.bat`. Hệ thống khởi động 2 tiến trình:
+- **MediaMTX** — WebRTC live view (port 8889)
+- **Python API** — Backend ghi hình, quét mã, cloud sync (port 8001)
 
 ### macOS
 ```bash
@@ -52,15 +54,15 @@ Truy cập: `http://localhost:8001`
 2. Nhập mã PIN mặc định: `08012011`.
 3. Điền thông tin trạm và Camera:
    - **Hãng Camera:** Chọn đúng hãng (Imou/Dahua, Tenda, EZVIZ, Tapo).
-   - **IP Camera:** Lấy từ modem hoặc app hãng (VD: `192.168.1.55`).
+   - **IP Camera:** Lấy từ modem hoặc app hãng (VD: `192.168.5.18`).
+   - **MAC Address (Khuyến khích):** In trên tem đáy Camera (VD: `30:24:50:48:09:38`). Giúp hệ thống tự tìm lại IP khi mạng đổi.
    - **Mật khẩu RTSP:**
      - **Imou/Dahua:** Safety Code (8 ký tự in ở tem đáy Camera).
      - **Tenda:** Mật khẩu tự đặt lúc cài Camera (mặc định `admin123456`).
      - **EZVIZ:** Verification Code (6 ký tự in ở tem đáy Camera).
      - **TP-Link Tapo:** Tạo "Camera Account" trong app Tapo (Advanced Settings), đặt Username `admin` + Password → nhập Password vào đây.
-   - **MAC Address (Tùy chọn):** In trên tem đáy Camera. Nhập để hệ thống tự tìm lại IP khi mạng đổi.
 4. Chọn chế độ `SINGLE` → **LƯU TRẠM NÀY**.
-5. Camera sẽ lên sóng Live! Cắm súng quét mã vạch và bắn đơn đầu tiên.
+5. Camera sẽ lên sóng Live WebRTC! Cắm súng quét mã vạch và bắn đơn đầu tiên.
 
 ---
 

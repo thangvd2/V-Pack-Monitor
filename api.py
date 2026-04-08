@@ -6,19 +6,17 @@
 
 import os
 import sys
-
-os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
-os.environ["OPENCV_VIDEOIO_PRIORITY_MSMF"] = "0"
-import cv2
 import time
 import shutil
 import threading
 import sqlite3
+import json
+import urllib.request
+import urllib.error
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import database
 from recorder import CameraRecorder
@@ -26,41 +24,82 @@ import cloud_sync
 import network
 
 # --- Quản lý Trạng thái Ghi hình Đa Trạm ---
-# Dictionary ánh xạ station_id -> CameraRecorder object
 active_recorders = {}
-# Dictionary ánh xạ station_id -> Waybill code
 active_waybills = {}
-# Dictionary ánh xạ station_id -> CameraStreamManager
 stream_managers = {}
 
-# --- Quản lý Luồng Video (Background Thread) ---
-
-
 reconnect_status = {}
+
+MTX_API = "http://127.0.0.1:9997"
+
+
+def _mtx_add_path(station_id, rtsp_url):
+    name = f"station_{station_id}"
+    conf = {
+        "name": name,
+        "source": rtsp_url,
+        "rtspTransport": "tcp",
+    }
+    try:
+        req = urllib.request.Request(
+            f"{MTX_API}/v3/config/paths/remove/{name}",
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=3)
+    except Exception:
+        pass
+    try:
+        data = json.dumps(conf).encode()
+        req = urllib.request.Request(
+            f"{MTX_API}/v3/config/paths/add/{name}",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
+
+
+def _mtx_remove_path(station_id):
+    name = f"station_{station_id}"
+    try:
+        req = urllib.request.Request(
+            f"{MTX_API}/v3/config/paths/remove/{name}",
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
 
 
 class CameraStreamManager:
     def __init__(self, url, station_id=None):
         self.url = url
         self.station_id = station_id
-        self.latest_frame = None
         self.is_running = False
         self.thread = None
-        self.lock = threading.Lock()
         self._fail_count = 0
-        self._reconnect_cooldown = 10
+        self._lock = threading.Lock()
 
     def start(self):
         if not self.is_running and self.url:
             self.is_running = True
             self._fail_count = 0
-            self.thread = threading.Thread(target=self._update_frame, daemon=True)
+            self._mtx_register()
+            self.thread = threading.Thread(target=self._monitor_loop, daemon=True)
             self.thread.start()
 
     def stop(self):
         self.is_running = False
+        if self.station_id:
+            _mtx_remove_path(self.station_id)
         if self.thread:
             self.thread.join()
+
+    def _mtx_register(self):
+        if self.station_id and self.url:
+            _mtx_add_path(self.station_id, self.url)
 
     def _try_rediscover_camera(self):
         if not self.station_id:
@@ -76,8 +115,9 @@ class CameraStreamManager:
             database.update_station_ip(self.station_id, "ip_camera_1", new_ip)
             brand = station.get("camera_brand", "imou")
             code = station.get("safety_code", "")
-            new_url = get_rtsp_url(new_ip, code, channel=1, brand=brand)
+            new_url = get_rtsp_sub_url(new_ip, code, channel=1, brand=brand)
             self.url = new_url
+            self._mtx_register()
             reconnect_status[self.station_id] = {
                 "status": "found",
                 "new_ip": new_ip,
@@ -88,56 +128,32 @@ class CameraStreamManager:
             reconnect_status[self.station_id] = {"status": "same_ip", "ip": new_ip}
         return None
 
-    def _update_frame(self):
-        cap = cv2.VideoCapture(self.url)
+    def _monitor_loop(self):
         while self.is_running:
-            if not cap.isOpened():
-                self._fail_count += 1
-                if self._fail_count >= 5 and self._fail_count % 5 == 0:
-                    if self.station_id:
-                        reconnect_status[self.station_id] = {"status": "searching"}
-                    found = self._try_rediscover_camera()
-                    if found:
-                        cap.release()
-                        cap = cv2.VideoCapture(self.url)
-                        self._fail_count = 0
-                        time.sleep(2)
-                        continue
-                cooldown = min(self._reconnect_cooldown, 60)
-                time.sleep(cooldown)
-                cap = cv2.VideoCapture(self.url)
+            time.sleep(15)
+            if not self.is_running:
+                break
+            if not self.station_id:
                 continue
-
-            success, frame = cap.read()
-            if not success:
-                self._fail_count += 1
-                cap.release()
-                time.sleep(1)
-                continue
-
-            self._fail_count = 0
-            if self.station_id in reconnect_status:
-                del reconnect_status[self.station_id]
-
-            frame = cv2.resize(frame, (854, 480))
-            ret, buffer = cv2.imencode(
-                ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50]
-            )
-            with self.lock:
-                self.latest_frame = buffer.tobytes()
-
-            time.sleep(0.01)
-
-        cap.release()
+            try:
+                req = urllib.request.Request(
+                    f"{MTX_API}/v3/paths/list",
+                    method="GET",
+                )
+                resp = urllib.request.urlopen(req, timeout=3)
+                paths_data = json.loads(resp.read())
+                items = paths_data.get("items", [])
+                path_name = f"station_{self.station_id}"
+                found = any(p.get("name") == path_name for p in items)
+                if not found:
+                    self._mtx_register()
+            except Exception:
+                pass
 
     def update_url(self, new_url):
-        self.stop()
-        self.url = new_url
-        self.start()
-
-    def get_latest_frame(self):
-        with self.lock:
-            return self.latest_frame
+        with self._lock:
+            self.url = new_url
+        self._mtx_register()
 
 
 def get_rtsp_url(ip, safety_code, channel=1, brand="imou"):
@@ -148,13 +164,23 @@ def get_rtsp_url(ip, safety_code, channel=1, brand="imou"):
     elif brand == "ezviz":
         return f"rtsp://admin:{safety_code}@{ip}:554/ch{channel}/main"
     elif brand == "tapo":
-        # Tapo doesn't use standard channel params, stream1 is Main, stream2 is
-        # Sub.
         stream_id = 1 if channel == 1 else 2
         return f"rtsp://admin:{safety_code}@{ip}:554/stream{stream_id}"
     else:
-        # Default Imou/Dahua
         return f"rtsp://admin:{safety_code}@{ip}:554/cam/realmonitor?channel={channel}&subtype=0"
+
+
+def get_rtsp_sub_url(ip, safety_code, channel=1, brand="imou"):
+    if not ip or not safety_code:
+        return ""
+    if brand == "tenda":
+        return f"rtsp://admin:{safety_code}@{ip}:554/ch={channel}&subtype=1"
+    elif brand == "ezviz":
+        return f"rtsp://admin:{safety_code}@{ip}:554/ch{channel}/sub"
+    elif brand == "tapo":
+        return f"rtsp://admin:{safety_code}@{ip}:554/stream2"
+    else:
+        return f"rtsp://admin:{safety_code}@{ip}:554/cam/realmonitor?channel={channel}&subtype=1"
 
 
 import telebot
@@ -163,16 +189,31 @@ import telegram_bot
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
+    loop = asyncio.get_event_loop()
+    orig_handler = loop.get_exception_handler()
+
+    def _suppress_conn_reset(loop, ctx):
+        exc = ctx.get("exception")
+        if isinstance(exc, (ConnectionResetError, ConnectionAbortedError)):
+            return
+        if orig_handler:
+            orig_handler(loop, ctx)
+        else:
+            loop.default_exception_handler(ctx)
+
+    loop.set_exception_handler(_suppress_conn_reset)
+
     database.init_db()
     stations = database.get_stations()
     for st in stations:
-        url = get_rtsp_url(
+        sub_url = get_rtsp_sub_url(
             st["ip_camera_1"],
             st["safety_code"],
             channel=1,
             brand=st.get("camera_brand", "imou"),
         )
-        manager = CameraStreamManager(url, station_id=st["id"])
+        manager = CameraStreamManager(sub_url, station_id=st["id"])
         stream_managers[st["id"]] = manager
         manager.start()
 
@@ -313,7 +354,7 @@ def get_stations_api():
 @app.post("/api/stations")
 def create_station(payload: StationPayload):
     new_id = database.add_station(payload.dict())
-    url = get_rtsp_url(
+    url = get_rtsp_sub_url(
         payload.ip_camera_1, payload.safety_code, channel=1, brand=payload.camera_brand
     )
     sm = CameraStreamManager(url, station_id=new_id)
@@ -326,7 +367,7 @@ def create_station(payload: StationPayload):
 def update_station(station_id: int, payload: StationPayload):
     database.update_station(station_id, payload.dict())
     if station_id in stream_managers:
-        url = get_rtsp_url(
+        url = get_rtsp_sub_url(
             payload.ip_camera_1,
             payload.safety_code,
             channel=1,
@@ -352,6 +393,26 @@ def delete_station(station_id: int):
 
 
 # --- CAMERA DISCOVERY API ---
+
+
+@app.get("/api/discover-mac")
+def discover_camera_by_mac(mac: str):
+    if not mac or not network.validate_mac(mac):
+        return {
+            "status": "error",
+            "message": "MAC Address không hợp lệ.",
+        }
+    new_ip = network.scan_lan_for_mac(mac)
+    if not new_ip:
+        return {
+            "status": "not_found",
+            "message": f"Không tìm thấy thiết bị có MAC {mac} trên mạng LAN.",
+        }
+    return {
+        "status": "found",
+        "message": f"Tìm thấy thiết bị tại IP: {new_ip}",
+        "ip": new_ip,
+    }
 
 
 @app.get("/api/discover/{station_id}")
@@ -386,7 +447,7 @@ def discover_camera(station_id: int):
     database.update_station_ip(station_id, "ip_camera_1", new_ip)
     brand = station.get("camera_brand", "imou")
     code = station.get("safety_code", "")
-    new_url = get_rtsp_url(new_ip, code, channel=1, brand=brand)
+    new_url = get_rtsp_sub_url(new_ip, code, channel=1, brand=brand)
     if station_id in stream_managers:
         stream_managers[station_id].update_url(new_url)
 
@@ -413,6 +474,28 @@ class ScanPayload(BaseModel):
     station_id: int
 
 
+_stopping_recorders = {}
+_stopping_lock = threading.Lock()
+
+
+def _async_stop_and_save(sid, recorder, waybill, save=True):
+    with _stopping_lock:
+        if sid in _stopping_recorders:
+            return
+        _stopping_recorders[sid] = waybill
+        active_recorders.pop(sid, None)
+
+    try:
+        saved_files = recorder.stop_recording()
+        if save and saved_files:
+            database.save_record(sid, waybill, saved_files, recorder.record_mode)
+    except Exception as e:
+        print(f"Loi khi luu video station {sid}: {e}")
+    finally:
+        active_waybills.pop(sid, None)
+        _stopping_recorders.pop(sid, None)
+
+
 @app.post("/api/scan")
 def handle_scan(payload: ScanPayload):
     sid = payload.station_id
@@ -420,6 +503,9 @@ def handle_scan(payload: ScanPayload):
 
     if not barcode:
         return {"status": "error", "message": "Mã vạch trống"}
+
+    if sid in _stopping_recorders:
+        return {"status": "busy", "message": "Đang lưu video đơn hàng trước. Vui lòng quét lại sau vài giây."}
 
     station = database.get_station(sid)
     if not station:
@@ -430,30 +516,28 @@ def handle_scan(payload: ScanPayload):
 
     if barcode == "EXIT":
         if current_recorder:
-            current_recorder.stop_recording()
-            active_recorders.pop(sid, None)
-            active_waybills.pop(sid, None)
-        return {"status": "exit", "message": "Đã ngắt ghi hình."}
+            t = threading.Thread(
+                target=_async_stop_and_save,
+                args=(sid, current_recorder, current_waybill, False),
+                daemon=True,
+            )
+            t.start()
+            return {"status": "busy", "message": "Đang hủy ghi hình..."}
+        return {"status": "idle", "message": "Trạm đang nhàn rỗi."}
 
     if barcode == "STOP":
         if current_recorder:
-            saved_files = current_recorder.stop_recording()
-            if saved_files:
-                database.save_record(
-                    sid, current_waybill, saved_files, current_recorder.record_mode
-                )
-            active_recorders.pop(sid, None)
-            active_waybills.pop(sid, None)
-            return {"status": "stopped", "message": f"Đã lưu đơn hàng thành công!"}
+            t = threading.Thread(
+                target=_async_stop_and_save,
+                args=(sid, current_recorder, current_waybill, True),
+                daemon=True,
+            )
+            t.start()
+            return {"status": "busy", "message": "Đang đóng gói và lưu video. Vui lòng đợi..."}
         return {"status": "idle", "message": "Trạm đang nhàn rỗi."}
 
-    # Chốt đơn cũ nếu có
     if current_recorder:
-        saved_files = current_recorder.stop_recording()
-        if saved_files:
-            database.save_record(
-                sid, current_waybill, saved_files, current_recorder.record_mode
-            )
+        return {"status": "recording", "message": "Đang ghi đơn. Vui lòng quét STOP để kết thúc đơn hàng hiện tại."}
 
     active_waybills[sid] = barcode
 
@@ -480,7 +564,7 @@ def handle_scan(payload: ScanPayload):
             database.update_station_ip(sid, "ip_camera_1", ip1)
             brand = station.get("camera_brand", "imou")
             code = station.get("safety_code", "")
-            new_url = get_rtsp_url(ip1, code, channel=1, brand=brand)
+            new_url = get_rtsp_sub_url(ip1, code, channel=1, brand=brand)
             if sid in stream_managers:
                 stream_managers[sid].update_url(new_url)
 
@@ -511,6 +595,11 @@ def handle_scan(payload: ScanPayload):
 
 @app.get("/api/status")
 def get_status(station_id: int):
+    if station_id in _stopping_recorders:
+        return {
+            "status": "saving",
+            "waybill": _stopping_recorders.get(station_id, ""),
+        }
     return {
         "status": "recording" if station_id in active_recorders else "idle",
         "waybill": active_waybills.get(station_id, ""),
@@ -594,27 +683,22 @@ def get_analytics_today(station_id: int):
         return {"data": {"total_today": total_today, "station_today": station_today}}
 
 
-def generate_frames(station_id: int):
-    manager = stream_managers.get(station_id)
-    if not manager:
-        yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n\r\n"
-        return
-
-    while True:
-        frame_bytes = manager.get_latest_frame()
-        if frame_bytes is not None:
-            yield (
-                b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
-            )
-        time.sleep(0.05)
-
-
 @app.get("/api/live")
 def live_preview(station_id: int):
-    return StreamingResponse(
-        generate_frames(station_id),
-        media_type="multipart/x-mixed-replace; boundary=frame",
-    )
+    return {
+        "status": "ok",
+        "webrtc_url": f"http://localhost:8889/station_{station_id}",
+    }
+
+
+@app.get("/api/mtx-status")
+def mtx_status():
+    try:
+        req = urllib.request.Request(f"{MTX_API}/v3/paths/list", method="GET")
+        resp = urllib.request.urlopen(req, timeout=3)
+        return json.loads(resp.read())
+    except Exception:
+        return {"status": "error", "message": "MediaMTX not running"}
 
 
 # --- SERVE FRONTEND (PRODUCTION BUILD) ---
@@ -627,6 +711,4 @@ if os.path.exists(dist_dir):
 
 if __name__ == "__main__":
     import uvicorn
-
-    # V-Pack Monitor Production Entry Point
     uvicorn.run(app, host="0.0.0.0", port=8001)

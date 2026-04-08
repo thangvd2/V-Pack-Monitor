@@ -228,20 +228,24 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
                     }}
                     className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50"
                   />
-                  {macAddress && currentStation.id && (
+                  {macAddress && (
                     <button 
                       type="button"
                       onClick={async () => {
+                        const raw = macAddress.replace(/[\s:\-\.]/g, '').toUpperCase();
+                        if (raw.length !== 12) {
+                          setDiscoverResult('❌ MAC Address không hợp lệ (cần 12 ký tự hex).');
+                          return;
+                        }
                         setDiscovering(true);
                         setDiscoverResult('');
                         try {
-                          const res = await axios.get(`${API_BASE}/api/discover/${currentStation.id}`);
+                          const formattedMac = raw.match(/.{2}/g).join(':');
+                          const res = await axios.get(`${API_BASE}/api/discover-mac?mac=${encodeURIComponent(formattedMac)}`);
                           const data = res.data;
                           if (data.status === 'found') {
-                            setDiscoverResult(`✅ Tìm thấy IP mới: ${data.new_ip}`);
-                            setIp1(data.new_ip);
-                          } else if (data.status === 'same_ip') {
-                            setDiscoverResult(`ℹ️ Camera đang ở đúng IP: ${data.ip}`);
+                            setDiscoverResult(`✅ Tìm thấy IP: ${data.ip}`);
+                            setIp1(data.ip);
                           } else {
                             setDiscoverResult(`❌ Không tìm thấy camera trên mạng.`);
                           }

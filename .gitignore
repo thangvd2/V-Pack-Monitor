@@ -7,6 +7,9 @@ build/
 V-Pack-Monitor.spec
 *.DS_Store
 recordings/
+hls/
+bin/
 *.zip
 InnoSetup/
 credentials.json
+install_log.txt
