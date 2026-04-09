@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.8.0
+# V-Pack Monitor - CamDongHang v1.9.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -14,6 +14,8 @@ import json
 import asyncio
 import urllib.request
 import urllib.error
+import io
+import csv
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -1039,6 +1041,63 @@ def get_analytics_today(station_id: int, current_user: CurrentUser):
         station_today = cursor.fetchone()[0]
 
         return {"data": {"total_today": total_today, "station_today": station_today}}
+
+
+# --- ANALYTICS PRO API ---
+
+
+@app.get("/api/analytics/hourly")
+def get_hourly_stats_api(
+    current_user: CurrentUser, date: str | None = None, station_id: int | None = None
+):
+    data = database.get_hourly_stats(date=date, station_id=station_id)
+    return {"data": data}
+
+
+@app.get("/api/analytics/trend")
+def get_daily_trend_api(current_user: CurrentUser, days: int = 7):
+    data = database.get_daily_trend(days=min(days, 30))
+    return {"data": data}
+
+
+@app.get("/api/analytics/stations-comparison")
+def get_stations_comparison_api(current_user: CurrentUser):
+    data = database.get_stations_comparison()
+    return {"data": data}
+
+
+@app.get("/api/export/csv")
+def export_csv(
+    current_user: CurrentUser, date: str | None = None, station_id: int | None = None
+):
+    records = database.get_records_for_export(date=date, station_id=station_id)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Mã vận đơn", "Trạm", "Thời gian ghi", "Trạng thái", "File video"])
+    for r in records:
+        video_files = (
+            "; ".join(r.get("video_paths", []))
+            if isinstance(r.get("video_paths"), list)
+            else (r.get("video_paths") or "")
+        )
+        writer.writerow(
+            [
+                r["waybill_code"],
+                r.get("station_name", ""),
+                r.get("recorded_at", ""),
+                r.get("status", ""),
+                video_files,
+            ]
+        )
+
+    output.seek(0)
+    filename = f"vpack_export_{date or 'all'}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @app.get("/api/live")

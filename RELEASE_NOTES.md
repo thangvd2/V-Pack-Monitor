@@ -2,6 +2,23 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v1.9.0] - 2026-04-09 (Dashboard & Analytics Pro)
+
+### 📊 Tính Năng Lớn
+- **Dashboard Page:** Trang tổng quan với biểu đồ sản xuất, xu hướng, so sánh trạm. Toggle bằng nút BarChart3 ở header.
+- **Biểu Đồ Sản Xuất Theo Giờ:** BarChart (Recharts) hiển thị số đơn theo từng giờ (0-23h). Filter theo ngày và trạm.
+- **Xu Hướng 7 Ngày:** LineChart hiển thị trend sản xuất 7 ngày gần nhất.
+- **So Sánh Trạm:** PieChart (donut) so sánh năng suất các trạm trong ngày.
+- **Xuất CSV:** Download báo cáo danh sách đơn theo filter (ngày, trạm) dạng CSV.
+
+### 🏗️ Kiến Trúc
+- **`Dashboard.jsx`** (mới): Component dashboard với Recharts (BarChart, LineChart, PieChart).
+- **`database.py`**: 4 hàm analytics mới (get_hourly_stats, get_daily_trend, get_stations_comparison, get_records_for_export).
+- **`api.py`**: 4 endpoints mới (`GET /api/analytics/hourly`, `GET /api/analytics/trend`, `GET /api/analytics/stations-comparison`, `GET /api/export/csv`).
+- **Recharts** (`npm install recharts`): Thư viện biểu đồ React (~160KB gzip).
+
+---
+
 ## [v1.8.0] - 2026-04-09 (User Management UI + Security)
 
 ### 👤 Tính Năng Lớn

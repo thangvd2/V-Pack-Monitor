@@ -1,4 +1,4 @@
-# Hướng Dẫn Từng Bước (Cho Team Sales / Triển Khai) - V-Pack Monitor v1.8.0
+# Hướng Dẫn Từng Bước (Cho Team Sales / Triển Khai) - V-Pack Monitor v1.9.0
 
 Tài liệu dành cho nhân viên kinh doanh / kỹ thuật viên đem V-Pack Monitor đi cài đặt tại kho khách hàng.
 

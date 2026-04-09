@@ -1,5 +1,5 @@
 /**
- * V-Pack Monitor - CamDongHang v1.8.0
+ * V-Pack Monitor - CamDongHang v1.9.0
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
@@ -10,6 +10,7 @@ import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Tras
 import SetupModal from './SetupModal';
 import VideoPlayerModal from './VideoPlayerModal';
 import UserManagementModal from './UserManagementModal';
+import Dashboard from './Dashboard';
 
 const API_BASE = window.location.hostname === 'localhost' && ['3000', '3001', '5173'].includes(window.location.port) 
   ? 'http://localhost:8001' 
@@ -41,6 +42,7 @@ function App() {
   
   // Grid View State
   const [viewMode, setViewMode] = useState('single'); // 'single' | 'grid'
+  const [showDashboard, setShowDashboard] = useState(false);
   const [stationStatuses, setStationStatuses] = useState({}); // { [stationId]: { status, waybill } }
   
   // Custom Video Player State
@@ -487,7 +489,7 @@ function App() {
             </button>
           </form>
           <p className="text-center text-xs text-slate-500 mt-6">
-            V-Pack Monitor v1.8.0 • VDT
+            V-Pack Monitor v1.9.0 • VDT
           </p>
         </div>
       </div>
@@ -661,6 +663,14 @@ function App() {
             </button>
           )}
 
+          <button
+            onClick={() => setShowDashboard(prev => !prev)}
+            className={`p-3 border rounded-2xl transition-all shadow-lg ${showDashboard ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-blue-500/30 text-slate-400 hover:text-blue-400'}`}
+            title={showDashboard ? 'Quay lại giao diện chính' : 'Bảng điều khiển'}
+          >
+            <BarChart3 className="w-5 h-5" />
+          </button>
+
           <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 hidden xl:flex">
             <BarChart3 className="w-5 h-5 text-blue-400" />
             <div className="flex flex-col">
@@ -792,6 +802,15 @@ function App() {
       </header>
 
       {/* Main Content */}
+      {showDashboard ? (
+        <Dashboard
+          stations={stations}
+          activeStationId={activeStationId}
+          storageInfo={storageInfo}
+          currentUser={currentUser}
+          analytics={analytics}
+        />
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Left Column: Live Camera / Grid */}
@@ -1100,6 +1119,7 @@ function App() {
         </div>
         
       </div>
+      )}
     </div>
   );
 }

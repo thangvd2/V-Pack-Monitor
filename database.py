@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.8.0
+# V-Pack Monitor - CamDongHang v1.9.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -709,3 +709,104 @@ def end_session_by_id(session_id: int):
             "UPDATE sessions SET status = 'EXPIRED' WHERE id = ?", (session_id,)
         )
         conn.commit()
+
+
+# --- ANALYTICS FUNCTIONS ---
+
+
+def get_hourly_stats(
+    date: str | None = None, station_id: int | None = None
+) -> list[dict]:
+    """Get record counts grouped by hour for a given date.
+    Returns list of {hour, count} for hours 0-23.
+    date format: YYYY-MM-DD, defaults to today."""
+    target_date = date or datetime.now().strftime("%Y-%m-%d")
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        query = (
+            "SELECT CAST(strftime('%H', recorded_at) AS INTEGER) as hour, COUNT(*) as count "
+            "FROM packing_video WHERE status = 'READY' AND date(recorded_at) = ?"
+        )
+        params: list[str | int] = [target_date]
+        if station_id is not None:
+            query += " AND station_id = ?"
+            params.append(station_id)
+        query += " GROUP BY hour ORDER BY hour"
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        hour_map = {r[0]: r[1] for r in rows}
+    result = []
+    for h in range(24):
+        result.append({"hour": h, "count": hour_map.get(h, 0)})
+    return result
+
+
+def get_daily_trend(days: int = 7) -> list[dict]:
+    """Get daily record counts for last N days.
+    Returns list of {date, count}."""
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT date(recorded_at) as d, COUNT(*) as count "
+            f"FROM packing_video WHERE status = 'READY' "
+            f"AND date(recorded_at) >= date('now', '-{days} days') "
+            f"GROUP BY d ORDER BY d"
+        )
+        rows = cursor.fetchall()
+        date_map = {r[0]: r[1] for r in rows}
+    result = []
+    from datetime import timedelta
+
+    for i in range(days):
+        d = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+        result.append({"date": d, "count": date_map.get(d, 0)})
+    result.reverse()
+    return result
+
+
+def get_stations_comparison() -> list[dict]:
+    """Get today's record count per station.
+    Returns list of {station_id, station_name, count}."""
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT s.id, s.name, COUNT(p.id) as count "
+            "FROM stations s LEFT JOIN packing_video p "
+            "ON s.id = p.station_id AND date(p.recorded_at) = date('now', 'localtime') AND p.status = 'READY' "
+            "GROUP BY s.id ORDER BY count DESC"
+        )
+        rows = cursor.fetchall()
+        return [{"station_id": r[0], "station_name": r[1], "count": r[2]} for r in rows]
+
+
+def get_records_for_export(
+    date: str | None = None, station_id: int | None = None
+) -> list[dict]:
+    """Get records for CSV export.
+    Returns list of {waybill_code, station_name, recorded_at, status, video_paths}."""
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        query = (
+            "SELECT p.waybill_code, s.name, p.recorded_at, p.status, p.video_paths "
+            "FROM packing_video p JOIN stations s ON p.station_id = s.id WHERE 1=1"
+        )
+        params = []
+        if date is not None:
+            query += " AND date(p.recorded_at) = ?"
+            params.append(date)
+        if station_id is not None:
+            query += " AND p.station_id = ?"
+            params.append(station_id)
+        query += " ORDER BY p.recorded_at DESC"
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        return [
+            {
+                "waybill_code": r[0],
+                "station_name": r[1],
+                "recorded_at": r[2],
+                "status": r[3],
+                "video_paths": r[4],
+            }
+            for r in rows
+        ]
