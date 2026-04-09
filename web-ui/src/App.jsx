@@ -99,7 +99,7 @@ function App() {
             setRecordingStatus(stationStatus);
             setCurrentWaybill(waybill);
           }
-          if (data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
+          if ((data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') && data.station_id === activeStationId) {
             fetchRecords(searchTerm, activeStationId);
           }
         } else {
@@ -215,6 +215,10 @@ function App() {
 
   useEffect(() => {
     if (viewMode !== 'grid' || stations.length === 0) return;
+    setStationStatuses(prev => ({
+      ...prev,
+      [activeStationId]: { status: recordingStatus, waybill: currentWaybill }
+    }));
     stations.forEach(st => {
       axios.get(`${API_BASE}/api/status?station_id=${st.id}`).then(res => {
         setStationStatuses(prev => ({
@@ -699,6 +703,16 @@ function App() {
                           style={{ border: 'none', background: '#000' }}
                           allow="autoplay"
                         />
+                        {station.id === activeStationId && reconnectInfo && reconnectInfo.status === 'searching' && (
+                          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-amber-500/90 text-white text-xs font-semibold px-3 py-1 rounded-full animate-pulse">
+                            🔄 Tìm lại Camera...
+                          </div>
+                        )}
+                        {station.id === activeStationId && reconnectInfo && reconnectInfo.status === 'found' && (
+                          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-emerald-500/90 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                            ✅ IP mới: {reconnectInfo.new_ip}
+                          </div>
+                        )}
                         <div className="absolute top-3 left-3 right-3 flex items-start gap-2 pointer-events-none">
                           <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-mono text-white/90">
                             {station.name}
