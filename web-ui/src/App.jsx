@@ -1,12 +1,12 @@
 /**
- * V-Pack Monitor - CamDongHang v1.6.0
+ * V-Pack Monitor - CamDongHang v1.7.0
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Trash2, HardDrive, Plus, Monitor, ShieldCheck, BarChart3, CloudUpload, LogOut, User, Users } from 'lucide-react';
+import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Trash2, HardDrive, Plus, Monitor, ShieldCheck, BarChart3, CloudUpload, LogOut, User, Users, LayoutGrid, Maximize2 } from 'lucide-react';
 import SetupModal from './SetupModal';
 import VideoPlayerModal from './VideoPlayerModal';
 
@@ -37,6 +37,10 @@ function App() {
   const [analytics, setAnalytics] = useState({ total_today: 0, station_today: 0 });
   const [reconnectInfo, setReconnectInfo] = useState(null);
   const [previousStationId, setPreviousStationId] = useState(null);
+  
+  // Grid View State
+  const [viewMode, setViewMode] = useState('single'); // 'single' | 'grid'
+  const [stationStatuses, setStationStatuses] = useState({}); // { [stationId]: { status, waybill } }
   
   // Custom Video Player State
   const [videoModalOpen, setVideoModalOpen] = useState(false);
@@ -74,31 +78,51 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const es = new EventSource(`${API_BASE}/api/events?stations=${activeStationId}`);
+    const stationIds = viewMode === 'grid'
+      ? stations.map(s => s.id).join(',')
+      : String(activeStationId);
+    const es = new EventSource(`${API_BASE}/api/events?stations=${stationIds}`);
     
     es.addEventListener('video_status', (evt) => {
       try {
         const data = JSON.parse(evt.data);
-        if (data.station_id !== activeStationId) return;
         
-        if (data.status === 'RECORDING') {
-          setRecordingStatus('recording');
-        } else if (data.status === 'PROCESSING') {
-          setRecordingStatus('processing');
-        } else if (data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
-          setRecordingStatus('idle');
-          setCurrentWaybill('');
-          fetchRecords(searchTerm, activeStationId);
+        if (viewMode === 'grid') {
+          const stationStatus = data.status === 'RECORDING' ? 'recording'
+            : data.status === 'PROCESSING' ? 'processing' : 'idle';
+          const waybill = data.waybill || '';
+          setStationStatuses(prev => ({
+            ...prev,
+            [data.station_id]: { status: stationStatus, waybill }
+          }));
+          if (data.station_id === activeStationId) {
+            setRecordingStatus(stationStatus);
+            setCurrentWaybill(waybill);
+          }
+          if (data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
+            fetchRecords(searchTerm, activeStationId);
+          }
+        } else {
+          if (data.station_id !== activeStationId) return;
+          
+          if (data.status === 'RECORDING') {
+            setRecordingStatus('recording');
+            setCurrentWaybill(data.waybill || '');
+          } else if (data.status === 'PROCESSING') {
+            setRecordingStatus('processing');
+          } else if (data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
+            setRecordingStatus('idle');
+            setCurrentWaybill('');
+            fetchRecords(searchTerm, activeStationId);
+          }
         }
       } catch {}
     });
 
-    es.onerror = () => {
-      // SSE will auto-reconnect, no action needed
-    };
+    es.onerror = () => {};
 
     return () => es.close();
-  }, [activeStationId]);
+  }, [activeStationId, viewMode, stations]);
 
   // Init fetch
   useEffect(() => {
@@ -188,6 +212,18 @@ function App() {
       console.log('Status not ready', error);
     }
   };
+
+  useEffect(() => {
+    if (viewMode !== 'grid' || stations.length === 0) return;
+    stations.forEach(st => {
+      axios.get(`${API_BASE}/api/status?station_id=${st.id}`).then(res => {
+        setStationStatuses(prev => ({
+          ...prev,
+          [st.id]: { status: res.data.status, waybill: res.data.waybill || '' }
+        }));
+      }).catch(() => {});
+    });
+  }, [viewMode, stations]);
 
   // Fetch records
   useEffect(() => {
@@ -440,7 +476,7 @@ function App() {
             </button>
           </form>
           <p className="text-center text-xs text-slate-500 mt-6">
-            V-Pack Monitor v1.6.0 • VDT
+            V-Pack Monitor v1.7.0 • VDT
           </p>
         </div>
       </div>
@@ -494,6 +530,7 @@ function App() {
           
           <div className="mt-6 md:mt-0 flex items-center gap-4 w-full md:w-auto">
           {/* Station Selector Dropdown */}
+          {!(viewMode === 'grid' && stations.length >= 2) && (
           <div className="relative group flex items-center border border-white/10 rounded-2xl bg-white/5 py-2 px-3 shadow-lg">
              <Monitor className="w-5 h-5 text-indigo-400 mr-2" />
              <select 
@@ -508,12 +545,24 @@ function App() {
                ))}
                {stations.length === 0 && <option value={0} disabled>Chưa có trạm nào</option>}
              </select>
-              {currentUser?.role === 'ADMIN' && (
-                <button title="Thêm Trạm Mới" onClick={() => requestAdminAccess({ type: 'setup', isNew: true })} className="ml-2 p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition">
-                   <Plus className="w-4 h-4" />
-                </button>
-              )}
+               {currentUser?.role === 'ADMIN' && (
+                 <button title="Thêm Trạm Mới" onClick={() => requestAdminAccess({ type: 'setup', isNew: true })} className="ml-2 p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition">
+                    <Plus className="w-4 h-4" />
+                 </button>
+               )}
           </div>
+          )}
+
+          {/* View Mode Toggle */}
+          {stations.length >= 2 && (
+            <button
+              onClick={() => setViewMode(prev => prev === 'single' ? 'grid' : 'single')}
+              className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/30 rounded-2xl transition-all shadow-lg text-slate-400 hover:text-blue-400"
+              title={viewMode === 'single' ? 'Xem tổng quan tất cả trạm' : 'Xem trạm đơn lẻ'}
+            >
+              {viewMode === 'single' ? <LayoutGrid className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            </button>
+          )}
 
           <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 hidden xl:flex">
             <BarChart3 className="w-5 h-5 text-blue-400" />
@@ -611,123 +660,201 @@ function App() {
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Left Column: Live Camera */}
+        {/* Left Column: Live Camera / Grid */}
         <div className="lg:col-span-2 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <MonitorPlay className="w-5 h-5 text-red-400" />
-              Chế Độ Quan Sát Live
-            </h2>
-            <span className="flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-            </span>
-          </div>
-          
-          <div className="relative group rounded-3xl overflow-hidden bg-zinc-900 border border-white/10 shadow-2xl shadow-blue-900/20 aspect-video flex items-center justify-center">
-            {activeStationId ? (
-                <>
-                {reconnectInfo && reconnectInfo.status === 'searching' && (
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-amber-500/90 text-white text-xs font-semibold px-3 py-1 rounded-full animate-pulse">
-                    🔄 Đang tìm lại Camera...
-                  </div>
-                )}
-                {reconnectInfo && reconnectInfo.status === 'found' && (
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-emerald-500/90 text-white text-xs font-semibold px-3 py-1 rounded-full">
-                    ✅ Đã tìm thấy IP mới: {reconnectInfo.new_ip}
-                  </div>
-                )}
-                <iframe
-                  key={`live-${activeStationId}`}
-                  src={`http://${MTX_HOST}:8889/station_${activeStationId}?controls=false&muted=true&autoplay=true`}
-                  scrolling="no"
-                  className="w-full h-full object-cover"
-                  style={{ border: 'none', background: '#000' }}
-                  allow="autoplay"
-                />
-                {/* Glass Overlay status */}
-                <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
-                  <div className="flex gap-2">
-                    <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-mono text-white/90">
-                       {activeStation?.name || "Đang tải"}
+
+          {viewMode === 'grid' ? (
+            <>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <LayoutGrid className="w-5 h-5 text-blue-400" />
+                  Tổng Quan Toàn Kho
+                </h2>
+                <span className="flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+              </div>
+
+              {stations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-16 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-sm">
+                  <Monitor className="w-12 h-12 text-slate-500 mb-3" />
+                  <p className="text-slate-400">Chưa có trạm nào</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))' }}>
+                  {stations.map(station => {
+                    const st = stationStatuses[station.id] || { status: 'idle', waybill: '' };
+                    return (
+                      <div
+                        key={station.id}
+                        onClick={() => { setActiveStationId(station.id); setViewMode('single'); }}
+                        className="relative group rounded-3xl overflow-hidden bg-zinc-900 border border-white/10 hover:border-blue-400/30 shadow-2xl shadow-blue-900/20 aspect-video flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-[1.02]"
+                      >
+                        <iframe
+                          key={`grid-${station.id}`}
+                          src={`http://${MTX_HOST}:8889/station_${station.id}?controls=false&muted=true&autoplay=true`}
+                          scrolling="no"
+                          className="w-full h-full object-cover"
+                          style={{ border: 'none', background: '#000' }}
+                          allow="autoplay"
+                        />
+                        <div className="absolute top-3 left-3 right-3 flex items-start gap-2 pointer-events-none">
+                          <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-mono text-white/90">
+                            {station.name}
+                          </div>
+                          {st.status === 'recording' && (
+                            <div className="px-3 py-1.5 rounded-full bg-red-600/90 backdrop-blur-md border border-red-400 text-xs font-bold text-white flex items-center gap-2 animate-pulse">
+                              <div className="w-2 h-2 rounded-full bg-white"></div>
+                              ĐANG GHI: {st.waybill}
+                            </div>
+                          )}
+                          {st.status === 'processing' && (
+                            <div className="px-3 py-1.5 rounded-full bg-amber-500/90 backdrop-blur-md border border-amber-300 text-xs font-bold text-white flex items-center gap-2 animate-pulse">
+                              <div className="w-2 h-2 rounded-full bg-white"></div>
+                              ĐANG XỬ LÝ
+                            </div>
+                          )}
+                          {st.status === 'idle' && (
+                            <div className="px-3 py-1.5 rounded-full bg-emerald-600/90 backdrop-blur-md border border-emerald-400 text-xs font-bold text-white flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-white"></div>
+                              SẴN SÀNG
+                            </div>
+                          )}
+                        </div>
+                        <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/5 transition-all duration-300 pointer-events-none" />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <MonitorPlay className="w-5 h-5 text-red-400" />
+                    Chế Độ Quan Sát Live
+                  </h2>
+                  {stations.length >= 2 && (
+                    <button onClick={() => setViewMode('grid')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-slate-400 hover:text-white transition">
+                      <LayoutGrid className="w-4 h-4" />
+                      Tổng quan
+                    </button>
+                  )}
+                </div>
+                <span className="flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+              </div>
+              
+              <div className="relative group rounded-3xl overflow-hidden bg-zinc-900 border border-white/10 shadow-2xl shadow-blue-900/20 aspect-video flex items-center justify-center">
+                {activeStationId ? (
+                    <>
+                    {reconnectInfo && reconnectInfo.status === 'searching' && (
+                      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-amber-500/90 text-white text-xs font-semibold px-3 py-1 rounded-full animate-pulse">
+                        🔄 Đang tìm lại Camera...
+                      </div>
+                    )}
+                    {reconnectInfo && reconnectInfo.status === 'found' && (
+                      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-emerald-500/90 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                        ✅ Đã tìm thấy IP mới: {reconnectInfo.new_ip}
+                      </div>
+                    )}
+                    <iframe
+                      key={`live-${activeStationId}`}
+                      src={`http://${MTX_HOST}:8889/station_${activeStationId}?controls=false&muted=true&autoplay=true`}
+                      scrolling="no"
+                      className="w-full h-full object-cover"
+                      style={{ border: 'none', background: '#000' }}
+                      allow="autoplay"
+                    />
+                    <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
+                      <div className="flex gap-2">
+                        <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-mono text-white/90">
+                           {activeStation?.name || "Đang tải"}
+                        </div>
+                        {recordingStatus === 'recording' && (
+                          <div className="px-3 py-1.5 rounded-full bg-red-600/90 backdrop-blur-md border border-red-400 text-xs font-bold text-white flex items-center gap-2 animate-pulse transition-all">
+                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                            ĐANG GHI ĐƠN: {currentWaybill}
+                          </div>
+                        )}
+                        {recordingStatus === 'processing' && (
+                          <div className="px-3 py-1.5 rounded-full bg-amber-500/90 backdrop-blur-md border border-amber-300 text-xs font-bold text-white flex items-center gap-2 animate-pulse transition-all">
+                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                            ĐANG XỬ LÝ VIDEO: {currentWaybill}
+                          </div>
+                        )}
+                        {recordingStatus === 'idle' && (
+                          <div className="px-3 py-1.5 rounded-full bg-emerald-600/90 backdrop-blur-md border border-emerald-400 text-xs font-bold text-white flex items-center gap-2 transition-all">
+                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                            SAN SANG CHO DON HANG TIEP THEO
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {recordingStatus === 'recording' && (
-                      <div className="px-3 py-1.5 rounded-full bg-red-600/90 backdrop-blur-md border border-red-400 text-xs font-bold text-white flex items-center gap-2 animate-pulse transition-all">
-                        <div className="w-2 h-2 rounded-full bg-white"></div>
-                        ĐANG GHI ĐƠN: {currentWaybill}
-                      </div>
-                    )}
-                    {recordingStatus === 'processing' && (
-                      <div className="px-3 py-1.5 rounded-full bg-amber-500/90 backdrop-blur-md border border-amber-300 text-xs font-bold text-white flex items-center gap-2 animate-pulse transition-all">
-                        <div className="w-2 h-2 rounded-full bg-white"></div>
-                        ĐANG XỬ LÝ VIDEO: {currentWaybill}
-                      </div>
-                    )}
-                    {recordingStatus === 'idle' && (
-                      <div className="px-3 py-1.5 rounded-full bg-emerald-600/90 backdrop-blur-md border border-emerald-400 text-xs font-bold text-white flex items-center gap-2 transition-all">
-                        <div className="w-2 h-2 rounded-full bg-white"></div>
-                        SAN SANG CHO DON HANG TIEP THEO
-                      </div>
-                    )}
-                  </div>
+                    </>
+                ) : (
+                    <div className="text-slate-500 flex flex-col items-center">
+                        <Settings className="w-12 h-12 mb-2 opacity-50" />
+                        <p>Vui lòng tạo Trạm Đóng Hàng đầu tiên</p>
+                        {currentUser?.role === 'ADMIN' && (
+                          <button onClick={() => requestAdminAccess({ type: 'setup', isNew: true })} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg">Cài đặt ngay</button>
+                        )}
+                    </div>
+                )}
+              </div>
+              
+              <div className="p-5 rounded-2xl bg-white/5 border border-purple-500/30 backdrop-blur-lg mt-2 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 bg-purple-500/20 text-purple-300 text-[10px] px-3 py-1 rounded-bl-xl font-mono border-l border-b border-purple-500/20">
+                  DEV MODE
                 </div>
-                </>
-            ) : (
-                <div className="text-slate-500 flex flex-col items-center">
-                    <Settings className="w-12 h-12 mb-2 opacity-50" />
-                    <p>Vui lòng tạo Trạm Đóng Hàng đầu tiên</p>
-                    {currentUser?.role === 'ADMIN' && (
-                      <button onClick={() => requestAdminAccess({ type: 'setup', isNew: true })} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg">Cài đặt ngay</button>
-                    )}
+                <h3 className="font-medium text-slate-200 mb-4 flex items-center gap-2">
+                  <Box className="w-4 h-4 text-purple-400" />
+                  Công Cụ Giả Lập Máy Quét (Manual Simulator)
+                </h3>
+                
+                <div className="flex flex-col sm:flex-row gap-3">
+                   <input
+                     type="text"
+                     placeholder="Nhập mã vận đơn (VD: SPX12345)"
+                     className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500/50 font-mono text-sm"
+                     id="simulated-barcode-input"
+                     onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.target.value.trim()) {
+                            sendScanAction(e.target.value.trim());
+                            e.target.value = '';
+                        }
+                     }}
+                   />
+                   <button 
+                     onClick={() => {
+                       const inputUI = document.getElementById('simulated-barcode-input');
+                       if(inputUI.value.trim()) {
+                         sendScanAction(inputUI.value.trim());
+                         inputUI.value = '';
+                       }
+                     }}
+                     className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl font-medium text-white shadow-lg transition-colors border border-purple-400/20"
+                   >
+                     Bắt Đầu Ghi
+                   </button>
+                   <button 
+                     onClick={() => sendScanAction('STOP')}
+                     className="px-6 py-2.5 bg-slate-800 hover:bg-rose-600 rounded-xl font-medium text-white shadow-lg transition-colors border border-white/10"
+                   >
+                     STOP (Chốt Đơn)
+                   </button>
                 </div>
-            )}
-          </div>
-          
-          <div className="p-5 rounded-2xl bg-white/5 border border-purple-500/30 backdrop-blur-lg mt-2 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 bg-purple-500/20 text-purple-300 text-[10px] px-3 py-1 rounded-bl-xl font-mono border-l border-b border-purple-500/20">
-              DEV MODE
-            </div>
-            <h3 className="font-medium text-slate-200 mb-4 flex items-center gap-2">
-              <Box className="w-4 h-4 text-purple-400" />
-              Công Cụ Giả Lập Máu Quét (Manual Simulator)
-            </h3>
-            
-            <div className="flex flex-col sm:flex-row gap-3">
-               <input
-                 type="text"
-                 placeholder="Nhập mã vận đơn (VD: SPX12345)"
-                 className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500/50 font-mono text-sm"
-                 id="simulated-barcode-input"
-                 onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.target.value.trim()) {
-                        sendScanAction(e.target.value.trim());
-                        e.target.value = '';
-                    }
-                 }}
-               />
-               <button 
-                 onClick={() => {
-                   const inputUI = document.getElementById('simulated-barcode-input');
-                   if(inputUI.value.trim()) {
-                     sendScanAction(inputUI.value.trim());
-                     inputUI.value = '';
-                   }
-                 }}
-                 className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl font-medium text-white shadow-lg transition-colors border border-purple-400/20"
-               >
-                 Bắt Đầu Ghi
-               </button>
-               <button 
-                 onClick={() => sendScanAction('STOP')}
-                 className="px-6 py-2.5 bg-slate-800 hover:bg-rose-600 rounded-xl font-medium text-white shadow-lg transition-colors border border-white/10"
-               >
-                 STOP (Chốt Đơn)
-               </button>
-            </div>
-            <p className="text-xs text-slate-500 mt-4 leading-relaxed italic">
-              * Sử dụng thanh công cụ này nếu bạn không có súng bắn mã vạch. Hệ thống sẽ kết nối với Camera ở Trạm đang chọn.
-            </p>
-          </div>
+                <p className="text-xs text-slate-500 mt-4 leading-relaxed italic">
+                  * Sử dụng thanh công cụ này nếu bạn không có súng bắn mã vạch. Hệ thống sẽ kết nối với Camera ở Trạm đang chọn.
+                </p>
+              </div>
+            </>
+          )}
 
         </div>
 

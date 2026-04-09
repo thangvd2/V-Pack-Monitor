@@ -2,6 +2,23 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v1.7.0] - 2026-04-09 (Multi-Camera Live View UI)
+
+### 🖥️ Tính Năng Lớn
+- **Overview Grid Mode:** Hiển thị tất cả camera trạm đồng thời trong lưới responsive. Tự động tính số cột dựa trên số trạm (2x2, 3x2, v.v.). Click vào ô → zoom sang single view.
+- **View Mode Toggle:** Nút chuyển đổi giữa Single View và Overview Grid ở header (chỉ hiện khi có ≥2 trạm).
+- **Click-to-Zoom:** Click ô grid → chuyển sang single view cho trạm đó. Nút "Tổng quan" để quay lại grid.
+- **Per-Station Status:** Theo dõi trạng thái ghi hình riêng cho từng trạm trong grid — badge RECORDING/PROCESSING/SẴN SÀNG trên mỗi ô.
+
+### 🎨 UI/UX
+- Grid responsive: mobile 1 cột, tablet 2 cột, desktop auto-fill.
+- Hover effect trên grid tile: scale + border highlight.
+- Barcode simulator ẩn trong grid mode (chỉ hiện ở single mode).
+- Station selector ẩn trong grid mode.
+- SSE subscribe tất cả trạm trong grid mode — realtime status update.
+
+---
+
 ## [v1.6.0] - 2026-04-09 (User Management & Access Control)
 
 ### 🔐 Tính Năng Lớn

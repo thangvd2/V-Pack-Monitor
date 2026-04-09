@@ -201,7 +201,9 @@ CREATE TABLE sessions (
 
 ---
 
-## Phase 3: Multi-Camera Live View UI
+## Phase 3: Multi-Camera Live View UI ✅ COMPLETED (v1.7.0 - 2026-04-09)
+
+**Status:** Đã hoàn thành — Overview Grid, click-to-zoom, per-station status, responsive grid.
 
 **Mục tiêu:** Hiển thị live view cho tất cả camera, hỗ trợ nhiều mode.
 
