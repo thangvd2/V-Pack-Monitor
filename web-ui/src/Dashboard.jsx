@@ -1,3 +1,9 @@
+/**
+ * V-Pack Monitor - CamDongHang v1.9.0
+ * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
+ * All rights reserved. Unauthorized copying or distribution is prohibited.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { BarChart3, HardDrive, Download, TrendingUp, Clock, PieChart as PieChartIcon, Calendar } from 'lucide-react';
