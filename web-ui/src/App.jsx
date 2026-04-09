@@ -1,5 +1,5 @@
 /**
- * V-Pack Monitor - CamDongHang v1.9.0
+ * V-Pack Monitor - CamDongHang v1.10.0
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
@@ -42,6 +42,7 @@ function App() {
   
   // Grid View State
   const [viewMode, setViewMode] = useState('single'); // 'single' | 'grid'
+  const [cameraMode, setCameraMode] = useState('single-cam'); // 'single-cam' | 'dual' | 'pip'
   const [showDashboard, setShowDashboard] = useState(false);
   const [stationStatuses, setStationStatuses] = useState({}); // { [stationId]: { status, waybill } }
   
@@ -432,6 +433,11 @@ function App() {
   };
   
   const activeStation = stations.find(s => s.id === activeStationId) || {};
+  const hasCam2 = activeStation?.ip_camera_2 && activeStation.ip_camera_2.trim() !== '';
+
+  useEffect(() => {
+    if (!hasCam2) setCameraMode('single-cam');
+  }, [activeStationId]);
 
   if (authLoading) {
     return (
@@ -489,7 +495,7 @@ function App() {
             </button>
           </form>
           <p className="text-center text-xs text-slate-500 mt-6">
-            V-Pack Monitor v1.9.0 • VDT
+            V-Pack Monitor v1.10.0 • VDT
           </p>
         </div>
       </div>
@@ -885,6 +891,11 @@ function App() {
                             </div>
                           )}
                         </div>
+                        {station.ip_camera_2 && station.ip_camera_2.trim() !== '' && (
+                          <div className="absolute top-3 right-3 px-2 py-0.5 bg-blue-500/30 border border-blue-400/40 rounded text-[10px] text-blue-200 font-bold pointer-events-none z-10">
+                            2 CAM
+                          </div>
+                        )}
                         <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/5 transition-all duration-300 pointer-events-none" />
                       </div>
                     );
@@ -906,6 +917,22 @@ function App() {
                       Tổng quan
                     </button>
                   )}
+                  {hasCam2 && (
+                    <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-0.5">
+                      <button
+                        onClick={() => setCameraMode('single-cam')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${cameraMode === 'single-cam' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-400 hover:text-white'}`}
+                      >1 Cam</button>
+                      <button
+                        onClick={() => setCameraMode('dual')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${cameraMode === 'dual' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-400 hover:text-white'}`}
+                      >Dual</button>
+                      <button
+                        onClick={() => setCameraMode('pip')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${cameraMode === 'pip' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-400 hover:text-white'}`}
+                      >PIP</button>
+                    </div>
+                  )}
                 </div>
                 <span className="flex h-3 w-3">
                   <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-400 opacity-75"></span>
@@ -926,14 +953,64 @@ function App() {
                         ✅ Đã tìm thấy IP mới: {reconnectInfo.new_ip}
                       </div>
                     )}
-                    <iframe
-                      key={`live-${activeStationId}`}
-                      src={`http://${MTX_HOST}:8889/station_${activeStationId}?controls=false&muted=true&autoplay=true`}
-                      scrolling="no"
-                      className="w-full h-full object-cover"
-                      style={{ border: 'none', background: '#000' }}
-                      allow="autoplay"
-                    />
+
+                    {hasCam2 && cameraMode === 'dual' ? (
+                      <div className="flex gap-1 w-full h-full">
+                        <div className="flex-1 relative">
+                          <iframe
+                            key={`live-${activeStationId}`}
+                            src={`http://${MTX_HOST}:8889/station_${activeStationId}?controls=false&muted=true&autoplay=true`}
+                            scrolling="no"
+                            className="w-full h-full object-cover"
+                            style={{ border: 'none', background: '#000' }}
+                            allow="autoplay"
+                          />
+                          <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 rounded text-xs text-white/80 pointer-events-none">Camera 1</div>
+                        </div>
+                        <div className="flex-1 relative">
+                          <iframe
+                            key={`live-cam2-${activeStationId}`}
+                            src={`http://${MTX_HOST}:8889/station_${activeStationId}_cam2?controls=false&muted=true&autoplay=true`}
+                            scrolling="no"
+                            className="w-full h-full object-cover"
+                            style={{ border: 'none', background: '#000' }}
+                            allow="autoplay"
+                          />
+                          <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 rounded text-xs text-white/80 pointer-events-none">Camera 2</div>
+                        </div>
+                      </div>
+                    ) : hasCam2 && cameraMode === 'pip' ? (
+                      <div className="w-full h-full relative">
+                        <iframe
+                          key={`live-${activeStationId}`}
+                          src={`http://${MTX_HOST}:8889/station_${activeStationId}?controls=false&muted=true&autoplay=true`}
+                          scrolling="no"
+                          className="w-full h-full object-cover"
+                          style={{ border: 'none', background: '#000' }}
+                          allow="autoplay"
+                        />
+                        <div className="absolute bottom-3 right-3 w-1/4 h-1/4 rounded-xl overflow-hidden border-2 border-white/20 shadow-2xl z-20">
+                          <iframe
+                            key={`pip-cam2-${activeStationId}`}
+                            src={`http://${MTX_HOST}:8889/station_${activeStationId}_cam2?controls=false&muted=true&autoplay=true`}
+                            scrolling="no"
+                            className="w-full h-full object-cover"
+                            style={{ border: 'none', background: '#000' }}
+                            allow="autoplay"
+                          />
+                          <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/60 rounded text-[10px] text-white/80 pointer-events-none">Camera 2</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <iframe
+                        key={`live-${activeStationId}`}
+                        src={`http://${MTX_HOST}:8889/station_${activeStationId}?controls=false&muted=true&autoplay=true`}
+                        scrolling="no"
+                        className="w-full h-full object-cover"
+                        style={{ border: 'none', background: '#000' }}
+                        allow="autoplay"
+                      />
+                    )}
                     <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
                       <div className="flex gap-2">
                         <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-mono text-white/90">

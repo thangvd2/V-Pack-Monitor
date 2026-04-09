@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.9.0
+# V-Pack Monitor - CamDongHang v1.10.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -59,8 +59,8 @@ def notify_sse(event_type, data):
             _sse_clients.pop(i)
 
 
-def _mtx_add_path(station_id, rtsp_url):
-    name = f"station_{station_id}"
+def _mtx_add_path(station_id, rtsp_url, suffix=""):
+    name = f"station_{station_id}{suffix}"
     conf = {
         "name": name,
         "source": rtsp_url,
@@ -87,8 +87,8 @@ def _mtx_add_path(station_id, rtsp_url):
         pass
 
 
-def _mtx_remove_path(station_id):
-    name = f"station_{station_id}"
+def _mtx_remove_path(station_id, suffix=""):
+    name = f"station_{station_id}{suffix}"
     try:
         req = urllib.request.Request(
             f"{MTX_API}/v3/config/paths/remove/{name}",
@@ -100,9 +100,10 @@ def _mtx_remove_path(station_id):
 
 
 class CameraStreamManager:
-    def __init__(self, url, station_id=None):
+    def __init__(self, url, station_id=None, cam2_url=None):
         self.url = url
         self.station_id = station_id
+        self.cam2_url = cam2_url
         self.is_running = False
         self.thread = None
         self._fail_count = 0
@@ -113,6 +114,8 @@ class CameraStreamManager:
             self.is_running = True
             self._fail_count = 0
             self._mtx_register()
+            if self.cam2_url:
+                _mtx_add_path(self.station_id, self.cam2_url, suffix="_cam2")
             self.thread = threading.Thread(target=self._monitor_loop, daemon=True)
             self.thread.start()
 
@@ -120,6 +123,8 @@ class CameraStreamManager:
         self.is_running = False
         if self.station_id:
             _mtx_remove_path(self.station_id)
+            if self.cam2_url:
+                _mtx_remove_path(self.station_id, suffix="_cam2")
         if self.thread:
             self.thread.join()
 
@@ -173,12 +178,27 @@ class CameraStreamManager:
                 found = any(p.get("name") == path_name for p in items)
                 if not found:
                     self._mtx_register()
+                # Also check cam2 path
+                if self.cam2_url:
+                    cam2_path_name = f"station_{self.station_id}_cam2"
+                    cam2_found = any(p.get("name") == cam2_path_name for p in items)
+                    if not cam2_found:
+                        _mtx_add_path(self.station_id, self.cam2_url, suffix="_cam2")
             except Exception:
                 pass
 
     def update_url(self, new_url):
         with self._lock:
             self.url = new_url
+
+    def update_cam2_url(self, new_url):
+        with self._lock:
+            old_cam2 = self.cam2_url
+            self.cam2_url = new_url
+        if old_cam2 and self.station_id:
+            _mtx_remove_path(self.station_id, suffix="_cam2")
+        if new_url and self.station_id:
+            _mtx_add_path(self.station_id, new_url, suffix="_cam2")
         self._mtx_register()
 
 
@@ -370,7 +390,17 @@ async def lifespan(app: FastAPI):
             channel=1,
             brand=st.get("camera_brand", "imou"),
         )
-        manager = CameraStreamManager(sub_url, station_id=st["id"])
+        cam2_sub_url = None
+        if st.get("ip_camera_2"):
+            cam2_sub_url = get_rtsp_sub_url(
+                st["ip_camera_2"],
+                st["safety_code"],
+                channel=2,
+                brand=st.get("camera_brand", "imou"),
+            )
+        manager = CameraStreamManager(
+            sub_url, station_id=st["id"], cam2_url=cam2_sub_url
+        )
         stream_managers[st["id"]] = manager
         manager.start()
 
@@ -620,7 +650,15 @@ def create_station(payload: StationPayload, admin: AdminUser):
     url = get_rtsp_sub_url(
         payload.ip_camera_1, payload.safety_code, channel=1, brand=payload.camera_brand
     )
-    sm = CameraStreamManager(url, station_id=new_id)
+    cam2_url = None
+    if payload.ip_camera_2:
+        cam2_url = get_rtsp_sub_url(
+            payload.ip_camera_2,
+            payload.safety_code,
+            channel=2,
+            brand=payload.camera_brand,
+        )
+    sm = CameraStreamManager(url, station_id=new_id, cam2_url=cam2_url)
     stream_managers[new_id] = sm
     sm.start()
     return {"status": "success", "id": new_id}
@@ -637,6 +675,15 @@ def update_station(station_id: int, payload: StationPayload, admin: AdminUser):
             brand=payload.camera_brand,
         )
         stream_managers[station_id].update_url(url)
+        cam2_url = None
+        if payload.ip_camera_2:
+            cam2_url = get_rtsp_sub_url(
+                payload.ip_camera_2,
+                payload.safety_code,
+                channel=2,
+                brand=payload.camera_brand,
+            )
+        stream_managers[station_id].update_cam2_url(cam2_url)
     return {"status": "success"}
 
 
@@ -1105,6 +1152,16 @@ def live_preview(station_id: int, current_user: CurrentUser):
     return {
         "status": "ok",
         "webrtc_url": f"http://localhost:8889/station_{station_id}",
+    }
+
+
+@app.get("/api/live-cam2")
+def live_preview_cam2(station_id: int, current_user: CurrentUser):
+    return {
+        "status": "ok",
+        "webrtc_url": f"http://localhost:8889/station_{station_id}_cam2",
+        "has_cam2": station_id in stream_managers
+        and stream_managers[station_id].cam2_url is not None,
     }
 
 

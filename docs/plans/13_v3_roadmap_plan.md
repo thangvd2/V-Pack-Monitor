@@ -118,7 +118,9 @@ GET /api/analytics/stations-comparison                    # So sánh năng suấ
 
 ---
 
-## Phase 3: Dual Camera + PIP Mode
+## Phase 3: Dual Camera + PIP Mode ✅ COMPLETED (v1.10.0 - 2026-04-09)
+
+**Status:** Đã hoàn thành — Dual side-by-side, PIP overlay, MediaMTX cam2 path, grid badges.
 
 **Mục tiêu:** Hiển thị 2 camera cho trạm có `ip_camera_2` configured.
 

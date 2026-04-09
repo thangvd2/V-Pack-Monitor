@@ -2,6 +2,20 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v1.10.0] - 2026-04-09 (Dual Camera + PIP Mode)
+
+### 📹 Tính Năng Lớn
+- **Dual Camera Side-by-Side:** Trạm có 2 camera → hiển thị song song 50/50. Toggle "1 Cam / Dual / PIP".
+- **Picture-in-Picture (PIP):** Camera 1 chiếm full, Camera 2 small overlay góc dưới phải.
+- **MediaMTX Dual Path:** Backend tự tạo path `station_{id}_cam2` cho camera phụ. Live view WebRTC riêng biệt.
+- **Grid Badge:** Ô grid hiển thị badge "2 CAM" cho trạm có camera phụ.
+
+### 🏗️ Kiến Trúc
+- **`api.py`**: `CameraStreamManager` quản lý cam2_url riêng. `_mtx_add_path` hỗ trợ suffix. Endpoint `GET /api/live-cam2`.
+- **`App.jsx`**: `cameraMode` state ('single-cam' | 'dual' | 'pip'). Conditional render iframe cho dual/PIP. Toggle 3 nút chỉ hiện khi hasCam2.
+
+---
+
 ## [v1.9.0] - 2026-04-09 (Dashboard & Analytics Pro)
 
 ### 📊 Tính Năng Lớn
