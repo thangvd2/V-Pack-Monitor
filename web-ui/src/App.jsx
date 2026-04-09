@@ -1,14 +1,13 @@
 /**
- * V-Pack Monitor - CamDongHang v1.5.0
+ * V-Pack Monitor - CamDongHang v1.6.0
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Trash2, HardDrive, Plus, Monitor, ShieldCheck, BarChart3, CloudUpload } from 'lucide-react';
+import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Trash2, HardDrive, Plus, Monitor, ShieldCheck, BarChart3, CloudUpload, LogOut, User, Users } from 'lucide-react';
 import SetupModal from './SetupModal';
-import PinModal from './PinModal';
 import VideoPlayerModal from './VideoPlayerModal';
 
 const API_BASE = window.location.hostname === 'localhost' && ['3000', '3001', '5173'].includes(window.location.port) 
@@ -30,10 +29,11 @@ function App() {
   const [storageInfo, setStorageInfo] = useState({ size_str: '0 MB', file_count: 0 });
   const [diskHealth, setDiskHealth] = useState(null);
   
-  // Security & Analytics State
-  const [isAdminAuth, setIsAdminAuth] = useState(false);
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState(null); // 'setup' or {type: 'delete', id: ...}
+  // Auth State
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loginError, setLoginError] = useState('');
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [analytics, setAnalytics] = useState({ total_today: 0, station_today: 0 });
   const [reconnectInfo, setReconnectInfo] = useState(null);
   const [previousStationId, setPreviousStationId] = useState(null);
@@ -41,6 +41,37 @@ function App() {
   // Custom Video Player State
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState({ url: '', waybillCode: '' });
+
+  useEffect(() => {
+    const token = localStorage.getItem('vpack_token');
+    const savedUser = localStorage.getItem('vpack_user');
+    if (token && savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      } catch {
+        localStorage.removeItem('vpack_token');
+        localStorage.removeItem('vpack_user');
+      }
+    }
+    setAuthLoading(false);
+  }, []);
+
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 401) {
+          localStorage.removeItem('vpack_token');
+          localStorage.removeItem('vpack_user');
+          setCurrentUser(null);
+          delete axios.defaults.headers.common['Authorization'];
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(interceptor);
+  }, []);
 
   useEffect(() => {
     const es = new EventSource(`${API_BASE}/api/events?stations=${activeStationId}`);
@@ -72,7 +103,6 @@ function App() {
   // Init fetch
   useEffect(() => {
     fetchStations();
-    checkSettings();
     fetchDiskHealth();
     
     // Refresh disk health every 60 seconds
@@ -228,22 +258,22 @@ function App() {
     }
   };
 
-  // --- Quản lý Bảo mật (PIN Gateway) ---
+  // --- Quản lý Bảo mật (Role Gateway) ---
   const requestAdminAccess = (action) => {
-    if (isAdminAuth) {
+    if (currentUser?.role === 'ADMIN') {
       executeSecureAction(action);
     } else {
-      setPendingAction(action);
-      setShowPinModal(true);
+      alert('Yêu cầu quyền Administrator.');
     }
   };
 
-  const executeSecureAction = (action) => {
+  const executeSecureAction = async (action) => {
     if (action.type === 'setup') {
       if (action.isNew) {
         setPreviousStationId(activeStationId);
         setActiveStationId(0);
       }
+      await checkSettings();
       setShowSetupModal(true);
     } else if (action.type === 'delete') {
       doDeleteRecord(action.id, action.waybill);
@@ -252,15 +282,33 @@ function App() {
     }
   };
 
-  const handlePinSuccess = () => {
-    setIsAdminAuth(true);
-    setShowPinModal(false);
-    if (pendingAction) {
-      executeSecureAction(pendingAction);
-      setPendingAction(null);
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    try {
+      const res = await axios.post(`${API_BASE}/api/auth/login`, loginForm);
+      if (res.data.status === 'success') {
+        const { access_token, user } = res.data;
+        localStorage.setItem('vpack_token', access_token);
+        localStorage.setItem('vpack_user', JSON.stringify(user));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+        setCurrentUser(user);
+        setLoginForm({ username: '', password: '' });
+      } else {
+        setLoginError(res.data.message || 'Đăng nhập thất bại.');
+      }
+    } catch (err) {
+      setLoginError('Lỗi kết nối server.');
     }
   };
-  
+
+  const handleLogout = () => {
+    localStorage.removeItem('vpack_token');
+    localStorage.removeItem('vpack_user');
+    delete axios.defaults.headers.common['Authorization'];
+    setCurrentUser(null);
+  };
+   
   // --- Hàm xoá bản ghi (Đã qua kiểm duyệt bảo mật) ---
   const handleDeleteRecord = (id, waybill_code) => {
     requestAdminAccess({ type: 'delete', id, waybill: waybill_code });
@@ -271,12 +319,9 @@ function App() {
       try {
         await axios.delete(`${API_BASE}/api/records/${id}`);
         fetchRecords(searchTerm, activeStationId);
-        setIsAdminAuth(false); // Khoá lại sau khi xoá
       } catch (err) {
         alert("Có lỗi xảy ra khi xoá.");
       }
-    } else {
-      setIsAdminAuth(false); // Khoá lại nếu huỷ
     }
   };
 
@@ -290,10 +335,8 @@ function App() {
         alert("Lỗi Upload: " + res.data.message);
       }
       setLoading(false);
-      setIsAdminAuth(false); // Khoá lại
     } catch (e) {
       setLoading(false);
-      setIsAdminAuth(false);
       alert("Đã xảy ra lỗi khi đồng bộ Đám mây.");
     }
   };
@@ -341,14 +384,71 @@ function App() {
   
   const activeStation = stations.find(s => s.id === activeStationId) || {};
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center border border-blue-400/30 mx-auto mb-4">
+              <PackageCheck className="text-blue-400 w-9 h-9" />
+            </div>
+            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
+              V-Pack Monitor
+            </h1>
+            <p className="text-slate-400 mt-2">Đăng nhập để tiếp tục</p>
+          </div>
+          <form onSubmit={handleLogin} className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-md shadow-2xl">
+            {loginError && (
+              <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-sm">
+                {loginError}
+              </div>
+            )}
+            <div className="mb-4">
+              <label className="block text-sm text-slate-400 mb-2">Tên đăng nhập</label>
+              <input
+                type="text"
+                value={loginForm.username}
+                onChange={(e) => setLoginForm(f => ({ ...f, username: e.target.value }))}
+                className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+                placeholder="Nhập tên đăng nhập"
+                autoFocus
+              />
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm text-slate-400 mb-2">Mật khẩu</label>
+              <input
+                type="password"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm(f => ({ ...f, password: e.target.value }))}
+                className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+                placeholder="Nhập mật khẩu"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full py-3 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 rounded-xl font-semibold text-white shadow-lg transition-all"
+            >
+              Đăng Nhập
+            </button>
+          </form>
+          <p className="text-center text-xs text-slate-500 mt-6">
+            V-Pack Monitor v1.6.0 • VDT
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen p-6 md:p-10 font-sans">
-      <PinModal 
-        isOpen={showPinModal} 
-        onSuccess={handlePinSuccess} 
-        onCancel={() => { setShowPinModal(false); setPendingAction(null); }} 
-      />
-      
       {showSetupModal && (
         <SetupModal 
           isOpen={showSetupModal}
@@ -357,12 +457,10 @@ function App() {
           isNewStation={!activeStation.id}
           onSaved={() => {
             setShowSetupModal(false);
-            setIsAdminAuth(false);
             window.location.reload(); 
           }} 
           onCancel={() => {
             setShowSetupModal(false);
-            setIsAdminAuth(false);
             if (activeStationId === 0 && previousStationId) {
               setActiveStationId(previousStationId);
             } else if (activeStationId === 0 && stations.length > 0) {
@@ -410,9 +508,11 @@ function App() {
                ))}
                {stations.length === 0 && <option value={0} disabled>Chưa có trạm nào</option>}
              </select>
-             <button title="Thêm Trạm Mới" onClick={() => requestAdminAccess({ type: 'setup', isNew: true })} className="ml-2 p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition">
-                <Plus className="w-4 h-4" />
-             </button>
+              {currentUser?.role === 'ADMIN' && (
+                <button title="Thêm Trạm Mới" onClick={() => requestAdminAccess({ type: 'setup', isNew: true })} className="ml-2 p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition">
+                   <Plus className="w-4 h-4" />
+                </button>
+              )}
           </div>
 
           <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 hidden xl:flex">
@@ -448,21 +548,36 @@ function App() {
             </div>
           </div>
           
-          <button 
-            onClick={() => requestAdminAccess({ type: 'cloud_sync' })}
-            className="p-3 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-2xl transition-all shadow-lg hidden md:flex text-indigo-400"
-            title="Đẩy Video lên Cloud"
-          >
-            <CloudUpload className="w-6 h-6" />
-          </button>
+          {currentUser?.role === 'ADMIN' && (
+            <button 
+              onClick={() => requestAdminAccess({ type: 'cloud_sync' })}
+              className="p-3 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-2xl transition-all shadow-lg hidden md:flex text-indigo-400"
+              title="Đẩy Video lên Cloud"
+            >
+              <CloudUpload className="w-6 h-6" />
+            </button>
+          )}
           
-          <button 
-            onClick={() => requestAdminAccess({ type: 'setup' })}
-            className={`p-3 border rounded-2xl transition-all shadow-lg hidden md:flex ${isAdminAuth ? 'bg-blue-600/30 border-blue-500 text-blue-300' : 'bg-white/5 hover:bg-blue-500/20 border-white/10 hover:border-blue-500/50 text-slate-400 hover:text-blue-400'}`}
-            title="Cài đặt Camera & Hệ thống cho Trạm này"
-          >
-            {isAdminAuth ? <ShieldCheck className="w-6 h-6" /> : <Settings className="w-6 h-6" />}
-          </button>
+          {currentUser?.role === 'ADMIN' && (
+            <button 
+              onClick={() => requestAdminAccess({ type: 'setup' })}
+              className="p-3 bg-white/5 hover:bg-blue-500/20 border border-white/10 hover:border-blue-500/50 rounded-2xl transition-all shadow-lg hidden md:flex text-slate-400 hover:text-blue-400"
+              title="Cài đặt Camera & Hệ thống cho Trạm này"
+            >
+              <Settings className="w-6 h-6" />
+            </button>
+          )}
+
+          <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5">
+            <User className="w-5 h-5 text-blue-400" />
+            <div className="flex flex-col">
+              <span className="text-sm text-slate-200 font-medium">{currentUser.full_name || currentUser.username}</span>
+              <span className="text-[10px] text-slate-400 uppercase">{currentUser.role}</span>
+            </div>
+            <button onClick={handleLogout} className="ml-2 p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-red-400 transition" title="Đăng xuất">
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         </div>
 
@@ -561,7 +676,9 @@ function App() {
                 <div className="text-slate-500 flex flex-col items-center">
                     <Settings className="w-12 h-12 mb-2 opacity-50" />
                     <p>Vui lòng tạo Trạm Đóng Hàng đầu tiên</p>
-                    <button onClick={() => requestAdminAccess({ type: 'setup', isNew: true })} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg">Cài đặt ngay</button>
+                    {currentUser?.role === 'ADMIN' && (
+                      <button onClick={() => requestAdminAccess({ type: 'setup', isNew: true })} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg">Cài đặt ngay</button>
+                    )}
                 </div>
             )}
           </div>
@@ -664,13 +781,15 @@ function App() {
                          Trạm: {record.station_name || 'Mặc định'}
                        </span>
                     </div>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleDeleteRecord(record.id, record.waybill_code); }}
-                      className="p-2 -mr-2 -mt-2 text-slate-500 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors"
-                      title="Xoá bản ghi lưu trữ dọn ổ đĩa"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {currentUser?.role === 'ADMIN' && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeleteRecord(record.id, record.waybill_code); }}
+                        className="p-2 -mr-2 -mt-2 text-slate-500 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors"
+                        title="Xoá bản ghi lưu trữ dọn ổ đĩa"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                   
                   <p className="text-xs text-slate-400 mb-4 font-mono">

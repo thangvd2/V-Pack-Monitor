@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.5.0
+# V-Pack Monitor - CamDongHang v1.6.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -101,6 +101,45 @@ def init_db():
             """,
                 (ip1, code, mode),
             )
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'OPERATOR',
+                full_name TEXT NOT NULL DEFAULT '',
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                station_id INTEGER NOT NULL,
+                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_heartbeat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'ACTIVE',
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (station_id) REFERENCES stations(id)
+            )
+        """)
+
+        cursor.execute("SELECT COUNT(*) FROM users")
+        if cursor.fetchone()[0] == 0:
+            from passlib.context import CryptContext
+
+            pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            cursor.execute(
+                "INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, 'ADMIN', 'Administrator')",
+                ("admin", pwd_ctx.hash("08012011")),
+            )
+            print("Default admin created: admin/08012011")
+
+        # Expire all stale sessions on startup
+        cursor.execute("UPDATE sessions SET status = 'EXPIRED' WHERE status = 'ACTIVE'")
 
         conn.commit()
 
@@ -374,3 +413,177 @@ def delete_station(station_id):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM stations WHERE id = ?", (station_id,))
         conn.commit()
+
+
+def get_user_by_username(username):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, username, password_hash, role, full_name, is_active FROM users WHERE username = ?",
+            (username,),
+        )
+        row = cursor.fetchone()
+        if row:
+            return {
+                "id": row[0],
+                "username": row[1],
+                "password_hash": row[2],
+                "role": row[3],
+                "full_name": row[4],
+                "is_active": row[5],
+            }
+        return None
+
+
+def get_user_by_id(user_id):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, username, role, full_name, is_active FROM users WHERE id = ?",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        if row:
+            return {
+                "id": row[0],
+                "username": row[1],
+                "role": row[2],
+                "full_name": row[3],
+                "is_active": row[4],
+            }
+        return None
+
+
+def get_all_users():
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, username, role, full_name, is_active, created_at FROM users ORDER BY id ASC"
+        )
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": r[0],
+                "username": r[1],
+                "role": r[2],
+                "full_name": r[3],
+                "is_active": r[4],
+                "created_at": r[5],
+            }
+            for r in rows
+        ]
+
+
+def create_user(username, password, role="OPERATOR", full_name=""):
+    from passlib.context import CryptContext
+
+    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, ?, ?)",
+                (username, pwd_ctx.hash(password), role, full_name),
+            )
+            conn.commit()
+            return cursor.lastrowid
+        except sqlite3.IntegrityError:
+            return None
+
+
+def update_user(user_id, **kwargs):
+    allowed = {"role", "full_name", "is_active"}
+    sets = []
+    vals = []
+    for k, v in kwargs.items():
+        if k in allowed:
+            sets.append(f"{k} = ?")
+            vals.append(v)
+    if not sets:
+        return
+    vals.append(user_id)
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"UPDATE users SET {', '.join(sets)} WHERE id = ?", vals)
+        conn.commit()
+
+
+def update_user_password(user_id, new_password):
+    from passlib.context import CryptContext
+
+    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (pwd_ctx.hash(new_password), user_id),
+        )
+        conn.commit()
+
+
+def delete_user(user_id):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+
+
+def create_session(user_id, station_id):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO sessions (user_id, station_id, status) VALUES (?, ?, 'ACTIVE')",
+            (user_id, station_id),
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+
+def get_active_session(station_id):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT s.id, s.user_id, s.station_id, s.last_heartbeat, u.username, u.full_name FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.station_id = ? AND s.status = 'ACTIVE'",
+            (station_id,),
+        )
+        row = cursor.fetchone()
+        if row:
+            return {
+                "id": row[0],
+                "user_id": row[1],
+                "station_id": row[2],
+                "last_heartbeat": row[3],
+                "username": row[4],
+                "full_name": row[5],
+            }
+        return None
+
+
+def update_session_heartbeat(session_id):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE sessions SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?",
+            (session_id,),
+        )
+        conn.commit()
+
+
+def end_session(session_id):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE sessions SET status = 'EXPIRED' WHERE id = ?", (session_id,)
+        )
+        conn.commit()
+
+
+def expire_stale_sessions(timeout_seconds=90):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE sessions SET status = 'EXPIRED' WHERE status = 'ACTIVE' AND strftime('%s', 'now') - strftime('%s', last_heartbeat) > ?",
+            (timeout_seconds,),
+        )
+        conn.commit()
+        return cursor.rowcount

@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.5.0
+# V-Pack Monitor - CamDongHang v1.6.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -26,6 +26,8 @@ from recorder import CameraRecorder
 import cloud_sync
 import network
 import video_worker
+import auth
+from auth import CurrentUser, AdminUser, oauth2_scheme
 
 # --- Quản lý Trạng thái Ghi hình Đa Trạm ---
 active_recorders = {}
@@ -406,7 +408,7 @@ except BaseException:
 
 # --- SYSTEM HEALTH API ---
 @app.get("/api/system/disk")
-def get_disk_health():
+def get_disk_health(current_user: CurrentUser):
     total, used, free = shutil.disk_usage("recordings")
     return {
         "status": "success",
@@ -433,12 +435,12 @@ class SettingsUpdate(BaseModel):
 
 
 @app.get("/api/settings")
-def get_settings():
+def get_settings(admin: AdminUser):
     return {"data": database.get_all_settings()}
 
 
 @app.post("/api/settings")
-def update_settings(payload: SettingsUpdate):
+def update_settings(payload: SettingsUpdate, admin: AdminUser):
     database.set_settings(payload.dict())
 
     # Restart Telegram Bot polling if tokens change
@@ -455,7 +457,7 @@ def update_settings(payload: SettingsUpdate):
 
 
 @app.post("/api/credentials")
-async def upload_credentials(file: UploadFile = File(...)):
+async def upload_credentials(admin: AdminUser, file: UploadFile = File(...)):
     contents = await file.read()
     with open("credentials.json", "wb") as f:
         f.write(contents)
@@ -463,7 +465,7 @@ async def upload_credentials(file: UploadFile = File(...)):
 
 
 @app.post("/api/cloud-sync")
-def trigger_cloud_sync():
+def trigger_cloud_sync(admin: AdminUser):
     try:
         msg = cloud_sync.process_cloud_sync()
         return {"status": "success", "message": msg}
@@ -471,20 +473,99 @@ def trigger_cloud_sync():
         return {"status": "error", "message": str(e)}
 
 
-# --- SECURITY PIN API ---
+# --- AUTH API ---
 
 
-class PinPayload(BaseModel):
-    pin: str
+class LoginPayload(BaseModel):
+    username: str
+    password: str
 
 
-@app.post("/api/verify-pin")
-def verify_pin(payload: PinPayload):
-    # Lấy PIN từ database, nếu không có lấy mặc định 08012011
-    correct_pin = database.get_setting("ADMIN_PIN", "08012011")
-    if payload.pin == correct_pin:
-        return {"status": "success"}
-    return {"status": "error", "message": "Sai mã PIN quản trị viên."}
+@app.post("/api/auth/login")
+def login(payload: LoginPayload):
+    user = database.get_user_by_username(payload.username)
+    if not user or not auth.verify_password(payload.password, user["password_hash"]):
+        return {"status": "error", "message": "Sai tên đăng nhập hoặc mật khẩu."}
+    if not user.get("is_active"):
+        return {"status": "error", "message": "Tài khoản đã bị khóa."}
+    token = auth.create_access_token({"sub": str(user["id"]), "role": user["role"]})
+    return {
+        "status": "success",
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "role": user["role"],
+            "full_name": user["full_name"],
+        },
+    }
+
+
+@app.get("/api/auth/me")
+def get_me(current_user: CurrentUser):
+    return {"status": "success", "user": current_user}
+
+
+@app.post("/api/auth/logout")
+def logout():
+    return {"status": "success", "message": "Đã đăng xuất."}
+
+
+# --- USER MANAGEMENT API (ADMIN ONLY) ---
+
+
+@app.get("/api/users")
+def list_users(admin: AdminUser):
+    return {"data": database.get_all_users()}
+
+
+class UserCreatePayload(BaseModel):
+    username: str
+    password: str
+    role: str = "OPERATOR"
+    full_name: str = ""
+
+
+@app.post("/api/users")
+def create_user(payload: UserCreatePayload, admin: AdminUser):
+    if payload.role not in ("ADMIN", "OPERATOR"):
+        return {"status": "error", "message": "Role phải là ADMIN hoặc OPERATOR."}
+    new_id = database.create_user(
+        payload.username, payload.password, payload.role, payload.full_name
+    )
+    if new_id is None:
+        return {"status": "error", "message": "Username đã tồn tại."}
+    return {"status": "success", "id": new_id}
+
+
+class UserUpdatePayload(BaseModel):
+    role: str | None = None
+    full_name: str | None = None
+    is_active: int | None = None
+
+
+@app.put("/api/users/{user_id}")
+def update_user_api(user_id: int, payload: UserUpdatePayload, admin: AdminUser):
+    kwargs = {k: v for k, v in payload.dict().items() if v is not None}
+    if not kwargs:
+        return {"status": "error", "message": "Không có dữ liệu cập nhật."}
+    database.update_user(user_id, **kwargs)
+    return {"status": "success"}
+
+
+@app.put("/api/users/{user_id}/password")
+def reset_password(user_id: int, password: str, admin: AdminUser):
+    database.update_user_password(user_id, password)
+    return {"status": "success"}
+
+
+@app.delete("/api/users/{user_id}")
+def delete_user_api(user_id: int, admin: AdminUser):
+    if user_id == admin["id"]:
+        return {"status": "error", "message": "Không thể xoá chính mình."}
+    database.delete_user(user_id)
+    return {"status": "success"}
 
 
 # --- STATIONS CRUD API ---
@@ -506,7 +587,7 @@ def get_stations_api():
 
 
 @app.post("/api/stations")
-def create_station(payload: StationPayload):
+def create_station(payload: StationPayload, admin: AdminUser):
     new_id = database.add_station(payload.dict())
     url = get_rtsp_sub_url(
         payload.ip_camera_1, payload.safety_code, channel=1, brand=payload.camera_brand
@@ -518,7 +599,7 @@ def create_station(payload: StationPayload):
 
 
 @app.put("/api/stations/{station_id}")
-def update_station(station_id: int, payload: StationPayload):
+def update_station(station_id: int, payload: StationPayload, admin: AdminUser):
     database.update_station(station_id, payload.dict())
     if station_id in stream_managers:
         url = get_rtsp_sub_url(
@@ -532,7 +613,7 @@ def update_station(station_id: int, payload: StationPayload):
 
 
 @app.delete("/api/stations/{station_id}")
-def delete_station(station_id: int):
+def delete_station(station_id: int, admin: AdminUser):
     database.delete_station(station_id)
     if station_id in stream_managers:
         stream_managers[station_id].stop()
@@ -552,7 +633,7 @@ def delete_station(station_id: int):
 
 
 @app.get("/api/discover-mac")
-def discover_camera_by_mac(mac: str):
+def discover_camera_by_mac(mac: str, current_user: AdminUser):
     if not mac or not network.validate_mac(mac):
         return {
             "status": "error",
@@ -572,7 +653,7 @@ def discover_camera_by_mac(mac: str):
 
 
 @app.get("/api/discover/{station_id}")
-def discover_camera(station_id: int):
+def discover_camera(station_id: int, current_user: AdminUser):
     station = database.get_station(station_id)
     if not station:
         return {"status": "error", "message": "Trạm không tồn tại"}
@@ -622,6 +703,50 @@ def get_reconnect_status(station_id: int | None = None):
     return {"data": reconnect_status}
 
 
+# --- SESSION LOCKING API ---
+
+
+@app.post("/api/sessions/acquire")
+def acquire_session(station_id: int, current_user: CurrentUser):
+    if current_user["role"] == "ADMIN":
+        return {
+            "status": "error",
+            "message": "Admin không thể đóng hàng. Vui lòng dùng tài khoản Operator.",
+        }
+
+    database.expire_stale_sessions()
+
+    existing = database.get_active_session(station_id)
+    if existing:
+        if existing["user_id"] != current_user["id"]:
+            return {
+                "status": "error",
+                "message": f"Trạm đang được sử dụng bởi {existing['full_name'] or existing['username']}.",
+            }
+        return {
+            "status": "success",
+            "session_id": existing["id"],
+            "message": "Session đã tồn tại.",
+        }
+
+    session_id = database.create_session(current_user["id"], station_id)
+    return {"status": "success", "session_id": session_id}
+
+
+@app.post("/api/sessions/heartbeat")
+def heartbeat_session(session_id: int, current_user: CurrentUser):
+    database.update_session_heartbeat(session_id)
+    return {"status": "success"}
+
+
+@app.post("/api/sessions/release")
+def release_session(station_id: int, current_user: CurrentUser):
+    existing = database.get_active_session(station_id)
+    if existing and existing["user_id"] == current_user["id"]:
+        database.end_session(existing["id"])
+    return {"status": "success"}
+
+
 # --- SCAN API ---
 
 
@@ -631,9 +756,18 @@ class ScanPayload(BaseModel):
 
 
 @app.post("/api/scan")
-def handle_scan(payload: ScanPayload):
+def handle_scan(payload: ScanPayload, current_user: CurrentUser):
     sid = payload.station_id
     barcode = payload.barcode.strip().upper()
+
+    if current_user["role"] != "ADMIN":
+        session = database.get_active_session(sid)
+        if not session or session["user_id"] != current_user["id"]:
+            return {
+                "status": "error",
+                "message": "Bạn chưa mở session cho trạm này. Vui lòng chọn trạm và bấm 'Bắt đầu'.",
+            }
+        database.update_session_heartbeat(session["id"])
 
     if not barcode:
         return {"status": "error", "message": "M\u00e3 v\u1ea1ch tr\u1ed1ng"}
@@ -748,7 +882,7 @@ def handle_scan(payload: ScanPayload):
 
 
 @app.get("/api/status")
-def get_status(station_id: int):
+def get_status(station_id: int, current_user: CurrentUser):
     if station_id in _processing_stations:
         return {"status": "processing", "waybill": active_waybills.get(station_id, "")}
     return {
@@ -761,7 +895,7 @@ def get_status(station_id: int):
 
 
 @app.get("/api/records")
-def get_records(station_id: int = None, search: str = ""):
+def get_records(current_user: CurrentUser, station_id: int = None, search: str = ""):
     records = database.get_records(search, station_id)
     results = []
     for r in records:
@@ -781,7 +915,7 @@ def get_records(station_id: int = None, search: str = ""):
 
 
 @app.delete("/api/records/{record_id}")
-def delete_record(record_id: int):
+def delete_record(record_id: int, admin: AdminUser):
     try:
         database.delete_record(record_id)
         return {"status": "success"}
@@ -790,7 +924,7 @@ def delete_record(record_id: int):
 
 
 @app.get("/api/storage/info")
-def get_storage_info():
+def get_storage_info(current_user: CurrentUser):
     total_size = 0
     dir_path = "recordings"
     file_count = 0
@@ -815,7 +949,7 @@ def get_storage_info():
 
 
 @app.get("/api/analytics/today")
-def get_analytics_today(station_id: int):
+def get_analytics_today(station_id: int, current_user: CurrentUser):
     with sqlite3.connect(database.DB_FILE) as conn:
         cursor = conn.cursor()
 
@@ -836,7 +970,7 @@ def get_analytics_today(station_id: int):
 
 
 @app.get("/api/live")
-def live_preview(station_id: int):
+def live_preview(station_id: int, current_user: CurrentUser):
     return {
         "status": "ok",
         "webrtc_url": f"http://localhost:8889/station_{station_id}",
@@ -844,7 +978,7 @@ def live_preview(station_id: int):
 
 
 @app.get("/api/mtx-status")
-def mtx_status():
+def mtx_status(current_user: CurrentUser):
     try:
         req = urllib.request.Request(f"{MTX_API}/v3/paths/list", method="GET")
         resp = urllib.request.urlopen(req, timeout=3)

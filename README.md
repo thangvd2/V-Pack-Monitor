@@ -1,11 +1,11 @@
-# 📦 V-Pack Monitor (CamDongHang) - v1.5.0
+# 📦 V-Pack Monitor (CamDongHang) - v1.6.0
 
 Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa cho nền tảng thương mại điện tử (Shopee, TikTok, Lazada). Giải pháp cung cấp hệ thống quản lý Camera trạm đóng gói, ghi hình chính xác theo kiện hàng và cung cấp bằng chứng "Thép" giúp xử lý khiếu nại trong 1 nốt nhạc.
 
 ![V-Pack Monitor Architecture](/placeholder.png "Mô phỏng Hệ thống")
 
-## 🌟 Chức năng nổi bật (v1.5.0)
-- 📹 **Record Đa Trạm (Multi-Station):** Hỗ trợ nhiều trạm đóng hàng, cấu hình riêng biệt cho từng bàn đóng với mã PIN/Safety Code. Hỗ trợ nhiều hãng Camera như Imou, Dahua, Tenda, Tapo, Ezviz, v.v.
+## 🌟 Chức năng nổi bật (v1.6.0)
+- 📹 **Record Đa Trạm (Multi-Station):** Hỗ trợ nhiều trạm đóng hàng, cấu hình riêng biệt cho từng bàn đóng. Hỗ trợ nhiều hãng Camera như Imou, Dahua, Tenda, Tapo, Ezviz, v.v.
 - 🔴 **WebRTC Live View (Sub-second Latency):** Quan sát trực tiếp qua WebRTC với độ trễ gần như thời gian thực, chất lượng H.264 gốc từ camera. Không decode/re-encode, CPU server gần như 0.
 - 🎯 **Quét Mã Vạch (Smart Barcode):** Tự động bám theo vận đơn. Camera chỉ Record khi bắt đầu gói mã kiện hàng, tự kết thúc Video khi quét mã EXIT hoặc kiện tiếp theo.
 - 🎬 **Ghi hình MPEG-TS an toàn:** Record dưới dạng MPEG-TS (streamable), tự động chuyển sang MP4 khi dừng. Hỗ trợ hardware-accelerated transcode HEVC→H.264 (Intel QSV, NVIDIA NVENC, AMD AMF, Apple VideoToolbox).
@@ -13,8 +13,9 @@ Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa 
 - 🤖 **Telegram Bot 2 Chiều:** Cảnh báo tức thì + Chatbot tra cứu (`/baocao`, `/kiemtra`).
 - 🎬 **Video Player Pro:** Tua 0.5x-2x, Snapshot chụp khung hình JPG.
 - 🔍 **Auto-Discovery Camera:** Tự động tìm lại camera khi đổi IP (quét theo MAC Address), không cần can thiệp tay.
+- 🔐 **JWT Authentication & RBAC:** Đăng nhập bằng Username/Password. Phân quyền ADMIN (toàn quyền) / OPERATOR (ghi đơn & xem lịch sử). Session locking ngăn xung đột multi-user.
 
-## 🏗 Kiến Trúc Hệ Thống (v1.5.0)
+## 🏗 Kiến Trúc Hệ Thống (v1.6.0)
 
 ```
 Camera Imou (RTSP)
@@ -88,7 +89,8 @@ Kết quả sẽ sinh ra tệp `V-Pack-Monitor.exe` (Trên Windows) hoặc `V-Pa
 
 ## 👥 Cấu hình Lần Đầu (Onboarding)
 - **Truy cập web UI**: http://localhost:5173 (Môi trường Dev) hoặc mở giao diện app Exe (Môi trường Pro).
-- **Mã PIN quản trị viên:** `08012011`
+- **Tài khoản mặc định:** Username `admin` / Mật khẩu `08012011` (tự tạo lần đầu khởi động). Nên đổi mật khẩu ngay sau khi đăng nhập.
+- **Quyền hạn:** ADMIN (toàn quyền: cài đặt, cloud sync, quản lý user) / OPERATOR (chỉ ghi đơn & xem lịch sử).
 - **Kết nối Bot Telegram:** Vào mục cấu hình, nhập `Bot Token` và `Chat ID`. Mọi thông tin sẽ được mã hoá bảo mật.
 
 ## 🛠 Troubleshooting (Các Lỗi Thường Gặp)

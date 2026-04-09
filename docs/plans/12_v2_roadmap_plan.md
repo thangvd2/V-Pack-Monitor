@@ -12,9 +12,9 @@ Bản kế hoạch nâng cấp V-Pack Monitor từ v1.4.0 lên v2.0 với 3 phas
 
 ---
 
-## Phase 1: Video Pipeline Reliability (Nền tảng)
+## Phase 1: Video Pipeline Reliability ✅ COMPLETED (v1.5.0 - 2026-04-09)
 
-**Mục tiêu:** Đảm bảo 100% video ghi hình thành công, không mất dữ liệu.
+**Status:** Đã hoàn thành và push lên GitHub (commit `1a8b375`).
 
 ### 1.1 DB Schema: thêm `status` column
 
@@ -127,9 +127,9 @@ Implementation: FastAPI `StreamingResponse` với `media_type="text/event-stream
 
 ---
 
-## Phase 2: User Management & Access Control
+## Phase 2: User Management & Access Control ✅ COMPLETED (v1.6.0 - 2026-04-09)
 
-**Mục tiêu:** Hệ thống multi-user với phân quyền rõ ràng.
+**Status:** Đã hoàn thành — JWT auth, RBAC (ADMIN/OPERATOR), session locking, user CRUD. PinModal replaced by login form.
 
 ### 2.1 Users table + Auth API
 

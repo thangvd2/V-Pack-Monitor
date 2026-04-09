@@ -2,6 +2,36 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v1.6.0] - 2026-04-09 (User Management & Access Control)
+
+### 🔐 Tính Năng Lớn
+- **JWT Authentication:** Hệ thống đăng nhập bằng Username/Password với JWT token (PyJWT). Token hết hạn sau 8 giờ (1 ca làm việc), leeway 30s cho đồng hồ LAN không đồng bộ.
+- **Role-Based Access Control (RBAC):** Hai vai trò ADMIN (toàn quyền) và OPERATOR (chỉ ghi đơn/xem lịch sử). Tự động ẩn/hiển các nút chức năng theo vai trò.
+- **Session Locking:** Acquire/Heartbeat/Release session khi quét mã vạch. Ngăn nhiều người dùng cùng ghi trên 1 trạm. Session tự expire khi server khởi động lại.
+- **User Management (ADMIN):** CRUD người dùng đầy đủ — tạo, sửa tên/vai trò/trạng thái, xoá. API được bảo vệ bởi `require_admin` dependency.
+- **Auto-create Admin:** Lần đầu khởi động, tự động tạo tài khoản `admin` / mật khẩu `08012011`. Không cần setup thủ công.
+
+### 🗑 Xóa Bỏ
+- **PIN System hoàn toàn:** Xóa PinModal, `/api/verify-pin`, mã PIN ở SetupModal. Thay thế bằng user/password login.
+- `PinModal.jsx` không còn được import (file vẫn tồn tại để tham khảo).
+
+### 🎨 UI/UX
+- **Login Form:** Giao diện đăng nhập glassmorphism với username/password, lỗi hiển thị inline. Conditional render — không dùng react-router.
+- **User Info Header:** Hiển thị tên người dùng + vai trò + nút đăng xuất ở header.
+- **Role-based UI:** Nút Cloud Sync, Settings, Add Station, Delete Record chỉ hiện cho ADMIN. OPERATOR chỉ thấy giao diện ghi đơn và xem lịch sử.
+- **Auto-logout on 401:** Axios interceptor tự động đăng xuất khi token hết hạn hoặc không hợp lệ.
+
+### 🏗️ Kiến Trúc
+- **`auth.py`** (mới): JWT token creation/verification, bcrypt password hashing, `get_current_user()` và `require_admin()` FastAPI dependencies.
+- **`database.py`**: Thêm bảng `users` (username, password_hash, role, full_name, is_active) và `sessions` (user_id, station_id, started_at, last_heartbeat, status). 13 hàm auth/session mới.
+- **`api.py`**: Auth endpoints (login/me/logout), user CRUD (ADMIN only), session locking (acquire/heartbeat/release), RBAC protection trên TẤT CẢ endpoints.
+- **`requirements.txt`**: Thêm `PyJWT>=2.8.0`, `passlib[bcrypt]>=1.7.4`.
+
+### 🐛 Sửa Lỗi
+- **OPERATOR 401 bug fix:** `checkSettings()` không còn gọi trên mount — chỉ gọi khi mở SetupModal (ADMIN-gated). Tránh OPERATOR bị logout do 401 từ `/api/settings` (ADMIN-only).
+
+---
+
 ## [v1.5.0] - 2026-04-09 (Video Pipeline Reliability)
 
 ### 🚀 Tính Năng Lớn
