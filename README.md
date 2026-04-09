@@ -15,6 +15,10 @@ Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa 
 - 🔍 **Auto-Discovery Camera:** Tự động tìm lại camera khi đổi IP (quét theo MAC Address), không cần can thiệp tay.
 - 🔐 **JWT Authentication & RBAC:** Đăng nhập bằng Username/Password. Phân quyền ADMIN (toàn quyền) / OPERATOR (ghi đơn & xem lịch sử). Session locking ngăn xung đột multi-user.
 - 🖥️ **Multi-Camera Overview Grid:** Xem tất cả camera cùng lúc trong lưới responsive. Click-to-zoom, per-station status realtime.
+- 📹 **Dual Camera + PIP:** Trạm 2 camera → hiển thị song song (Dual) hoặc Picture-in-Picture. Toggle 1 Cam / Dual / PIP.
+- 📊 **Dashboard & Analytics Pro:** Biểu đồ sản xuất theo giờ, xu hướng 7 ngày, so sánh năng suất trạm. Xuất CSV.
+- 👤 **User Management & Audit Log:** CRUD user, session management, nhật ký hệ thống. Audit log tự dọn sau 90 ngày.
+- 🏥 **System Health Dashboard:** Giám sát CPU/RAM/Disk, FFmpeg processes, camera reachability. Auto-refresh 5s.
 
 ## 🏗 Kiến Trúc Hệ Thống (v2.0.0)
 
@@ -27,7 +31,7 @@ Camera Imou (RTSP)
 - **MediaMTX**: Media server proxy RTSP→WebRTC, zero-CPU live view, single binary (~30MB)
 - **FFmpeg**: Record + post-process (MPEG-TS safe recording, HEVC→H.264 GPU transcode)
 - **FastAPI**: Backend API, station management, barcode scanning, cloud sync
-- **React**: Frontend dashboard với WebRTC player, video player, analytics
+- **React**: Frontend dashboard với WebRTC player, video player, analytics, dual camera, system health
 
 ## 🚀 Cài Đặt Nhanh
 

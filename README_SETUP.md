@@ -48,10 +48,10 @@ Truy cập: `http://localhost:8001`
 
 ---
 
-## Bước 3: Đấu Nối Camera với Trạm Đầu Tiên
+## Bước 3: Đăng Nhập & Đấu Nối Camera
 
-1. Bấm nút **Cài Đặt Ngay** ở giữa màn hình.
-2. Nhập mã PIN mặc định: `08012011`.
+1. Mở trình duyệt, đăng nhập bằng tài khoản mặc định: Username `admin` / Mật khẩu `08012011`.
+2. Bấm nút **Cài Đặt Ngay** ở giữa màn hình.
 3. Điền thông tin trạm và Camera:
    - **Hãng Camera:** Chọn đúng hãng (Imou/Dahua, Tenda, EZVIZ, Tapo).
    - **IP Camera:** Lấy từ modem hoặc app hãng (VD: `192.168.5.18`).
@@ -68,10 +68,22 @@ Truy cập: `http://localhost:8001`
 
 ## Bước 4: Thiết Lập Quản Trị (Nâng Cao)
 
-Nhấp nút Settings (bánh răng) góc phải → Nhập PIN `08012011`:
+Nhấp nút Settings (bánh răng) góc phải:
 1. **Dọn rác tự động:** Giữ video 10/30 ngày tuỳ ổ cứng.
 2. **Cloud Sync:** Kích hoạt Google Drive hoặc S3.
 3. **Telegram Bot:** Nhập Bot Token + Chat ID để nhận cảnh báo.
+
+### Quản lý Người dùng
+Nhấp nút **Users** (icon người) góc phải (chỉ ADMIN):
+1. **Tạo OPERATOR:** Thêm tài khoản cho nhân viên đóng hàng → chỉ được ghi đơn & xem lịch sử.
+2. **Đổi mật khẩu:** Click dropdown tên user → "Đổi mật khẩu".
+3. **Audit Log:** Xem nhật ký hệ thống (đăng nhập, ghi hình, thao tác user).
+
+### Giám sát Hệ thống
+Nhấp nút **Activity** (icon tim) góc phải (chỉ ADMIN):
+- CPU / RAM / Disk usage thời gian thực.
+- FFmpeg processes đang chạy.
+- Camera reachability (ping check).
 
 ---
 
@@ -79,7 +91,7 @@ Nhấp nút Settings (bánh răng) góc phải → Nhập PIN `08012011`:
 
 1. **Bắt đầu đóng:** Quét mã vận đơn → màn hình đỏ nhấp nháy `ĐANG GHI ĐƠN`.
 2. **Kết thúc đóng:** Quét mã STOP hoặc nhấn foot switch → lưu file hoàn tất.
-3. **Mã PIN:** Dặn chủ kho thay đổi/giữ kỹ mã `08012011`, không cho nhân viên biết.
+3. **Bảo mật:** Dặn chủ kho đổi mật khẩu `admin` ngay sau khi nhận, tạo tài khoản OPERATOR cho nhân viên.
 
 ---
 
