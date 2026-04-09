@@ -1,16 +1,17 @@
 /**
- * V-Pack Monitor - CamDongHang v1.10.0
+ * V-Pack Monitor - CamDongHang v2.0.0
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Trash2, HardDrive, Plus, Monitor, ShieldCheck, BarChart3, CloudUpload, LogOut, User, Users, LayoutGrid, Maximize2 } from 'lucide-react';
+import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Trash2, HardDrive, Plus, Monitor, ShieldCheck, BarChart3, CloudUpload, LogOut, User, Users, LayoutGrid, Maximize2, Activity } from 'lucide-react';
 import SetupModal from './SetupModal';
 import VideoPlayerModal from './VideoPlayerModal';
 import UserManagementModal from './UserManagementModal';
 import Dashboard from './Dashboard';
+import SystemHealth from './SystemHealth';
 
 const API_BASE = window.location.hostname === 'localhost' && ['3000', '3001', '5173'].includes(window.location.port) 
   ? 'http://localhost:8001' 
@@ -44,6 +45,7 @@ function App() {
   const [viewMode, setViewMode] = useState('single'); // 'single' | 'grid'
   const [cameraMode, setCameraMode] = useState('single-cam'); // 'single-cam' | 'dual' | 'pip'
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showSystemHealth, setShowSystemHealth] = useState(false);
   const [stationStatuses, setStationStatuses] = useState({}); // { [stationId]: { status, waybill } }
   
   // Custom Video Player State
@@ -495,7 +497,7 @@ function App() {
             </button>
           </form>
           <p className="text-center text-xs text-slate-500 mt-6">
-            V-Pack Monitor v1.10.0 • VDT
+            V-Pack Monitor v2.0.0 • VDT
           </p>
         </div>
       </div>
@@ -677,6 +679,16 @@ function App() {
             <BarChart3 className="w-5 h-5" />
           </button>
 
+          {currentUser?.role === 'ADMIN' && (
+            <button
+              onClick={() => setShowSystemHealth(prev => !prev)}
+              className={`p-3 border rounded-2xl transition-all shadow-lg ${showSystemHealth ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-amber-500/30 text-slate-400 hover:text-amber-400'}`}
+              title={showSystemHealth ? 'Quay lại giao diện chính' : 'Sức khỏe hệ thống'}
+            >
+              <Activity className="w-5 h-5" />
+            </button>
+          )}
+
           <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 hidden xl:flex">
             <BarChart3 className="w-5 h-5 text-blue-400" />
             <div className="flex flex-col">
@@ -808,7 +820,9 @@ function App() {
       </header>
 
       {/* Main Content */}
-      {showDashboard ? (
+      {showSystemHealth ? (
+        <SystemHealth currentUser={currentUser} />
+      ) : showDashboard ? (
         <Dashboard
           stations={stations}
           activeStationId={activeStationId}

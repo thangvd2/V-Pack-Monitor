@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.10.0
+# V-Pack Monitor - CamDongHang v2.0.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================

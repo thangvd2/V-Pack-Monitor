@@ -160,7 +160,9 @@ GET /api/analytics/stations-comparison                    # So sánh năng suấ
 
 ---
 
-## Phase 4: System Health Dashboard
+## Phase 4: System Health Dashboard ✅ COMPLETED (v2.0.0 - 2026-04-09)
+
+**Status:** Đã hoàn thành — System health page, FFmpeg monitor, camera reachability, auto-refresh.
 
 **Mục tiêu:** Trang theo dõi sức khỏe hệ thống thời gian thực.
 

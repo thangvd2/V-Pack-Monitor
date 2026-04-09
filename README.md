@@ -1,10 +1,10 @@
-# 📦 V-Pack Monitor (CamDongHang) - v1.10.0
+# 📦 V-Pack Monitor (CamDongHang) - v2.0.0
 
 Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa cho nền tảng thương mại điện tử (Shopee, TikTok, Lazada). Giải pháp cung cấp hệ thống quản lý Camera trạm đóng gói, ghi hình chính xác theo kiện hàng và cung cấp bằng chứng "Thép" giúp xử lý khiếu nại trong 1 nốt nhạc.
 
 ![V-Pack Monitor Architecture](/placeholder.png "Mô phỏng Hệ thống")
 
-## 🌟 Chức năng nổi bật (v1.10.0)
+## 🌟 Chức năng nổi bật (v2.0.0)
 - 📹 **Record Đa Trạm (Multi-Station):** Hỗ trợ nhiều trạm đóng hàng, cấu hình riêng biệt cho từng bàn đóng. Hỗ trợ nhiều hãng Camera như Imou, Dahua, Tenda, Tapo, Ezviz, v.v.
 - 🔴 **WebRTC Live View (Sub-second Latency):** Quan sát trực tiếp qua WebRTC với độ trễ gần như thời gian thực, chất lượng H.264 gốc từ camera. Không decode/re-encode, CPU server gần như 0.
 - 🎯 **Quét Mã Vạch (Smart Barcode):** Tự động bám theo vận đơn. Camera chỉ Record khi bắt đầu gói mã kiện hàng, tự kết thúc Video khi quét mã EXIT hoặc kiện tiếp theo.
@@ -16,7 +16,7 @@ Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa 
 - 🔐 **JWT Authentication & RBAC:** Đăng nhập bằng Username/Password. Phân quyền ADMIN (toàn quyền) / OPERATOR (ghi đơn & xem lịch sử). Session locking ngăn xung đột multi-user.
 - 🖥️ **Multi-Camera Overview Grid:** Xem tất cả camera cùng lúc trong lưới responsive. Click-to-zoom, per-station status realtime.
 
-## 🏗 Kiến Trúc Hệ Thống (v1.10.0)
+## 🏗 Kiến Trúc Hệ Thống (v2.0.0)
 
 ```
 Camera Imou (RTSP)

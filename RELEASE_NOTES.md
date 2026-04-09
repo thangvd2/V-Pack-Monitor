@@ -2,6 +2,28 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v2.0.0] - 2026-04-09 (System Health Dashboard) 🎉 MAJOR RELEASE
+
+### 🏥 Tính Năng Lớn
+- **System Health Dashboard:** Trang theo dõi sức khỏe hệ thống thời gian thực — CPU, RAM, Disk với progress bar + status indicators (OK/Warning/Critical).
+- **FFmpeg Process Monitor:** Liệt kê tất cả FFmpeg processes đang chạy — PID, lệnh, CPU%, RAM%.
+- **Camera Reachability:** Ping kiểm tra từng camera — hiển thị trạng thái 🟢 Reachable / 🔴 Unreachable.
+- **Server Info:** Uptime, hostname, local IP.
+- **Auto-refresh:** Polling mỗi 5 giây. ADMIN-only.
+
+### 🏗️ Kiến Trúc
+- **`SystemHealth.jsx`** (mới): Component dashboard sức khỏe với 3 API polling song song.
+- **`api.py`**: 3 endpoints mới (`GET /api/system/health`, `GET /api/system/processes`, `GET /api/system/network-info`). Thêm `psutil`.
+- **`requirements.txt`**: Thêm `psutil>=5.9.0`.
+
+### 🎯 v3.0 Roadmap HOÀN TẤT
+- ✅ Phase 1: User Management UI + Security (v1.8.0)
+- ✅ Phase 2: Dashboard & Analytics Pro (v1.9.0)
+- ✅ Phase 3: Dual Camera + PIP Mode (v1.10.0)
+- ✅ Phase 4: System Health Dashboard (v2.0.0)
+
+---
+
 ## [v1.10.0] - 2026-04-09 (Dual Camera + PIP Mode)
 
 ### 📹 Tính Năng Lớn

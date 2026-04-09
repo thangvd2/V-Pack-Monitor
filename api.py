@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.10.0
+# V-Pack Monitor - CamDongHang v2.0.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -28,8 +28,11 @@ from recorder import CameraRecorder
 import cloud_sync
 import network
 import video_worker
+import psutil
 import auth
 from auth import CurrentUser, AdminUser, oauth2_scheme
+
+_SERVER_START_TIME = time.time()
 
 # --- Quản lý Trạng thái Ghi hình Đa Trạm ---
 active_recorders = {}
@@ -1201,6 +1204,130 @@ async def sse_events(stations: str = ""):
                     pass
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# --- SYSTEM HEALTH PRO API ---
+
+
+@app.get("/api/system/health")
+def get_system_health(admin: AdminUser):
+    cpu_percent = psutil.cpu_percent(interval=0.5)
+    memory = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+
+    def _status(value, warn_threshold, crit_threshold):
+        if value >= crit_threshold:
+            return "critical"
+        if value >= warn_threshold:
+            return "warning"
+        return "ok"
+
+    uptime_seconds = int(time.time() - _SERVER_START_TIME)
+    days, remainder = divmod(uptime_seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    uptime_str = (
+        f"{days}d {hours}h {minutes}m {seconds}s"
+        if days > 0
+        else f"{hours}h {minutes}m {seconds}s"
+    )
+
+    return {
+        "cpu": {
+            "percent": cpu_percent,
+            "count": psutil.cpu_count(),
+            "status": _status(cpu_percent, 80, 95),
+        },
+        "memory": {
+            "total_gb": round(memory.total / (1024**3), 1),
+            "used_gb": round(memory.used / (1024**3), 1),
+            "percent": memory.percent,
+            "status": _status(memory.percent, 85, 95),
+        },
+        "disk": {
+            "total_gb": round(disk.total / (1024**3), 1),
+            "used_gb": round(disk.used / (1024**3), 1),
+            "percent": disk.percent,
+            "status": _status(disk.percent, 80, 95),
+        },
+        "uptime": uptime_str,
+        "uptime_seconds": uptime_seconds,
+    }
+
+
+@app.get("/api/system/processes")
+def get_system_processes(admin: AdminUser):
+    ffmpeg_procs = []
+    for proc in psutil.process_iter(
+        ["pid", "name", "cmdline", "cpu_percent", "memory_percent", "create_time"]
+    ):
+        try:
+            name = proc.info["name"] or ""
+            if "ffmpeg" in name.lower():
+                cmdline = proc.info.get("cmdline") or []
+                ffmpeg_procs.append(
+                    {
+                        "pid": proc.info["pid"],
+                        "name": name,
+                        "cmdline_short": " ".join(cmdline)[:120] if cmdline else "",
+                        "cpu_percent": proc.info.get("cpu_percent") or 0,
+                        "memory_percent": round(
+                            proc.info.get("memory_percent") or 0, 1
+                        ),
+                    }
+                )
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    return {
+        "ffmpeg_count": len(ffmpeg_procs),
+        "ffmpeg_processes": ffmpeg_procs,
+    }
+
+
+@app.get("/api/system/network-info")
+def get_network_info(admin: AdminUser):
+    import socket
+
+    hostname = socket.gethostname()
+    local_ip = "unknown"
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        pass
+
+    camera_status = []
+    stations = database.get_stations()
+    for st in stations:
+        ip = st.get("ip_camera_1", "")
+        alive = False
+        if ip:
+            try:
+                import subprocess
+
+                result = subprocess.run(
+                    ["ping", "-c", "1", "-W", "1", ip], capture_output=True, timeout=2
+                )
+                alive = result.returncode == 0
+            except Exception:
+                pass
+        camera_status.append(
+            {
+                "station_id": st["id"],
+                "station_name": st["name"],
+                "ip": ip,
+                "reachable": alive,
+            }
+        )
+
+    return {
+        "hostname": hostname,
+        "local_ip": local_ip,
+        "cameras": camera_status,
+    }
 
 
 # --- SERVE FRONTEND (PRODUCTION BUILD) ---
