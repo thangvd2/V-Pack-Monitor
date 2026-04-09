@@ -1,3 +1,9 @@
+/**
+ * V-Pack Monitor - CamDongHang v1.4.0
+ * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
+ * All rights reserved. Unauthorized copying or distribution is prohibited.
+ */
+
 import React, { useRef, useState, useEffect } from 'react';
 import { X, Play, Pause, Camera, Download, Volume2, VolumeX } from 'lucide-react';
 

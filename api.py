@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.3.0
+# V-Pack Monitor - CamDongHang v1.4.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -190,6 +190,7 @@ import telegram_bot
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
+
     loop = asyncio.get_event_loop()
     orig_handler = loop.get_exception_handler()
 
@@ -505,7 +506,10 @@ def handle_scan(payload: ScanPayload):
         return {"status": "error", "message": "Mã vạch trống"}
 
     if sid in _stopping_recorders:
-        return {"status": "busy", "message": "Đang lưu video đơn hàng trước. Vui lòng quét lại sau vài giây."}
+        return {
+            "status": "busy",
+            "message": "Đang lưu video đơn hàng trước. Vui lòng quét lại sau vài giây.",
+        }
 
     station = database.get_station(sid)
     if not station:
@@ -533,11 +537,17 @@ def handle_scan(payload: ScanPayload):
                 daemon=True,
             )
             t.start()
-            return {"status": "busy", "message": "Đang đóng gói và lưu video. Vui lòng đợi..."}
+            return {
+                "status": "busy",
+                "message": "Đang đóng gói và lưu video. Vui lòng đợi...",
+            }
         return {"status": "idle", "message": "Trạm đang nhàn rỗi."}
 
     if current_recorder:
-        return {"status": "recording", "message": "Đang ghi đơn. Vui lòng quét STOP để kết thúc đơn hàng hiện tại."}
+        return {
+            "status": "recording",
+            "message": "Đang ghi đơn. Vui lòng quét STOP để kết thúc đơn hàng hiện tại.",
+        }
 
     active_waybills[sid] = barcode
 
@@ -711,4 +721,5 @@ if os.path.exists(dist_dir):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8001)

@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.3.4
+# V-Pack Monitor - CamDongHang v1.4.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -45,8 +45,17 @@ def _detect_hw_encoder():
             cmd = [_ffmpeg_bin("ffmpeg"), "-hide_banner", "-y"]
             if extra:
                 cmd += extra.split()
-            cmd += ["-f", "lavfi", "-i", "nullsrc=s=256x256:d=0.1",
-                     "-c:v", enc, "-f", "null", "-"]
+            cmd += [
+                "-f",
+                "lavfi",
+                "-i",
+                "nullsrc=s=256x256:d=0.1",
+                "-c:v",
+                enc,
+                "-f",
+                "null",
+                "-",
+            ]
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             if r.returncode == 0:
                 _hw_encoder_cache = (enc, extra)
@@ -66,8 +75,18 @@ def _build_transcode_cmd(input_file, output_file):
         cmd += hw_accel.split()
     cmd += ["-i", input_file]
     if encoder == "libx264":
-        cmd += ["-c:v", "libx264", "-preset", "ultrafast",
-                 "-crf", "23", "-threads", "0", "-c:a", "copy"]
+        cmd += [
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-crf",
+            "23",
+            "-threads",
+            "0",
+            "-c:a",
+            "copy",
+        ]
     elif encoder == "h264_videotoolbox":
         cmd += ["-c:v", encoder, "-b:v", "5M", "-c:a", "copy"]
     else:
@@ -80,60 +99,24 @@ def _is_hevc(filepath):
     try:
         r = subprocess.run(
             [
-                _ffmpeg_bin("ffprobe"), "-v", "error",
-                "-select_streams", "v:0",
-                "-show_entries", "stream=codec_name",
-                "-of", "csv=p=0",
+                _ffmpeg_bin("ffprobe"),
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=codec_name",
+                "-of",
+                "csv=p=0",
                 filepath,
             ],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         return "hevc" in r.stdout.strip().lower()
     except Exception:
         return False
-
-
-def _post_process(filepath):
-    if not os.path.exists(filepath):
-        return filepath
-    if os.path.getsize(filepath) == 0:
-        os.remove(filepath)
-        return filepath
-
-    is_hevc = _is_hevc(filepath)
-    needs_fix = is_hevc
-    if not needs_fix:
-        try:
-            with open(filepath, "rb") as f:
-                header = f.read(8192)
-                if b"moov" not in header:
-                    needs_fix = True
-        except Exception:
-            needs_fix = True
-
-    if not needs_fix:
-        return filepath
-
-    fixed = filepath + ".fixed.mp4"
-    try:
-        if is_hevc:
-            cmd = _build_transcode_cmd(filepath, fixed)
-        else:
-            cmd = [_ffmpeg_bin("ffmpeg"), "-y", "-i", filepath,
-                   "-c", "copy", "-movflags", "+faststart", fixed]
-        subprocess.run(
-            cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=300,
-        )
-        if os.path.exists(fixed) and os.path.getsize(fixed) > 0:
-            os.replace(fixed, filepath)
-        else:
-            if os.path.exists(fixed):
-                os.remove(fixed)
-    except Exception:
-        if os.path.exists(fixed):
-            os.remove(fixed)
-
-    return filepath
 
 
 class CameraRecorder:
@@ -169,11 +152,16 @@ class CameraRecorder:
                 [
                     "ffmpeg",
                     "-y",
-                    "-rtsp_transport", "tcp",
-                    "-i", self.rtsp_url_1,
-                    "-c:v", "copy",
-                    "-c:a", "copy",
-                    "-f", "mpegts",
+                    "-rtsp_transport",
+                    "tcp",
+                    "-i",
+                    self.rtsp_url_1,
+                    "-c:v",
+                    "copy",
+                    "-c:a",
+                    "copy",
+                    "-f",
+                    "mpegts",
                     tmpfile,
                 ],
                 final_path=filepath,
@@ -189,11 +177,16 @@ class CameraRecorder:
                 [
                     "ffmpeg",
                     "-y",
-                    "-rtsp_transport", "tcp",
-                    "-i", self.rtsp_url_1,
-                    "-c:v", "copy",
-                    "-c:a", "copy",
-                    "-f", "mpegts",
+                    "-rtsp_transport",
+                    "tcp",
+                    "-i",
+                    self.rtsp_url_1,
+                    "-c:v",
+                    "copy",
+                    "-c:a",
+                    "copy",
+                    "-f",
+                    "mpegts",
                     tmp1,
                 ],
                 final_path=file1,
@@ -208,11 +201,16 @@ class CameraRecorder:
                 [
                     "ffmpeg",
                     "-y",
-                    "-rtsp_transport", "tcp",
-                    "-i", self.rtsp_url_2,
-                    "-c:v", "copy",
-                    "-c:a", "copy",
-                    "-f", "mpegts",
+                    "-rtsp_transport",
+                    "tcp",
+                    "-i",
+                    self.rtsp_url_2,
+                    "-c:v",
+                    "copy",
+                    "-c:a",
+                    "copy",
+                    "-f",
+                    "mpegts",
                     tmp2,
                 ],
                 final_path=file2,
@@ -233,34 +231,52 @@ class CameraRecorder:
                 command = [
                     "ffmpeg",
                     "-y",
-                    "-rtsp_transport", "tcp",
-                    "-i", self.rtsp_url_1,
+                    "-rtsp_transport",
+                    "tcp",
+                    "-i",
+                    self.rtsp_url_1,
                     "-filter_complex",
                     "[0:v]split=2[main][pip_raw]; [pip_raw]scale=iw/3:-1[pip]; [main][pip]overlay=main_w-overlay_w-10:10",
-                    "-c:v", vcodec,
-                    "-b:v", "2000k",
-                    "-pix_fmt", "yuv420p",
-                    "-c:a", "aac",
-                    "-f", "mpegts",
+                    "-c:v",
+                    vcodec,
+                    "-b:v",
+                    "2000k",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "aac",
+                    "-f",
+                    "mpegts",
                     tmpfile,
                 ]
             else:
                 command = [
                     "ffmpeg",
                     "-y",
-                    "-use_wallclock_as_timestamps", "1",
-                    "-rtsp_transport", "tcp",
-                    "-i", self.rtsp_url_1,
-                    "-use_wallclock_as_timestamps", "1",
-                    "-rtsp_transport", "tcp",
-                    "-i", self.rtsp_url_2,
+                    "-use_wallclock_as_timestamps",
+                    "1",
+                    "-rtsp_transport",
+                    "tcp",
+                    "-i",
+                    self.rtsp_url_1,
+                    "-use_wallclock_as_timestamps",
+                    "1",
+                    "-rtsp_transport",
+                    "tcp",
+                    "-i",
+                    self.rtsp_url_2,
                     "-filter_complex",
                     "[1:v]scale=iw/3:-1[pip]; [0:v][pip]overlay=main_w-overlay_w-10:10",
-                    "-c:v", vcodec,
-                    "-b:v", "2000k",
-                    "-pix_fmt", "yuv420p",
-                    "-c:a", "aac",
-                    "-f", "mpegts",
+                    "-c:v",
+                    vcodec,
+                    "-b:v",
+                    "2000k",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "aac",
+                    "-f",
+                    "mpegts",
                     tmpfile,
                 ]
             self._launch_ffmpeg(command, final_path=filepath)
@@ -333,10 +349,22 @@ class CameraRecorder:
                 if is_hevc:
                     cmd = _build_transcode_cmd(ts_path, final_path)
                 else:
-                    cmd = [_ffmpeg_bin("ffmpeg"), "-y", "-i", ts_path,
-                           "-c", "copy", "-movflags", "+faststart", final_path]
+                    cmd = [
+                        _ffmpeg_bin("ffmpeg"),
+                        "-y",
+                        "-i",
+                        ts_path,
+                        "-c",
+                        "copy",
+                        "-movflags",
+                        "+faststart",
+                        final_path,
+                    ]
                 subprocess.run(
-                    cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120,
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=120,
                 )
             except Exception:
                 pass
