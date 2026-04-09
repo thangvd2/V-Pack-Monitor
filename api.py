@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.7.0
+# V-Pack Monitor - CamDongHang v1.8.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -489,6 +489,7 @@ def login(payload: LoginPayload):
     if not user.get("is_active"):
         return {"status": "error", "message": "Tài khoản đã bị khóa."}
     token = auth.create_access_token({"sub": str(user["id"]), "role": user["role"]})
+    database.log_audit(user["id"], "LOGIN")
     return {
         "status": "success",
         "access_token": token,
@@ -508,8 +509,29 @@ def get_me(current_user: CurrentUser):
 
 
 @app.post("/api/auth/logout")
-def logout():
+def logout(current_user: CurrentUser):
+    database.log_audit(current_user["id"], "LOGOUT")
     return {"status": "success", "message": "Đã đăng xuất."}
+
+
+class ChangePasswordPayload(BaseModel):
+    old_password: str
+    new_password: str
+
+
+@app.put("/api/auth/change-password")
+def change_password(payload: ChangePasswordPayload, current_user: CurrentUser):
+    user = database.get_user_by_id(current_user["id"])
+    if not user:
+        return {"status": "error", "message": "Người dùng không tồn tại."}
+    full_user = database.get_user_by_username(user["username"])
+    if not full_user or not auth.verify_password(
+        payload.old_password, full_user["password_hash"]
+    ):
+        return {"status": "error", "message": "Mật khẩu cũ không đúng."}
+    database.update_user_password(user["id"], payload.new_password)
+    database.log_audit(user["id"], "CHANGE_PASSWORD")
+    return {"status": "success", "message": "Đã đổi mật khẩu thành công."}
 
 
 # --- USER MANAGEMENT API (ADMIN ONLY) ---
@@ -536,6 +558,7 @@ def create_user(payload: UserCreatePayload, admin: AdminUser):
     )
     if new_id is None:
         return {"status": "error", "message": "Username đã tồn tại."}
+    database.log_audit(admin["id"], "CREATE_USER", f"username={payload.username}")
     return {"status": "success", "id": new_id}
 
 
@@ -551,12 +574,14 @@ def update_user_api(user_id: int, payload: UserUpdatePayload, admin: AdminUser):
     if not kwargs:
         return {"status": "error", "message": "Không có dữ liệu cập nhật."}
     database.update_user(user_id, **kwargs)
+    database.log_audit(admin["id"], "UPDATE_USER", f"user_id={user_id}")
     return {"status": "success"}
 
 
 @app.put("/api/users/{user_id}/password")
 def reset_password(user_id: int, password: str, admin: AdminUser):
     database.update_user_password(user_id, password)
+    database.log_audit(admin["id"], "RESET_PASSWORD", f"user_id={user_id}")
     return {"status": "success"}
 
 
@@ -565,6 +590,7 @@ def delete_user_api(user_id: int, admin: AdminUser):
     if user_id == admin["id"]:
         return {"status": "error", "message": "Không thể xoá chính mình."}
     database.delete_user(user_id)
+    database.log_audit(admin["id"], "DELETE_USER", f"user_id={user_id}")
     return {"status": "success"}
 
 
@@ -747,6 +773,39 @@ def release_session(station_id: int, current_user: CurrentUser):
     return {"status": "success"}
 
 
+@app.get("/api/sessions/active")
+def get_active_sessions_api(admin: AdminUser):
+    sessions = database.get_active_sessions()
+    return {"data": sessions}
+
+
+@app.delete("/api/sessions/{session_id}")
+def force_end_session(session_id: int, admin: AdminUser):
+    session = database.get_session_by_id(session_id)
+    if not session or session["status"] != "ACTIVE":
+        return {
+            "status": "error",
+            "message": "Session không tồn tại hoặc đã kết thúc.",
+        }
+    database.end_session_by_id(session_id)
+    database.log_audit(admin["id"], "FORCE_END_SESSION", f"Kicked session {session_id}")
+    return {"status": "success"}
+
+
+@app.get("/api/audit-logs")
+def get_audit_logs_api(
+    admin: AdminUser,
+    user_id: int | None = None,
+    action: str | None = None,
+    limit: int = 200,
+    offset: int = 0,
+):
+    logs = database.get_audit_logs(
+        user_id=user_id, action=action, limit=limit, offset=offset
+    )
+    return {"data": logs}
+
+
 # --- SCAN API ---
 
 
@@ -803,6 +862,12 @@ def handle_scan(payload: ScanPayload, current_user: CurrentUser):
         if current_recorder:
             _processing_stations.add(sid)
             active_recorders.pop(sid, None)
+            database.log_audit(
+                current_user["id"],
+                "STOP_RECORD",
+                f"waybill={current_waybill}",
+                station_id=sid,
+            )
             video_worker.submit_stop_and_save(
                 current_record_id, current_recorder, current_waybill, sid, save=True
             )
@@ -869,6 +934,13 @@ def handle_scan(payload: ScanPayload, current_user: CurrentUser):
     new_recorder = CameraRecorder(url1, rtsp_url_2=url2, record_mode=r_mode)
     active_recorders[sid] = new_recorder
     new_recorder.start_recording(barcode)
+
+    database.log_audit(
+        current_user["id"],
+        "START_RECORD",
+        f"waybill={barcode}",
+        station_id=sid,
+    )
 
     notify_sse(
         "video_status",

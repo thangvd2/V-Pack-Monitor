@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.7.0
+# V-Pack Monitor - CamDongHang v1.8.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -137,6 +137,23 @@ def init_db():
                 ("admin", pwd_ctx.hash("08012011")),
             )
             print("Default admin created: admin/08012011")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                action TEXT NOT NULL,
+                details TEXT,
+                station_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+
+        # Clean up audit logs older than 90 days
+        cursor.execute(
+            "DELETE FROM audit_log WHERE created_at < datetime('now', '-90 days')"
+        )
 
         # Expire all stale sessions on startup
         cursor.execute("UPDATE sessions SET status = 'EXPIRED' WHERE status = 'ACTIVE'")
@@ -587,3 +604,108 @@ def expire_stale_sessions(timeout_seconds=90):
         )
         conn.commit()
         return cursor.rowcount
+
+
+def log_audit(
+    user_id: int, action: str, details: str | None = None, station_id: int | None = None
+):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO audit_log (user_id, action, details, station_id) VALUES (?, ?, ?, ?)",
+            (user_id, action, details, station_id),
+        )
+        conn.commit()
+
+
+def get_audit_logs(
+    user_id: int | None = None,
+    action: str | None = None,
+    limit: int = 200,
+    offset: int = 0,
+) -> list[dict]:
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        query = (
+            "SELECT audit_log.id, audit_log.user_id, audit_log.action, "
+            "audit_log.details, audit_log.station_id, audit_log.created_at, "
+            "users.username FROM audit_log LEFT JOIN users "
+            "ON audit_log.user_id = users.id WHERE 1=1"
+        )
+        params = []
+        if user_id is not None:
+            query += " AND audit_log.user_id = ?"
+            params.append(user_id)
+        if action:
+            query += " AND audit_log.action = ?"
+            params.append(action)
+        query += " ORDER BY audit_log.id DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": r[0],
+                "user_id": r[1],
+                "action": r[2],
+                "details": r[3],
+                "station_id": r[4],
+                "created_at": r[5],
+                "username": r[6],
+            }
+            for r in rows
+        ]
+
+
+def get_active_sessions() -> list[dict]:
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT s.id, s.user_id, s.station_id, s.started_at, s.last_heartbeat, "
+            "s.status, u.username, u.full_name, st.name AS station_name "
+            "FROM sessions s JOIN users u ON s.user_id = u.id "
+            "JOIN stations st ON s.station_id = st.id "
+            "WHERE s.status = 'ACTIVE' ORDER BY s.started_at DESC"
+        )
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": r[0],
+                "user_id": r[1],
+                "station_id": r[2],
+                "started_at": r[3],
+                "last_heartbeat": r[4],
+                "status": r[5],
+                "username": r[6],
+                "full_name": r[7],
+                "station_name": r[8],
+            }
+            for r in rows
+        ]
+
+
+def get_session_by_id(session_id: int):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, user_id, station_id, status FROM sessions WHERE id = ?",
+            (session_id,),
+        )
+        row = cursor.fetchone()
+        if row:
+            return {
+                "id": row[0],
+                "user_id": row[1],
+                "station_id": row[2],
+                "status": row[3],
+            }
+        return None
+
+
+def end_session_by_id(session_id: int):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE sessions SET status = 'EXPIRED' WHERE id = ?", (session_id,)
+        )
+        conn.commit()

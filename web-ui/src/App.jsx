@@ -1,5 +1,5 @@
 /**
- * V-Pack Monitor - CamDongHang v1.7.0
+ * V-Pack Monitor - CamDongHang v1.8.0
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
@@ -9,6 +9,7 @@ import axios from 'axios';
 import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Trash2, HardDrive, Plus, Monitor, ShieldCheck, BarChart3, CloudUpload, LogOut, User, Users, LayoutGrid, Maximize2 } from 'lucide-react';
 import SetupModal from './SetupModal';
 import VideoPlayerModal from './VideoPlayerModal';
+import UserManagementModal from './UserManagementModal';
 
 const API_BASE = window.location.hostname === 'localhost' && ['3000', '3001', '5173'].includes(window.location.port) 
   ? 'http://localhost:8001' 
@@ -45,6 +46,12 @@ function App() {
   // Custom Video Player State
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState({ url: '', waybillCode: '' });
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [changePasswordForm, setChangePasswordForm] = useState({ old_password: '', new_password: '', confirm_password: '' });
+  const [changePasswordError, setChangePasswordError] = useState('');
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('vpack_token');
@@ -480,7 +487,7 @@ function App() {
             </button>
           </form>
           <p className="text-center text-xs text-slate-500 mt-6">
-            V-Pack Monitor v1.7.0 • VDT
+            V-Pack Monitor v1.8.0 • VDT
           </p>
         </div>
       </div>
@@ -516,6 +523,92 @@ function App() {
         waybillCode={selectedVideo.waybillCode}
         onClose={() => setVideoModalOpen(false)}
       />
+
+      <UserManagementModal
+        isOpen={showUserModal}
+        onClose={() => setShowUserModal(false)}
+        currentUser={currentUser}
+      />
+
+      {showChangePassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowChangePassword(false)}>
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Settings className="w-5 h-5 text-blue-400" />
+                Đổi Mật Khẩu
+              </h3>
+              <button onClick={() => { setShowChangePassword(false); setChangePasswordError(''); setChangePasswordSuccess(''); }} className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {changePasswordSuccess ? (
+              <div className="p-4 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-200 text-sm text-center">
+                {changePasswordSuccess}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {changePasswordError && (
+                  <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-200 text-sm">
+                    {changePasswordError}
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Mật khẩu hiện tại</label>
+                  <input
+                    type="password"
+                    value={changePasswordForm.old_password}
+                    onChange={e => setChangePasswordForm(f => ({ ...f, old_password: e.target.value }))}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Mật khẩu mới</label>
+                  <input
+                    type="password"
+                    value={changePasswordForm.new_password}
+                    onChange={e => setChangePasswordForm(f => ({ ...f, new_password: e.target.value }))}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Xác nhận mật khẩu mới</label>
+                  <input
+                    type="password"
+                    value={changePasswordForm.confirm_password}
+                    onChange={e => setChangePasswordForm(f => ({ ...f, confirm_password: e.target.value }))}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        setChangePasswordError('');
+                        if (changePasswordForm.new_password.length < 6) { setChangePasswordError('Mật khẩu mới phải có ít nhất 6 ký tự.'); return; }
+                        if (changePasswordForm.new_password !== changePasswordForm.confirm_password) { setChangePasswordError('Mật khẩu xác nhận không khớp.'); return; }
+                        axios.put(`${API_BASE}/api/auth/change-password`, { old_password: changePasswordForm.old_password, new_password: changePasswordForm.new_password })
+                          .then(() => { setChangePasswordSuccess('Đổi mật khẩu thành công!'); setChangePasswordForm({ old_password: '', new_password: '', confirm_password: '' }); })
+                          .catch(err => { setChangePasswordError(err.response?.data?.detail || 'Mật khẩu cũ không đúng.'); });
+                      }
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    setChangePasswordError('');
+                    if (changePasswordForm.new_password.length < 6) { setChangePasswordError('Mật khẩu mới phải có ít nhất 6 ký tự.'); return; }
+                    if (changePasswordForm.new_password !== changePasswordForm.confirm_password) { setChangePasswordError('Mật khẩu xác nhận không khớp.'); return; }
+                    axios.put(`${API_BASE}/api/auth/change-password`, { old_password: changePasswordForm.old_password, new_password: changePasswordForm.new_password })
+                      .then(() => { setChangePasswordSuccess('Đổi mật khẩu thành công!'); setChangePasswordForm({ old_password: '', new_password: '', confirm_password: '' }); })
+                      .catch(err => { setChangePasswordError(err.response?.data?.detail || 'Mật khẩu cũ không đúng.'); });
+                  }}
+                  className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 rounded-xl font-semibold text-white shadow-lg transition-all text-sm"
+                >
+                  Xác Nhận Đổi Mật Khẩu
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Header */}
       <header className="flex flex-col mb-8">
@@ -621,15 +714,52 @@ function App() {
             </button>
           )}
 
-          <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5">
-            <User className="w-5 h-5 text-blue-400" />
-            <div className="flex flex-col">
-              <span className="text-sm text-slate-200 font-medium">{currentUser.full_name || currentUser.username}</span>
-              <span className="text-[10px] text-slate-400 uppercase">{currentUser.role}</span>
-            </div>
-            <button onClick={handleLogout} className="ml-2 p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-red-400 transition" title="Đăng xuất">
-              <LogOut className="w-4 h-4" />
+          {currentUser?.role === 'ADMIN' && (
+            <button 
+              onClick={() => setShowUserModal(true)}
+              className="p-3 bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/50 rounded-2xl transition-all shadow-lg hidden md:flex text-slate-400 hover:text-emerald-400"
+              title="Quản lý người dùng"
+            >
+              <Users className="w-6 h-6" />
             </button>
+          )}
+
+          <div className="relative">
+            <button
+              onClick={() => setShowUserDropdown(!showUserDropdown)}
+              className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 hover:bg-white/10 transition-all"
+            >
+              <User className="w-5 h-5 text-blue-400" />
+              <div className="flex flex-col items-start">
+                <span className="text-sm text-slate-200 font-medium">{currentUser.full_name || currentUser.username}</span>
+                <span className="text-[10px] text-slate-400 uppercase">{currentUser.role}</span>
+              </div>
+              <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {showUserDropdown && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowUserDropdown(false)} />
+                <div className="absolute right-0 top-full mt-2 w-56 bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-20 py-1 overflow-hidden">
+                  <button
+                    onClick={() => { setShowUserDropdown(false); setShowChangePassword(true); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors text-left"
+                  >
+                    <Settings className="w-4 h-4 text-slate-400" />
+                    Đổi mật khẩu
+                  </button>
+                  <button
+                    onClick={() => { setShowUserDropdown(false); handleLogout(); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-300 hover:bg-red-500/10 hover:text-red-200 transition-colors text-left border-t border-white/5"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Đăng xuất
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
         </div>

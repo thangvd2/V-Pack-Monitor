@@ -2,6 +2,22 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v1.8.0] - 2026-04-09 (User Management UI + Security)
+
+### 👤 Tính Năng Lớn
+- **User Management Modal:** Giao diện quản lý user chuyên nghiệp với 3 tab (Người dùng, Phiên hoạt động, Nhật ký hệ thống). ADMIN tạo/sửa/khoá/xoá user trực tiếp từ UI.
+- **Đổi Mật Khẩu:** Dropdown user → "Đổi mật khẩu". Xác thực mật khẩu cũ, validate độ dài, confirm match.
+- **Audit Log:** Ghi lại mọi hành động quan trọng (LOGIN, LOGOUT, START_RECORD, STOP_RECORD, CREATE_USER, DELETE_USER, CHANGE_PASSWORD, FORCE_END_SESSION). Tự động dọn log cũ sau 90 ngày.
+- **Session Management:** Xem tất cả phiên đang active (user, trạm, thời gian). ADMIN có thể force-kick session.
+
+### 🏗️ Kiến Trúc
+- **`database.py`**: Thêm bảng `audit_log`, 5 hàm mới (log_audit, get_audit_logs, get_active_sessions, get_session_by_id, end_session_by_id).
+- **`api.py`**: 4 endpoints mới (`PUT /api/auth/change-password`, `GET /api/sessions/active`, `DELETE /api/sessions/{id}`, `GET /api/audit-logs`). Audit logging trên 10 action points.
+- **`UserManagementModal.jsx`** (mới): 638 dòng, 3-tab UI với CRUD user, session viewer, audit log viewer.
+- **`App.jsx`**: Users button (ADMIN-only), user dropdown với đổi mật khẩu, modal integration.
+
+---
+
 ## [v1.7.0] - 2026-04-09 (Multi-Camera Live View UI)
 
 ### 🖥️ Tính Năng Lớn
