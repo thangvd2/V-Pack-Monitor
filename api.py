@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.4.0
+# V-Pack Monitor - CamDongHang v1.5.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -11,26 +11,48 @@ import shutil
 import threading
 import sqlite3
 import json
+import asyncio
 import urllib.request
 import urllib.error
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import database
+import recorder
 from recorder import CameraRecorder
 import cloud_sync
 import network
+import video_worker
 
 # --- Quản lý Trạng thái Ghi hình Đa Trạm ---
 active_recorders = {}
 active_waybills = {}
+active_record_ids = {}
+_processing_stations = set()
 stream_managers = {}
 
 reconnect_status = {}
 
 MTX_API = "http://127.0.0.1:9997"
+
+_sse_clients = []
+_sse_lock = threading.Lock()
+
+
+def notify_sse(event_type, data):
+    msg = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+    with _sse_lock:
+        dead = []
+        for i, q in enumerate(_sse_clients):
+            try:
+                q.put_nowait(msg)
+            except Exception:
+                dead.append(i)
+        for i in reversed(dead):
+            _sse_clients.pop(i)
 
 
 def _mtx_add_path(station_id, rtsp_url):
@@ -187,6 +209,135 @@ import telebot
 import telegram_bot
 
 
+def _preflight_checks(station_id):
+    if station_id in active_recorders:
+        return (
+            False,
+            "Tr\u1ea1m \u0111ang ghi h\u00ecnh. Qu\u00e9t STOP tr\u01b0\u1edbc.",
+        )
+    if station_id in _processing_stations:
+        return (
+            False,
+            "\u0110ang x\u1eed l\u00fd video \u0111\u01a1n tr\u01b0\u1edbc. Vui l\u00f2ng \u0111\u1ee3i.",
+        )
+    _, _, free = shutil.disk_usage("recordings")
+    if free < 500 * 1024 * 1024:
+        return (
+            False,
+            f"\u1ed4 c\u1ee9ng qu\u00e1 \u0111\u1ea7y! Ch\u1ec9 c\u00f2n {free // (1024 * 1024)} MB tr\u1ed1ng. C\u1ea7n \u00edt nh\u1ea5t 500 MB.",
+        )
+    ffmpeg_path = recorder._ffmpeg_bin("ffmpeg")
+    if os.path.exists(ffmpeg_path):
+        pass
+    elif ffmpeg_path == "ffmpeg":
+        if not shutil.which("ffmpeg"):
+            return (
+                False,
+                "Kh\u00f4ng t\u00ecm th\u1ea5y FFmpeg. Vui l\u00f2ng c\u00e0i \u0111\u1eb7t.",
+            )
+    else:
+        return (
+            False,
+            "Kh\u00f4ng t\u00ecm th\u1ea5y FFmpeg. Vui l\u00f2ng ch\u1ea1y l\u1ea1i installer.",
+        )
+    return True, ""
+
+
+def _verify_video_external(filepath):
+    import subprocess
+
+    if not filepath or not os.path.exists(filepath):
+        return False
+    if os.path.getsize(filepath) == 0:
+        return False
+    try:
+        cmd = [
+            recorder._ffmpeg_bin("ffprobe"),
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "csv=p=0",
+            filepath,
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        dur = r.stdout.strip()
+        return bool(dur and float(dur) > 0)
+    except Exception:
+        return False
+
+
+def _recover_pending_records():
+    pending = database.get_pending_records()
+    if not pending:
+        return
+    print(f"Crash recovery: found {len(pending)} pending records")
+    for rec in pending:
+        rid = rec["id"]
+        paths = rec["video_paths"]
+        waybill = rec["waybill_code"]
+        recovered = False
+        if paths:
+            for path in paths.split(","):
+                ts_path = path + ".tmp.ts"
+                if os.path.exists(ts_path):
+                    is_hevc = recorder._is_hevc(ts_path)
+                    try:
+                        import subprocess
+
+                        if is_hevc:
+                            cmd = recorder._build_transcode_cmd(ts_path, path)
+                        else:
+                            cmd = [
+                                recorder._ffmpeg_bin("ffmpeg"),
+                                "-y",
+                                "-i",
+                                ts_path,
+                                "-c",
+                                "copy",
+                                "-movflags",
+                                "+faststart",
+                                path,
+                            ]
+                        subprocess.run(
+                            cmd,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            timeout=120,
+                        )
+                        try:
+                            os.remove(ts_path)
+                        except Exception:
+                            pass
+                        if _verify_video_external(path):
+                            recovered = True
+                            break
+                    except Exception:
+                        pass
+                elif os.path.exists(path) and _verify_video_external(path):
+                    recovered = True
+                    break
+
+        if recovered:
+            database.update_record_status(rid, "READY", video_paths=paths)
+            print(f"Recovered record {rid} ({waybill}) \u2192 READY")
+        else:
+            database.update_record_status(rid, "FAILED", video_paths=paths)
+            print(f"Failed to recover record {rid} ({waybill}) \u2192 FAILED")
+            try:
+                msg = (
+                    f"\u26a0\ufe0f <b>PH\u1ee4C H\u1ed2I VIDEO L\u1ed6I</b>\n\n"
+                    f"\U0001f4e6 M\u00e3 v\u1eadn \u0111\u01a1n: <b>{waybill}</b>\n"
+                    f"\U0001f194 Record ID: {rid}\n"
+                    f"\u274c Kh\u00f4ng th\u1ec3 ph\u1ee5c h\u1ed3i video sau khi kh\u1edfi \u0111\u1ed9ng l\u1ea1i server.\n\n"
+                    f"Vui l\u00f2ng ki\u1ec3m tra th\u1ee7 c\u00f4ng."
+                )
+                telegram_bot.send_telegram_message(msg)
+            except Exception:
+                pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
@@ -206,6 +357,7 @@ async def lifespan(app: FastAPI):
     loop.set_exception_handler(_suppress_conn_reset)
 
     database.init_db()
+    _recover_pending_records()
     stations = database.get_stations()
     for st in stations:
         sub_url = get_rtsp_sub_url(
@@ -226,6 +378,7 @@ async def lifespan(app: FastAPI):
         manager.stop()
     for recorder in active_recorders.values():
         recorder.stop_recording()
+    video_worker.shutdown()
     telegram_bot.stop_polling()
 
 
@@ -388,6 +541,8 @@ def delete_station(station_id: int):
         active_recorders[station_id].stop_recording()
         del active_recorders[station_id]
         del active_waybills[station_id]
+        active_record_ids.pop(station_id, None)
+    _processing_stations.discard(station_id)
     if station_id in reconnect_status:
         del reconnect_status[station_id]
     return {"status": "success"}
@@ -475,85 +630,66 @@ class ScanPayload(BaseModel):
     station_id: int
 
 
-_stopping_recorders = {}
-_stopping_lock = threading.Lock()
-
-
-def _async_stop_and_save(sid, recorder, waybill, save=True):
-    with _stopping_lock:
-        if sid in _stopping_recorders:
-            return
-        _stopping_recorders[sid] = waybill
-        active_recorders.pop(sid, None)
-
-    try:
-        saved_files = recorder.stop_recording()
-        if save and saved_files:
-            database.save_record(sid, waybill, saved_files, recorder.record_mode)
-    except Exception as e:
-        print(f"Loi khi luu video station {sid}: {e}")
-    finally:
-        active_waybills.pop(sid, None)
-        _stopping_recorders.pop(sid, None)
-
-
 @app.post("/api/scan")
 def handle_scan(payload: ScanPayload):
     sid = payload.station_id
     barcode = payload.barcode.strip().upper()
 
     if not barcode:
-        return {"status": "error", "message": "Mã vạch trống"}
+        return {"status": "error", "message": "M\u00e3 v\u1ea1ch tr\u1ed1ng"}
 
-    if sid in _stopping_recorders:
+    if sid in _processing_stations:
         return {
             "status": "busy",
-            "message": "Đang lưu video đơn hàng trước. Vui lòng quét lại sau vài giây.",
+            "message": "\u0110ang x\u1eed l\u00fd video \u0111\u01a1n h\u00e0ng tr\u01b0\u1edbc. Vui l\u00f2ng qu\u00e9t l\u1ea1i sau v\u00e0i gi\u00e2y.",
         }
 
     station = database.get_station(sid)
     if not station:
-        return {"status": "error", "message": "Trạm không tồn tại"}
+        return {"status": "error", "message": "Tr\u1ea1m kh\u00f4ng t\u1ed3n t\u1ea1i"}
 
     current_recorder = active_recorders.get(sid)
     current_waybill = active_waybills.get(sid)
+    current_record_id = active_record_ids.get(sid)
 
     if barcode == "EXIT":
         if current_recorder:
-            t = threading.Thread(
-                target=_async_stop_and_save,
-                args=(sid, current_recorder, current_waybill, False),
-                daemon=True,
+            _processing_stations.add(sid)
+            active_recorders.pop(sid, None)
+            video_worker.submit_stop_and_save(
+                current_record_id, current_recorder, current_waybill, sid, save=False
             )
-            t.start()
-            return {"status": "busy", "message": "Đang hủy ghi hình..."}
-        return {"status": "idle", "message": "Trạm đang nhàn rỗi."}
+            return {
+                "status": "processing",
+                "message": "\u0110ang h\u1ee7y ghi h\u00ecnh...",
+            }
+        return {"status": "idle", "message": "Tr\u1ea1m \u0111ang nh\u00e0n r\u1ed7i."}
 
     if barcode == "STOP":
         if current_recorder:
-            t = threading.Thread(
-                target=_async_stop_and_save,
-                args=(sid, current_recorder, current_waybill, True),
-                daemon=True,
+            _processing_stations.add(sid)
+            active_recorders.pop(sid, None)
+            video_worker.submit_stop_and_save(
+                current_record_id, current_recorder, current_waybill, sid, save=True
             )
-            t.start()
             return {
-                "status": "busy",
-                "message": "Đang đóng gói và lưu video. Vui lòng đợi...",
+                "status": "processing",
+                "message": "\u0110ang x\u1eed l\u00fd video. Vui l\u00f2ng \u0111\u1ee3i...",
             }
-        return {"status": "idle", "message": "Trạm đang nhàn rỗi."}
+        return {"status": "idle", "message": "Tr\u1ea1m \u0111ang nh\u00e0n r\u1ed7i."}
 
     if current_recorder:
         return {
             "status": "recording",
-            "message": "Đang ghi đơn. Vui lòng quét STOP để kết thúc đơn hàng hiện tại.",
+            "message": "\u0110ang ghi \u0111\u01a1n. Vui l\u00f2ng qu\u00e9t STOP \u0111\u1ec3 k\u1ebft th\u00fac \u0111\u01a1n h\u00e0ng hi\u1ec7n t\u1ea1i.",
         }
+
+    ok, err_msg = _preflight_checks(sid)
+    if not ok:
+        return {"status": "error", "message": err_msg}
 
     active_waybills[sid] = barcode
 
-    station = database.get_station(sid)
-    if not station:
-        return {"status": "error", "message": "Trạm không tồn tại"}
     ip1 = station["ip_camera_1"]
     ip2 = station["ip_camera_2"]
     code = station["safety_code"]
@@ -563,7 +699,7 @@ def handle_scan(payload: ScanPayload):
     if not ip1 or not code:
         return {
             "status": "error",
-            "message": "Trạm chưa cấu hình IP Camera và Safety Code.",
+            "message": "Tr\u1ea1m ch\u01b0a c\u1ea5u h\u00ecnh IP Camera v\u00e0 Safety Code.",
         }
 
     mac = station.get("mac_address", "")
@@ -593,23 +729,28 @@ def handle_scan(payload: ScanPayload):
     else:
         r_mode = "SINGLE"
 
+    record_id = database.create_record(sid, barcode, r_mode)
+    active_record_ids[sid] = record_id
+
     new_recorder = CameraRecorder(url1, rtsp_url_2=url2, record_mode=r_mode)
     active_recorders[sid] = new_recorder
     new_recorder.start_recording(barcode)
 
+    notify_sse(
+        "video_status",
+        {"station_id": sid, "status": "RECORDING", "record_id": record_id},
+    )
+
     return {
         "status": "recording",
-        "message": f"Bắt đầu ghi hình đơn {barcode} tại Trạm {sid}...",
+        "message": f"B\u1eaft \u0111\u1ea7u ghi h\u00ecnh \u0111\u01a1n {barcode} t\u1ea1i Tr\u1ea1m {sid}...",
     }
 
 
 @app.get("/api/status")
 def get_status(station_id: int):
-    if station_id in _stopping_recorders:
-        return {
-            "status": "saving",
-            "waybill": _stopping_recorders.get(station_id, ""),
-        }
+    if station_id in _processing_stations:
+        return {"status": "processing", "waybill": active_waybills.get(station_id, "")}
     return {
         "status": "recording" if station_id in active_recorders else "idle",
         "waybill": active_waybills.get(station_id, ""),
@@ -624,7 +765,7 @@ def get_records(station_id: int = None, search: str = ""):
     records = database.get_records(search, station_id)
     results = []
     for r in records:
-        r_id, waybill_code, video_paths, record_mode, recorded_at, s_name = r
+        r_id, waybill_code, video_paths, record_mode, recorded_at, s_name, status = r
         results.append(
             {
                 "id": r_id,
@@ -633,6 +774,7 @@ def get_records(station_id: int = None, search: str = ""):
                 "record_mode": record_mode,
                 "recorded_at": recorded_at,
                 "station_name": s_name,
+                "status": status,
             }
         )
     return {"data": results}
@@ -709,6 +851,34 @@ def mtx_status():
         return json.loads(resp.read())
     except Exception:
         return {"status": "error", "message": "MediaMTX not running"}
+
+
+@app.get("/api/events")
+async def sse_events(stations: str = ""):
+    import queue
+
+    q = queue.Queue()
+    with _sse_lock:
+        _sse_clients.append(q)
+
+    async def event_stream():
+        try:
+            while True:
+                try:
+                    msg = q.get_nowait()
+                    yield msg
+                except queue.Empty:
+                    await asyncio.sleep(0.5)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            with _sse_lock:
+                try:
+                    _sse_clients.remove(q)
+                except ValueError:
+                    pass
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 # --- SERVE FRONTEND (PRODUCTION BUILD) ---

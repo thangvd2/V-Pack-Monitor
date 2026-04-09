@@ -1,5 +1,5 @@
 /**
- * V-Pack Monitor - CamDongHang v1.4.0
+ * V-Pack Monitor - CamDongHang v1.5.0
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
@@ -43,19 +43,31 @@ function App() {
   const [selectedVideo, setSelectedVideo] = useState({ url: '', waybillCode: '' });
 
   useEffect(() => {
-    if (recordingStatus !== 'saving') return;
-    const iv = setInterval(async () => {
+    const es = new EventSource(`${API_BASE}/api/events?stations=${activeStationId}`);
+    
+    es.addEventListener('video_status', (evt) => {
       try {
-        const res = await axios.get(`${API_BASE}/api/status?station_id=${activeStationId}`);
-        if (res.data.status === 'idle') {
+        const data = JSON.parse(evt.data);
+        if (data.station_id !== activeStationId) return;
+        
+        if (data.status === 'RECORDING') {
+          setRecordingStatus('recording');
+        } else if (data.status === 'PROCESSING') {
+          setRecordingStatus('processing');
+        } else if (data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
           setRecordingStatus('idle');
           setCurrentWaybill('');
           fetchRecords(searchTerm, activeStationId);
         }
       } catch {}
-    }, 2000);
-    return () => clearInterval(iv);
-  }, [recordingStatus, activeStationId]);
+    });
+
+    es.onerror = () => {
+      // SSE will auto-reconnect, no action needed
+    };
+
+    return () => es.close();
+  }, [activeStationId]);
 
   // Init fetch
   useEffect(() => {
@@ -207,9 +219,9 @@ function App() {
         setRecordingStatus('idle');
         setCurrentWaybill('');
         fetchRecords(searchTerm, activeStationId); 
-      } else if (res.data.status === 'busy') {
-        setRecordingStatus('saving');
-        alert(res.data.message);
+      } else if (res.data.status === 'busy' || res.data.status === 'processing') {
+        setRecordingStatus('processing');
+        if (res.data.message) alert(res.data.message);
       }
     } catch (err) {
       console.error("Barcode Lỗi", err);
@@ -530,10 +542,10 @@ function App() {
                         ĐANG GHI ĐƠN: {currentWaybill}
                       </div>
                     )}
-                    {recordingStatus === 'saving' && (
+                    {recordingStatus === 'processing' && (
                       <div className="px-3 py-1.5 rounded-full bg-amber-500/90 backdrop-blur-md border border-amber-300 text-xs font-bold text-white flex items-center gap-2 animate-pulse transition-all">
                         <div className="w-2 h-2 rounded-full bg-white"></div>
-                        ĐANG LUU VIDEO CHO DON: {currentWaybill}
+                        ĐANG XỬ LÝ VIDEO: {currentWaybill}
                       </div>
                     )}
                     {recordingStatus === 'idle' && (
@@ -635,9 +647,19 @@ function App() {
                        <h3 className="text-lg font-bold text-white group-hover:text-blue-300 transition-colors">
                          {record.waybill_code}
                        </h3>
-                       <span className="px-2 py-1 bg-white/10 rounded uppercase text-[10px] font-bold tracking-wider text-slate-300">
-                         {record.record_mode}
-                       </span>
+                        <span className="px-2 py-1 bg-white/10 rounded uppercase text-[10px] font-bold tracking-wider text-slate-300">
+                          {record.record_mode}
+                        </span>
+                        {record.status && record.status !== 'READY' && (
+                          <span className={`px-2 py-1 rounded uppercase text-[10px] font-bold tracking-wider ${
+                            record.status === 'RECORDING' ? 'bg-red-500/30 text-red-300 animate-pulse' :
+                            record.status === 'PROCESSING' ? 'bg-amber-500/30 text-amber-300 animate-pulse' :
+                            record.status === 'FAILED' ? 'bg-red-500/30 text-red-300' :
+                            'bg-white/10 text-slate-300'
+                          }`}>
+                            {record.status}
+                          </span>
+                        )}
                        <span className="px-2 py-1 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded text-[10px] font-bold">
                          Trạm: {record.station_name || 'Mặc định'}
                        </span>
@@ -665,10 +687,15 @@ function App() {
                           key={idx}
                           role="button"
                           onClick={() => {
+                            if (record.status && record.status !== 'READY' && record.status !== 'FAILED') return;
                             setSelectedVideo({ url: videoUrl, waybillCode: record.waybill_code });
                             setVideoModalOpen(true);
                           }}
-                          className="flex items-center gap-2 p-2 rounded-lg bg-black/20 hover:bg-black/40 border border-white/5 transition-colors text-sm"
+                          className={`flex items-center gap-2 p-2 rounded-lg bg-black/20 border border-white/5 text-sm ${
+                            record.status === 'RECORDING' || record.status === 'PROCESSING' 
+                              ? 'opacity-50 cursor-wait' 
+                              : 'hover:bg-black/40 cursor-pointer transition-colors'
+                          }`}
                         >
                           <Video className="w-4 h-4 text-emerald-400" />
                           <span className="truncate flex-1 text-slate-300">{fileName}</span>

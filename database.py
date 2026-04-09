@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.4.0
+# V-Pack Monitor - CamDongHang v1.5.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -38,6 +38,10 @@ def init_db():
         if "is_synced" not in columns:
             cursor.execute(
                 "ALTER TABLE packing_video ADD COLUMN is_synced INTEGER DEFAULT 0;"
+            )
+        if "status" not in columns:
+            cursor.execute(
+                "ALTER TABLE packing_video ADD COLUMN status TEXT DEFAULT 'READY';"
             )
 
         cursor.execute("""
@@ -150,10 +154,62 @@ def save_record(station_id, waybill_code, video_paths, record_mode):
         conn.commit()
 
 
+def create_record(station_id, waybill_code, record_mode, video_paths=""):
+    paths_str = ",".join(video_paths) if isinstance(video_paths, list) else video_paths
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO packing_video (station_id, waybill_code, video_paths, record_mode, recorded_at, status)
+            VALUES (?, ?, ?, ?, ?, 'RECORDING')""",
+            (station_id, waybill_code, paths_str, record_mode, datetime.now()),
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+
+def update_record_status(record_id, status, video_paths=None):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        if video_paths is not None:
+            paths_str = (
+                ",".join(video_paths) if isinstance(video_paths, list) else video_paths
+            )
+            cursor.execute(
+                "UPDATE packing_video SET status = ?, video_paths = ? WHERE id = ?",
+                (status, paths_str, record_id),
+            )
+        else:
+            cursor.execute(
+                "UPDATE packing_video SET status = ? WHERE id = ?",
+                (status, record_id),
+            )
+        conn.commit()
+
+
+def get_pending_records():
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, station_id, waybill_code, video_paths, record_mode, status FROM packing_video WHERE status IN ('RECORDING', 'PROCESSING')"
+        )
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": r[0],
+                "station_id": r[1],
+                "waybill_code": r[2],
+                "video_paths": r[3],
+                "record_mode": r[4],
+                "status": r[5],
+            }
+            for r in rows
+        ]
+
+
 def get_records(search="", station_id=None):
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
-        query = "SELECT p.id, p.waybill_code, p.video_paths, p.record_mode, p.recorded_at, s.name FROM packing_video p LEFT JOIN stations s ON p.station_id = s.id WHERE 1=1"
+        query = "SELECT p.id, p.waybill_code, p.video_paths, p.record_mode, p.recorded_at, s.name, p.status FROM packing_video p LEFT JOIN stations s ON p.station_id = s.id WHERE 1=1"
         params = []
 
         if search:

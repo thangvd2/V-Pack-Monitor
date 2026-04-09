@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v1.4.0
+# V-Pack Monitor - CamDongHang v1.5.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -376,11 +376,6 @@ class CameraRecorder:
                     break
                 except PermissionError:
                     time.sleep(1)
-            if not os.path.exists(final_path):
-                try:
-                    os.rename(ts_path, final_path)
-                except Exception:
-                    pass
 
         self.processes = []
 

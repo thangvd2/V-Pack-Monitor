@@ -1,13 +1,13 @@
 [Setup]
 AppName=V-Pack Monitor
-AppVersion=1.4.0
+AppVersion=1.5.0
 AppPublisher=VDT - Vu Duc Thang
 AppPublisherURL=https://github.com/thangvd2
 AppSupportURL=https://github.com/thangvd2/V-Pack-Monitor
 DefaultDirName={sd}\V-Pack Monitor
 DefaultGroupName=V-Pack Monitor
 OutputDir=.\installer
-OutputBaseFilename=V-Pack_Setup_v1.4.0
+OutputBaseFilename=V-Pack_Setup_v1.5.0
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=admin

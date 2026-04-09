@@ -2,6 +2,35 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v1.5.0] - 2026-04-09 (Video Pipeline Reliability)
+
+### 🚀 Tính Năng Lớn
+- **100% Video Guarantee:** Đảm bảo mọi video ghi hình đều được tracking từ lúc bắt đầu. DB record tạo TRƯỚC khi FFmpeg start, không bao giờ mất dấu video dù server crash.
+- **VideoWorker (Background Queue):** Tách luồng xử lý video ra khỏi barcode scanning. Operator quét STOP → trạm giải phóng ngay lập tức → VideoWorker xử lý convert/verify ở background. Operator không bao giờ bị block.
+- **Pre-flight Checks:** Trước khi ghi, kiểm tra tự động: ổ cứng còn đủ ≥500MB, FFmpeg còn hoạt động, trạm không đang ghi/đang xử lý. Từ chối ghi nếu điều kiện không đủ.
+- **Post-processing Verify:** Sau khi convert .ts→.mp4, dùng FFprobe verify file hợp lệ (duration > 0, codec valid). Video lỗi → mark FAILED + cảnh báo Telegram ngay lập tức.
+- **Crash Recovery:** Khi server khởi động lại, tự động detect records bị treo (RECORDING/PROCESSING). Nếu file .ts còn → convert sang MP4. Nếu mất hoàn toàn → mark FAILED + cảnh báo Telegram.
+- **SSE Realtime Updates:** Thay thế polling bằng Server-Sent Events. Frontend nhận push ngay khi status thay đổi (RECORDING → PROCESSING → READY/FAILED). Giảm ~1800 requests/giờ.
+
+### 🎨 UI/UX
+- **Status Badges:** Mỗi thẻ lịch sử hiển thị badge trạng thái: 🔴 RECORDING, 🟡 PROCESSING, 🟢 READY, ❌ FAILED.
+- **Live View Overlay:** Badge "ĐANG XỬ LÝ VIDEO" (amber) hiển thị khi video đang convert.
+- **Video Playback Guard:** Disable nút play cho video chưa xử lý xong (RECORDING/PROCESSING).
+
+### 🏗️ Kiến Trúc
+- **`video_worker.py`** (mới): ThreadPoolExecutor(max_workers=1), sequential processing, no race conditions.
+- **`database.py`**: Thêm `status` column, `create_record()`, `update_record_status()`, `get_pending_records()`.
+- **`recorder.py`**: Xóa fallback rename .ts→.mp4 (tránh tạo file invalid khi convert fail).
+- **`api.py`**: SSE endpoint `/api/events`, pre-flight checks, crash recovery, handle_scan rewrite.
+
+### 📋 Telegram Alerts
+- File mất hoàn toàn → FAILED → cảnh báo Telegram ngay.
+- Convert thất bại → FAILED → cảnh báo Telegram ngay.
+- Recovery thất bại sau crash → cảnh báo Telegram ngay.
+- Recovery thành công / server crash / recording dừng → không cảnh báo (không cần).
+
+---
+
 ## [v1.4.0] - 2026-04-09 (WebRTC + Recording Overhaul)
 
 ### 🚀 Tính Năng Lớn
