@@ -2,6 +2,43 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v2.1.0] - 2026-04-10 (Station Assignment & Bug Fixes)
+
+### 🔐 Tính Năng Lớn
+- **Station Assignment cho OPERATOR:** Sau khi đăng nhập, OPERATOR phải chọn trạm làm việc. Hiển thị trạng thái 🟢 Trống / 🔴 Đang dùng. Trạm occupied không thể chọn. ADMIN tự do xem tất cả.
+- **Session Lifecycle:** Acquire → Heartbeat 30s → Release. Session expire sau 90s nếu mất heartbeat. Auto-expire tất cả sessions khi server restart.
+- **PIP Click-to-Swap:** Click vào PIP overlay để swap camera chính/phụ. Badge ⇄ chỉ thị swap.
+
+### 📊 Audit & Monitoring
+- **6 Audit Actions mới:** LOCK_USER, UNLOCK_USER, SETTINGS_UPDATE, STATION_CREATE, STATION_UPDATE, STATION_DELETE. Tổng 16 actions được log.
+- **Periodic Audit Cleanup:** Dọn audit log cũ (>90 ngày) mỗi 24 giờ, không chỉ lúc startup.
+- **Station Status API:** `GET /api/sessions/station-status` — trả về tất cả trạm + occupied/free + username.
+
+### 🔧 Tách Trạng Thái Hiển Thị
+- **Live View:** Hiển thị trạng thái quy trình đóng hàng — 🔴 "Đang đóng hàng: [MÃ VẠCH]" / 🟢 "Sẵn sàng". Quét STOP → quay về Sẵn sàng ngay.
+- **History Cards:** Hiển thị trạng thái luồng video — "Đang ghi hình" / "Đang xử lý" / "Sẵn sàng" / "Lỗi" (tiếng Việt). SSE cập nhật realtime.
+
+### 🐛 Bug Fixes
+- **passlib → bcrypt:** Thay `passlib` (unmaintained) bằng `bcrypt` trực tiếp. Khắc phục crash trên Python 3.14.
+- **MediaMTX Fallback:** Frontend hiển thị "📡 MediaMTX chưa khởi động" thay vì broken iframe "localhost refused to connect".
+- **MTX Status API:** `/api/mtx-status` trả 503 (thay vì 200) khi MediaMTX down → frontend detect đúng.
+- **MediaMTX Auto-Install:** `install_macos.sh` tự động tải MediaMTX v1.17.1. Config `api: true` bật Control API.
+- **Data Load After Login:** Init fetch chuyển sang `useEffect([currentUser])` — data load sau khi login, không phải trước.
+- **Barcode Popup:** Bỏ alert không cần thiết khi scan lại mã đang đóng. Alert chỉ hiện khi busy/processing.
+
+### 📁 Files Thay Đổi
+- `auth.py`: `passlib` → `bcrypt` trực tiếp
+- `database.py`: 3 chỗ `passlib` → `bcrypt` + `cleanup_audit_log()` function mới
+- `api.py`: 6 audit log calls, periodic cleanup, `GET /api/sessions/station-status`, `HTTPException` import
+- `requirements.txt`: `passlib[bcrypt]` → `bcrypt>=4.0.0`
+- `App.jsx`: Station selection screen, session flow, PIP swap, status separation, MediaMTX fallback
+- `install_macos.sh` + `Install V-Pack Monitor.command`: Thêm bước download MediaMTX
+- `bin/mediamtx/mediamtx.yml`: `api: true`
+- `docs/plans/12_v2_roadmap_plan.md`: Mục 2.3.1 Station Assignment, mục 1.6 status separation
+- `docs/plans/13_v3_roadmap_plan.md`: Audit gaps, PIP swap, RAM threshold notes
+
+---
+
 ## [v2.0.0] - 2026-04-09 (System Health Dashboard) 🎉 MAJOR RELEASE
 
 ### 🏥 Tính Năng Lớn

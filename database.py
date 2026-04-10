@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.0.0
+# V-Pack Monitor - CamDongHang v2.1.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -129,12 +129,14 @@ def init_db():
 
         cursor.execute("SELECT COUNT(*) FROM users")
         if cursor.fetchone()[0] == 0:
-            from passlib.context import CryptContext
+            import bcrypt as _bcrypt
 
-            pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            hashed = _bcrypt.hashpw(
+                "08012011".encode("utf-8"), _bcrypt.gensalt()
+            ).decode("utf-8")
             cursor.execute(
                 "INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, 'ADMIN', 'Administrator')",
-                ("admin", pwd_ctx.hash("08012011")),
+                ("admin", hashed),
             )
             print("Default admin created: admin/08012011")
 
@@ -492,15 +494,15 @@ def get_all_users():
 
 
 def create_user(username, password, role="OPERATOR", full_name=""):
-    from passlib.context import CryptContext
+    import bcrypt as _bcrypt
 
-    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    hashed = _bcrypt.hashpw(password.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         try:
             cursor.execute(
                 "INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, ?, ?)",
-                (username, pwd_ctx.hash(password), role, full_name),
+                (username, hashed, role, full_name),
             )
             conn.commit()
             return cursor.lastrowid
@@ -526,14 +528,16 @@ def update_user(user_id, **kwargs):
 
 
 def update_user_password(user_id, new_password):
-    from passlib.context import CryptContext
+    import bcrypt as _bcrypt
 
-    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    hashed = _bcrypt.hashpw(new_password.encode("utf-8"), _bcrypt.gensalt()).decode(
+        "utf-8"
+    )
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE users SET password_hash = ? WHERE id = ?",
-            (pwd_ctx.hash(new_password), user_id),
+            (hashed, user_id),
         )
         conn.commit()
 
@@ -614,6 +618,16 @@ def log_audit(
         cursor.execute(
             "INSERT INTO audit_log (user_id, action, details, station_id) VALUES (?, ?, ?, ?)",
             (user_id, action, details, station_id),
+        )
+        conn.commit()
+
+
+def cleanup_audit_log(days: int = 90):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM audit_log WHERE created_at < datetime('now', ?)",
+            (f"-{days} days",),
         )
         conn.commit()
 

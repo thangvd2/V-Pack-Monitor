@@ -87,13 +87,62 @@ Khi server khởi động:
 - Admin cần biết và xử lý gốc vấn đề
 - Trong môi trường production, false-positive retry tạo rác và nhầm lẫn
 
-### 1.6 Frontend: status badges trên history cards
+### 1.6 Frontend: Tách biệt 2 loại trạng thái hiển thị
 
-Mỗi thẻ trong lịch sử ghi hình hiển thị badge trạng thái:
-- 🔴 RECORDING — đang ghi
-- 🟡 PROCESSING — đang xử lý video
-- 🟢 READY — sẵn sàng xem lại
-- ❌ FAILED — lỗi
+Hệ thống có 2 luồng hoạt động độc lập, cần hiển thị trạng thái riêng biệt:
+
+**Loại 1: Trạng thái quy trình đóng hàng (Live View area)**
+
+Hiển thị trên live view, cho operator biết tiến độ đóng hàng hiện tại:
+
+| State | Hiển thị | Ý nghĩa |
+|---|---|---|
+| `idle` | Không hiển thị gì / "Sẵn sàng" | Trạm trống, chờ quét mã vạch |
+| `packing` | 🔴 "Đang đóng hàng: [MÃ VẠCH]" | Operator đã quét mã, FFmpeg đang ghi |
+
+Khi operator quét STOP → trạng thái quay về `idle` **ngay lập tức**. Operator biết xong việc đóng hàng, không cần chờ video xử lý xong.
+
+Nguồn cập nhật: Barcode scan events (`sendScanAction`) → `packingStatus` state.
+
+**Loại 2: Trạng thái luồng lưu video async (History cards)**
+
+Hiển thị trên từng thẻ trong lịch sử ghi hình, cho biết video xử lý đến đâu:
+
+| State | Hiển thị | Ý nghĩa |
+|---|---|---|
+| `RECORDING` | 🔴 "Đang ghi hình" | FFmpeg đang quay |
+| `PROCESSING` | 🟡 "Đang xử lý" | Đang convert/verify video |
+| `READY` | 🟢 "Sẵn sàng" | Xem lại được |
+| `FAILED` | ❌ "Lỗi" | Cần admin xử lý |
+
+Nguồn cập nhật: SSE `video_status` event → `record.status` từ DB.
+
+**Tại sao phải tách:**
+- Operator quét STOP → đóng hàng xong → live view hiện "Sẵn sàng" (luồng 1 kết thúc)
+- Nhưng video vẫn đang convert → history card hiện 🟡 "Đang xử lý" (luồng 2 chưa xong)
+- Nếu dùng chung state → operator thấy "Đang xử lý video..." trên live view → nhầm lẫn nghĩ chưa xong việc đóng hàng
+- ADMIN cũng cần phân biệt: đóng hàng xong nhưng video chưa ready → biết chờ trước khi xem lại
+
+**Frontend changes (App.jsx):**
+
+- Thay `recordingStatus` state bằng 2 state riêng biệt:
+  - `packingStatus`: `"idle"` | `"packing"` — trạng thái đóng hàng, hiển thị trên live view
+  - Xóa `recordingStatus` cũ
+- `sendScanAction` cập nhật `packingStatus`:
+  - Scan mới (start recording) → `setPackingStatus('packing')` + `setCurrentWaybill(barcode)`
+  - Scan STOP → `setPackingStatus('idle')` + `setCurrentWaybill('')`
+  - Scan same barcode (đang đóng) → không hiện popup, giữ nguyên state
+- Live view hiển thị `packingStatus` thay vì `recordingStatus`
+- History cards giữ nguyên `record.status` từ DB (RECORDING/PROCESSING/READY/FAILED), hiển thị bằng tiếng Việt
+- SSE `video_status` event chỉ cập nhật `record.status` trên history cards, KHÔNG ảnh hưởng `packingStatus`
+- Grid view: `stationStatuses` dùng `packingStatus` cho mỗi trạm
+
+**Backend changes (api.py):**
+
+- Không cần thay đổi — API đã trả đúng status cho từng luồng
+- `/api/scan` trả `{status: "recording"}` khi bắt đầu ghi → frontend hiểu là `packing`
+- `/api/scan` trả `{status: "stopped"}` khi dừng → frontend hiểu là `idle`
+- SSE `video_status` push RECORDING→PROCESSING→READY/FAILED → chỉ ảnh hưởng history cards
 
 ### 1.7 SSE Event Stream cho realtime updates
 
@@ -191,6 +240,37 @@ CREATE TABLE sessions (
 - Operator đóng tab → heartbeat timeout → auto release sau 90s
 - Operator mở tab mới cùng trạm → session còn active → cho phép (cùng user)
 - Crash server → tất cả sessions ACTIVE → set EXPIRED on startup
+
+### 2.3.1 Station Assignment — Luồng chọn trạm sau khi đăng nhập ⚠️ CHƯA IMPLEMENT
+
+**Vấn đề hiện tại:** Backend API `/api/sessions/acquire`, `/heartbeat`, `/release` đã có sẵn nhưng frontend **không gọi**. Sau khi đăng nhập, user (kể cả OPERATOR) thẳng vào trạm 1 mặc định, không bị bắt chọn trạm, không acquire session, 2 OPERATOR cùng xem/ghi trên 1 trạm mà không có warning.
+
+**Yêu cầu mới (xác nhận bởi VDT 2026-04-10):**
+
+1. **OPERATOR phải chọn trạm sau khi đăng nhập** — không cho vào thẳng trạm mặc định. Hiển thị màn hình chọn trạm (danh sách trạm kèm trạng thái: trống / đang occupied). ADMIN thì bỏ qua bước này, vào thẳng trạm đầu tiên.
+2. **OPERATOR chỉ xem/ghi trên trạm đã chọn** — không thể xem trạm khác. Station dropdown bị ẩn hoặc disabled cho OPERATOR. ADMIN xem tất cả trạm tự do.
+3. **2 OPERATOR không được dùng cùng trạm** — nếu trạm đã có user khác (session ACTIVE) thì hiện thông báo "Trạm đang được sử dụng bởi [username]" và không cho chọn. ADMIN có thể xem đồng thời với bất kỳ user nào.
+4. **OPERATOR đổi trạm** — được phép đổi nếu trạm mới đang trống (không có session ACTIVE của user khác). Khi đổi → release session cũ → acquire session mới.
+
+**Frontend changes (App.jsx):**
+
+- Thêm state `stationAssigned` (boolean) — chỉ `true` khi OPERATOR đã acquire session thành công, hoặc khi user là ADMIN.
+- Sau khi login thành công:
+  - ADMIN: `setActiveStationId(stations[0].id)` + `setStationAssigned(true)` (như hiện tại).
+  - OPERATOR: hiển thị màn hình chọn trạm (danh sách stations + trạng thái occupied/free), gọi `POST /api/sessions/acquire?station_id=X` → nếu success → `setStationAssigned(true)` → vào main UI. Nếu error → hiện message.
+- Màn hình chọn trạm: grid/card layout, mỗi trạm hiện tên + trạng thái (🟢 Trống / 🔴 Đang dùng bởi [username]). Trạm occupied bị disable (click không được).
+- Khi OPERATOR đổi trạm qua dropdown: gọi `POST /api/sessions/release?station_id=old` → `POST /api/sessions/acquire?station_id=new`. Nếu acquire fail → revert về trạm cũ + hiện error.
+- Heartbeat: gọi `POST /api/sessions/heartbeat?session_id=X` mỗi 30s khi `stationAssigned=true` và user là OPERATOR.
+- Khi logout: gọi `POST /api/sessions/release?station_id=X`.
+- ADMIN không gọi acquire/heartbeat/release — admin skip station locking hoàn toàn.
+
+**Backend changes (api.py):**
+
+- `POST /api/sessions/acquire` — đã có, hoạt động đúng. Thêm audit log.
+- `POST /api/sessions/heartbeat` — đã có, hoạt động đúng.
+- `POST /api/sessions/release` — đã có, hoạt động đúng.
+- Thêm `GET /api/sessions/station-status` — trả về danh sách tất cả trạm + trạng thái occupied/free + username nếu occupied. Dùng cho màn hình chọn trạm của OPERATOR.
+- Tất cả API ghi hình (`POST /api/scan`, `POST /api/stop`) thêm check: OPERATOR chỉ ghi trên trạm có session ACTIVE của mình. ADMIN không ghi (như hiện tại).
 
 ### 2.4 Frontend: Login page, user menu, role-aware UI
 

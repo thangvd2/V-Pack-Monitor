@@ -75,6 +75,18 @@ Bản kế hoạch nâng cấp V-Pack Monitor từ v1.7.0 lên v3.0 với 4 phas
 - Tab "Nhật ký" trong User Management Modal (ADMIN only)
 - Filter theo user, action type, date range
 
+**Audit thực tế (2026-04-10):**
+
+10 actions đã được log qua `log_audit()`:
+- LOGIN, LOGOUT, CHANGE_PASSWORD, CREATE_USER, UPDATE_USER, RESET_PASSWORD, DELETE_USER, FORCE_END_SESSION, STOP_RECORD, START_RECORD
+
+6 actions thiếu `log_audit()` call (có trong frontend filter dropdown nhưng backend không ghi):
+- `LOCK_USER` / `UNLOCK_USER` — khi ADMIN toggle `is_active` của user, không có audit log
+- `SETTINGS_UPDATE` — khi thay đổi system settings, không có audit log
+- `STATION_CREATE` / `STATION_UPDATE` / `STATION_DELETE` — khi CRUD trạm, không có audit log
+
+Auto-cleanup 90 ngày chỉ chạy lúc server startup (trong `init_db()`), không chạy định kỳ. Nếu server chạy liên tục nhiều tháng thì log cũ không được dọn.
+
 ---
 
 ## Phase 2: Dashboard & Analytics Pro ✅ COMPLETED (v1.9.0 - 2026-04-09)
@@ -144,6 +156,8 @@ GET /api/analytics/stations-comparison                    # So sánh năng suấ
   - Click vào PIP → swap camera chính/phụ
 - Nút toggle ở góc trên phải player
 
+**Audit thực tế (2026-04-10):** PIP hiển thị đúng (cam1 full + cam2 overlay góc dưới phải) nhưng **click-to-swap không được implement**. PIP overlay không có onClick handler. Đây là cosmetic issue — người dùng vẫn thấy cả 2 camera, chỉ không đổi được camera nào là chính. Đã được descoped ở thời điểm implement.
+
 ### 3.3 Grid Mode Dual Camera
 
 - Trong overview grid, mỗi tile hiển thị camera chính
@@ -197,6 +211,8 @@ Cần thêm dependency: `psutil>=5.9.0`
   - CPU > 80% → 🟡, > 95% → 🔴
   - RAM > 85% → 🟡, > 95% → 🔴
   - Disk > 90% → 🔴 (đã có)
+
+**Lưu ý:** Kế hoạch ban đầu ghi RAM warning threshold là 80%, nhưng code thực tế dùng 85%. Giá trị 85% hợp lý hơn cho môi trường kho (nhiều FFmpeg process), giữ nguyên.
 
 ---
 

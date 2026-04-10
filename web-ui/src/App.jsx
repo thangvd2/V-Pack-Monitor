@@ -1,5 +1,5 @@
 /**
- * V-Pack Monitor - CamDongHang v2.0.0
+ * V-Pack Monitor - CamDongHang v2.1.0
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
@@ -19,6 +19,143 @@ const API_BASE = window.location.hostname === 'localhost' && ['3000', '3001', '5
 
 const MTX_HOST = window.location.hostname;
 
+function MtxFallback() {
+  return (
+    <div className="w-full h-full flex items-center justify-center" style={{ background: '#09090b' }}>
+      <div className="text-center">
+        <div className="text-4xl mb-3">📡</div>
+        <p className="text-slate-400 text-sm font-medium">MediaMTX chưa khởi động</p>
+        <p className="text-slate-500 text-xs mt-1">Live view cần MediaMTX chạy ở port 8889</p>
+      </div>
+    </div>
+  );
+}
+
+function StationSelectionScreen({ stations, stationStatusList, fetchStationStatus, acquireStation, currentUser }) {
+  const [loading, setLoading] = useState(true);
+  const [selecting, setSelecting] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      await fetchStationStatus();
+      setLoading(false);
+    };
+    load();
+    const interval = setInterval(fetchStationStatus, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const getStatusForStation = (stationId) => {
+    return stationStatusList.find(s => s.station_id === stationId);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-8">
+      <div className="text-center mb-10">
+        <div className="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-400/20 mx-auto mb-4">
+          <Monitor className="text-blue-400 w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold text-white mb-2">Chọn Trạm Làm Việc</h2>
+        <p className="text-slate-400 text-sm">
+          Xin chào <span className="text-blue-300 font-medium">{currentUser.full_name || currentUser.username}</span>, vui lòng chọn trạm để bắt đầu
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-3 text-slate-400">
+          <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500"></div>
+          <span>Đang tải trạng thái trạm...</span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full max-w-5xl">
+          {stations.length === 0 ? (
+            <div className="col-span-full text-center py-16">
+              <Monitor className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+              <p className="text-slate-400">Chưa có trạm nào được cấu hình</p>
+              <p className="text-slate-500 text-sm mt-1">Vui lòng liên hệ Administrator</p>
+            </div>
+          ) : (
+            stations.map(station => {
+              const status = getStatusForStation(station.id);
+              const isOccupied = status?.occupied && status?.occupied_by !== currentUser.username;
+              const isHeldBySelf = status?.occupied && status?.occupied_by === currentUser.username;
+
+              return (
+                <button
+                  key={station.id}
+                  disabled={isOccupied || selecting !== null}
+                  onClick={() => {
+                    if (isOccupied) return;
+                    setSelecting(station.id);
+                    acquireStation(station.id);
+                  }}
+                  className={`
+                    relative group p-6 rounded-3xl border backdrop-blur-sm shadow-xl transition-all duration-300 text-left
+                    ${isOccupied
+                      ? 'bg-zinc-900/60 border-red-500/20 opacity-60 cursor-not-allowed'
+                      : isHeldBySelf
+                        ? 'bg-amber-500/5 border-amber-500/30 cursor-pointer hover:scale-[1.02] hover:border-amber-400/50'
+                        : selecting === station.id
+                          ? 'bg-blue-500/10 border-blue-500/40 scale-[0.98]'
+                          : 'bg-zinc-900/80 border-white/10 cursor-pointer hover:scale-[1.02] hover:border-blue-400/40 hover:bg-blue-500/5'
+                    }
+                  `}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                      <Monitor className="w-5 h-5 text-slate-300" />
+                    </div>
+                    <span className={`
+                      flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full
+                      ${isOccupied
+                        ? 'bg-red-500/20 text-red-300 border border-red-500/20'
+                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/20'
+                      }
+                    `}>
+                      <span className="text-base">{isOccupied ? '🔴' : '🟢'}</span>
+                      {isOccupied ? 'Đang dùng' : 'Trống'}
+                    </span>
+                  </div>
+
+                  <h3 className="text-lg font-bold text-white mb-1">{station.name}</h3>
+                  <p className="text-xs text-slate-500 font-mono">ID: {station.id}</p>
+
+                  {isOccupied && status?.occupied_by_name && (
+                    <div className="mt-3 pt-3 border-t border-white/5">
+                      <p className="text-xs text-red-300/80">
+                        Đang dùng bởi <span className="font-semibold text-red-300">{status.occupied_by_name}</span>
+                      </p>
+                    </div>
+                  )}
+                  {isHeldBySelf && (
+                    <div className="mt-3 pt-3 border-t border-white/5">
+                      <p className="text-xs text-amber-300/80">
+                        Phiên của bạn đang giữ trạm này
+                      </p>
+                    </div>
+                  )}
+                  {!isOccupied && !isHeldBySelf && (
+                    <div className="mt-3 pt-3 border-t border-white/5">
+                      <p className="text-xs text-emerald-300/60 group-hover:text-emerald-300 transition-colors">
+                        {selecting === station.id ? 'Đang kết nối...' : 'Nhấn để chọn →'}
+                      </p>
+                    </div>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      <p className="text-slate-600 text-xs mt-8">
+        Trạng thái tự động cập nhật mỗi 10 giây
+      </p>
+    </div>
+  );
+}
+
 function App() {
   const [stations, setStations] = useState([]);
   const [activeStationId, setActiveStationId] = useState(1);
@@ -27,7 +164,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [initialSettings, setInitialSettings] = useState({});
-  const [recordingStatus, setRecordingStatus] = useState('idle');
+  const [packingStatus, setPackingStatus] = useState('idle');
   const [currentWaybill, setCurrentWaybill] = useState('');
   const [storageInfo, setStorageInfo] = useState({ size_str: '0 MB', file_count: 0 });
   const [diskHealth, setDiskHealth] = useState(null);
@@ -57,14 +194,25 @@ function App() {
   const [changePasswordForm, setChangePasswordForm] = useState({ old_password: '', new_password: '', confirm_password: '' });
   const [changePasswordError, setChangePasswordError] = useState('');
   const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
+  const [mtxAvailable, setMtxAvailable] = useState(null);
+
+  // Station Session State (OPERATOR)
+  const [stationAssigned, setStationAssigned] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [pipCamSwap, setPipCamSwap] = useState(false);
+  const [stationStatusList, setStationStatusList] = useState([]);
 
   useEffect(() => {
     const token = localStorage.getItem('vpack_token');
     const savedUser = localStorage.getItem('vpack_user');
     if (token && savedUser) {
       try {
-        setCurrentUser(JSON.parse(savedUser));
+        const user = JSON.parse(savedUser);
+        setCurrentUser(user);
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        if (user.role === 'ADMIN') {
+          setStationAssigned(true);
+        }
       } catch {
         localStorage.removeItem('vpack_token');
         localStorage.removeItem('vpack_user');
@@ -72,6 +220,23 @@ function App() {
     }
     setAuthLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    axios.get(`${API_BASE}/api/mtx-status`)
+      .then(() => setMtxAvailable(true))
+      .catch(() => setMtxAvailable(false));
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!activeSessionId || currentUser?.role === 'ADMIN') return;
+    const interval = setInterval(async () => {
+      try {
+        await axios.post(`${API_BASE}/api/sessions/heartbeat?session_id=${activeSessionId}`);
+      } catch {}
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [activeSessionId, currentUser]);
 
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
@@ -100,15 +265,14 @@ function App() {
         const data = JSON.parse(evt.data);
         
         if (viewMode === 'grid') {
-          const stationStatus = data.status === 'RECORDING' ? 'recording'
-            : data.status === 'PROCESSING' ? 'processing' : 'idle';
+          const isPacking = data.status === 'RECORDING';
           const waybill = data.waybill || '';
           setStationStatuses(prev => ({
             ...prev,
-            [data.station_id]: { status: stationStatus, waybill }
+            [data.station_id]: { status: isPacking ? 'packing' : 'idle', waybill }
           }));
-          if (data.station_id === activeStationId) {
-            setRecordingStatus(stationStatus);
+          if (data.station_id === activeStationId && isPacking) {
+            setPackingStatus('packing');
             setCurrentWaybill(waybill);
           }
           if ((data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') && data.station_id === activeStationId) {
@@ -118,13 +282,9 @@ function App() {
           if (data.station_id !== activeStationId) return;
           
           if (data.status === 'RECORDING') {
-            setRecordingStatus('recording');
+            setPackingStatus('packing');
             setCurrentWaybill(data.waybill || '');
-          } else if (data.status === 'PROCESSING') {
-            setRecordingStatus('processing');
           } else if (data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
-            setRecordingStatus('idle');
-            setCurrentWaybill('');
             fetchRecords(searchTerm, activeStationId);
           }
         }
@@ -138,13 +298,14 @@ function App() {
 
   // Init fetch
   useEffect(() => {
+    if (!currentUser) return;
     fetchStations();
     fetchDiskHealth();
     
     // Refresh disk health every 60 seconds
     const intervalId = setInterval(fetchDiskHealth, 60000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [currentUser]);
 
   const fetchDiskHealth = async () => {
     try {
@@ -218,8 +379,13 @@ function App() {
   const fetchStatus = async (sid) => {
     try {
       const res = await axios.get(`${API_BASE}/api/status?station_id=${sid}`);
-      setRecordingStatus(res.data.status);
-      setCurrentWaybill(res.data.waybill || '');
+      if (res.data.status === 'recording') {
+        setPackingStatus('packing');
+        setCurrentWaybill(res.data.waybill || '');
+      } else {
+        setPackingStatus('idle');
+        setCurrentWaybill('');
+      }
     } catch (error) {
       console.log('Status not ready', error);
     }
@@ -229,13 +395,14 @@ function App() {
     if (viewMode !== 'grid' || stations.length === 0) return;
     setStationStatuses(prev => ({
       ...prev,
-      [activeStationId]: { status: recordingStatus, waybill: currentWaybill }
+      [activeStationId]: { status: packingStatus, waybill: currentWaybill }
     }));
     stations.forEach(st => {
       axios.get(`${API_BASE}/api/status?station_id=${st.id}`).then(res => {
+        const isPacking = res.data.status === 'recording';
         setStationStatuses(prev => ({
           ...prev,
-          [st.id]: { status: res.data.status, waybill: res.data.waybill || '' }
+          [st.id]: { status: isPacking ? 'packing' : 'idle', waybill: res.data.waybill || '' }
         }));
       }).catch(() => {});
     });
@@ -273,6 +440,40 @@ function App() {
     }
   };
 
+  const acquireStation = async (stationId) => {
+    try {
+      const res = await axios.post(`${API_BASE}/api/sessions/acquire?station_id=${stationId}`);
+      if (res.data.status === 'success') {
+        setActiveSessionId(res.data.session_id);
+        setActiveStationId(stationId);
+        setStationAssigned(true);
+      } else {
+        alert(res.data.message || 'Không thể chọn trạm.');
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Lỗi khi chọn trạm.');
+    }
+  };
+
+  const releaseStation = async (stationId) => {
+    if (!stationId) return;
+    try {
+      await axios.post(`${API_BASE}/api/sessions/release?station_id=${stationId}`);
+    } catch {}
+    setActiveSessionId(null);
+  };
+
+  const fetchStationStatus = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/api/sessions/station-status`);
+      setStationStatusList(res.data.data || []);
+      return res.data.data || [];
+    } catch {
+      setStationStatusList([]);
+      return [];
+    }
+  };
+
   const checkSettings = async () => {
     try {
       const response = await axios.get(`${API_BASE}/api/settings`);
@@ -291,18 +492,15 @@ function App() {
         station_id: activeStationId
       });
       if (res.data.status === 'recording') {
-        if (recordingStatus === 'recording') {
-          alert(res.data.message);
-        } else {
-          setRecordingStatus('recording');
+        if (packingStatus !== 'packing') {
+          setPackingStatus('packing');
           setCurrentWaybill(finalBarcode);
         }
       } else if (res.data.status === 'stopped' || res.data.status === 'exit') {
-        setRecordingStatus('idle');
+        setPackingStatus('idle');
         setCurrentWaybill('');
         fetchRecords(searchTerm, activeStationId); 
       } else if (res.data.status === 'busy' || res.data.status === 'processing') {
-        setRecordingStatus('processing');
         if (res.data.message) alert(res.data.message);
       }
     } catch (err) {
@@ -345,6 +543,9 @@ function App() {
         localStorage.setItem('vpack_user', JSON.stringify(user));
         axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
         setCurrentUser(user);
+        if (user.role === 'ADMIN') {
+          setStationAssigned(true);
+        }
         setLoginForm({ username: '', password: '' });
       } else {
         setLoginError(res.data.message || 'Đăng nhập thất bại.');
@@ -354,11 +555,16 @@ function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (activeSessionId) {
+      await releaseStation(activeStationId);
+    }
     localStorage.removeItem('vpack_token');
     localStorage.removeItem('vpack_user');
     delete axios.defaults.headers.common['Authorization'];
     setCurrentUser(null);
+    setStationAssigned(false);
+    setActiveSessionId(null);
   };
    
   // --- Hàm xoá bản ghi (Đã qua kiểm duyệt bảo mật) ---
@@ -497,9 +703,44 @@ function App() {
             </button>
           </form>
           <p className="text-center text-xs text-slate-500 mt-6">
-            V-Pack Monitor v2.0.0 • VDT
+            V-Pack Monitor v2.1.0 • VDT
           </p>
         </div>
+      </div>
+    );
+  }
+
+  if (currentUser && !stationAssigned && currentUser.role !== 'ADMIN') {
+    return (
+      <div className="min-h-screen bg-[#09090b] text-white flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center border border-blue-400/30">
+              <PackageCheck className="text-blue-400 w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
+                V-Pack Monitor
+              </h1>
+              <p className="text-xs text-slate-400">Chọn trạm làm việc</p>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm text-slate-400 hover:text-white transition-all"
+          >
+            <LogOut className="w-4 h-4" />
+            Đăng xuất
+          </button>
+        </div>
+
+        <StationSelectionScreen
+          stations={stations}
+          stationStatusList={stationStatusList}
+          fetchStationStatus={fetchStationStatus}
+          acquireStation={acquireStation}
+          currentUser={currentUser}
+        />
       </div>
     );
   }
@@ -640,10 +881,38 @@ function App() {
           {!(viewMode === 'grid' && stations.length >= 2) && (
           <div className="relative group flex items-center border border-white/10 rounded-2xl bg-white/5 py-2 px-3 shadow-lg">
              <Monitor className="w-5 h-5 text-indigo-400 mr-2" />
-             <select 
-               value={activeStationId} 
-               onChange={(e) => setActiveStationId(Number(e.target.value))}
-               className="bg-transparent text-slate-200 focus:outline-none appearance-none font-semibold cursor-pointer pr-4"
+              <select 
+                value={activeStationId} 
+                onChange={async (e) => {
+                  const newId = Number(e.target.value);
+                  if (currentUser?.role === 'OPERATOR' && activeStationId !== newId) {
+                    try {
+                      const statusRes = await axios.get(`${API_BASE}/api/sessions/station-status`);
+                      const targetStatus = (statusRes.data.data || []).find(s => s.station_id === newId);
+                      if (targetStatus?.occupied && targetStatus?.occupied_by !== currentUser.username) {
+                        alert('Trạm này đang được sử dụng bởi ' + (targetStatus.occupied_by_name || targetStatus.occupied_by));
+                        return;
+                      }
+                      await releaseStation(activeStationId);
+                      const acquireRes = await axios.post(`${API_BASE}/api/sessions/acquire?station_id=${newId}`);
+                      if (acquireRes.data.status === 'success') {
+                        setActiveSessionId(acquireRes.data.session_id);
+                        setActiveStationId(newId);
+                      } else {
+                        alert(acquireRes.data.message || 'Không thể chuyển trạm.');
+                        const reacquireRes = await axios.post(`${API_BASE}/api/sessions/acquire?station_id=${activeStationId}`);
+                        if (reacquireRes.data.status === 'success') {
+                          setActiveSessionId(reacquireRes.data.session_id);
+                        }
+                      }
+                    } catch {
+                      alert('Lỗi khi chuyển trạm.');
+                    }
+                  } else {
+                    setActiveStationId(newId);
+                  }
+                }}
+                className="bg-transparent text-slate-200 focus:outline-none appearance-none font-semibold cursor-pointer pr-4"
              >
                {stations.map(st => (
                  <option key={st.id} value={st.id} className="bg-slate-800">
@@ -864,14 +1133,16 @@ function App() {
                         onClick={() => { setActiveStationId(station.id); setViewMode('single'); }}
                         className="relative group rounded-3xl overflow-hidden bg-zinc-900 border border-white/10 hover:border-blue-400/30 shadow-2xl shadow-blue-900/20 aspect-video flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-[1.02]"
                       >
-                        <iframe
-                          key={`grid-${station.id}`}
-                          src={`http://${MTX_HOST}:8889/station_${station.id}?controls=false&muted=true&autoplay=true`}
-                          scrolling="no"
-                          className="w-full h-full object-cover"
-                          style={{ border: 'none', background: '#000' }}
-                          allow="autoplay"
-                        />
+                        {mtxAvailable ? (
+                          <iframe
+                            key={`grid-${station.id}`}
+                            src={`http://${MTX_HOST}:8889/station_${station.id}?controls=false&muted=true&autoplay=true`}
+                            scrolling="no"
+                            className="w-full h-full object-cover"
+                            style={{ border: 'none', background: '#000' }}
+                            allow="autoplay"
+                          />
+                        ) : <MtxFallback />}
                         {station.id === activeStationId && reconnectInfo && reconnectInfo.status === 'searching' && (
                           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-amber-500/90 text-white text-xs font-semibold px-3 py-1 rounded-full animate-pulse">
                             🔄 Tìm lại Camera...
@@ -886,22 +1157,16 @@ function App() {
                           <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-mono text-white/90">
                             {station.name}
                           </div>
-                          {st.status === 'recording' && (
+                          {st.status === 'packing' && (
                             <div className="px-3 py-1.5 rounded-full bg-red-600/90 backdrop-blur-md border border-red-400 text-xs font-bold text-white flex items-center gap-2 animate-pulse">
                               <div className="w-2 h-2 rounded-full bg-white"></div>
-                              ĐANG GHI: {st.waybill}
-                            </div>
-                          )}
-                          {st.status === 'processing' && (
-                            <div className="px-3 py-1.5 rounded-full bg-amber-500/90 backdrop-blur-md border border-amber-300 text-xs font-bold text-white flex items-center gap-2 animate-pulse">
-                              <div className="w-2 h-2 rounded-full bg-white"></div>
-                              ĐANG XỬ LÝ
+                              Đang đóng: {st.waybill}
                             </div>
                           )}
                           {st.status === 'idle' && (
                             <div className="px-3 py-1.5 rounded-full bg-emerald-600/90 backdrop-blur-md border border-emerald-400 text-xs font-bold text-white flex items-center gap-2">
                               <div className="w-2 h-2 rounded-full bg-white"></div>
-                              SẴN SÀNG
+                              Sẵn sàng
                             </div>
                           )}
                         </div>
@@ -968,7 +1233,9 @@ function App() {
                       </div>
                     )}
 
-                    {hasCam2 && cameraMode === 'dual' ? (
+                    {!mtxAvailable ? (
+                      <MtxFallback />
+                    ) : hasCam2 && cameraMode === 'dual' ? (
                       <div className="flex gap-1 w-full h-full">
                         <div className="flex-1 relative">
                           <iframe
@@ -996,23 +1263,29 @@ function App() {
                     ) : hasCam2 && cameraMode === 'pip' ? (
                       <div className="w-full h-full relative">
                         <iframe
-                          key={`live-${activeStationId}`}
-                          src={`http://${MTX_HOST}:8889/station_${activeStationId}?controls=false&muted=true&autoplay=true`}
+                          key={`live-${activeStationId}-${pipCamSwap}`}
+                          src={`http://${MTX_HOST}:8889/station_${activeStationId}${pipCamSwap ? '_cam2' : ''}?controls=false&muted=true&autoplay=true`}
                           scrolling="no"
                           className="w-full h-full object-cover"
                           style={{ border: 'none', background: '#000' }}
                           allow="autoplay"
                         />
-                        <div className="absolute bottom-3 right-3 w-1/4 h-1/4 rounded-xl overflow-hidden border-2 border-white/20 shadow-2xl z-20">
+                        <div
+                          onClick={() => setPipCamSwap(!pipCamSwap)}
+                          className="absolute bottom-3 right-3 w-1/4 h-1/4 rounded-xl overflow-hidden border-2 border-white/20 shadow-2xl z-20 cursor-pointer hover:border-blue-400/50 transition-colors"
+                        >
                           <iframe
-                            key={`pip-cam2-${activeStationId}`}
-                            src={`http://${MTX_HOST}:8889/station_${activeStationId}_cam2?controls=false&muted=true&autoplay=true`}
+                            key={`pip-cam2-${activeStationId}-${pipCamSwap}`}
+                            src={`http://${MTX_HOST}:8889/station_${activeStationId}${pipCamSwap ? '' : '_cam2'}?controls=false&muted=true&autoplay=true`}
                             scrolling="no"
                             className="w-full h-full object-cover"
                             style={{ border: 'none', background: '#000' }}
                             allow="autoplay"
                           />
-                          <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/60 rounded text-[10px] text-white/80 pointer-events-none">Camera 2</div>
+                          <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/60 rounded text-[10px] text-white/80 pointer-events-none">
+                            {pipCamSwap ? 'Camera 1' : 'Camera 2'}
+                            <span className="ml-1 text-blue-300">⇄</span>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1030,22 +1303,16 @@ function App() {
                         <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-mono text-white/90">
                            {activeStation?.name || "Đang tải"}
                         </div>
-                        {recordingStatus === 'recording' && (
+                        {packingStatus === 'packing' && (
                           <div className="px-3 py-1.5 rounded-full bg-red-600/90 backdrop-blur-md border border-red-400 text-xs font-bold text-white flex items-center gap-2 animate-pulse transition-all">
                             <div className="w-2 h-2 rounded-full bg-white"></div>
-                            ĐANG GHI ĐƠN: {currentWaybill}
+                            Đang đóng hàng: {currentWaybill}
                           </div>
                         )}
-                        {recordingStatus === 'processing' && (
-                          <div className="px-3 py-1.5 rounded-full bg-amber-500/90 backdrop-blur-md border border-amber-300 text-xs font-bold text-white flex items-center gap-2 animate-pulse transition-all">
-                            <div className="w-2 h-2 rounded-full bg-white"></div>
-                            ĐANG XỬ LÝ VIDEO: {currentWaybill}
-                          </div>
-                        )}
-                        {recordingStatus === 'idle' && (
+                        {packingStatus === 'idle' && (
                           <div className="px-3 py-1.5 rounded-full bg-emerald-600/90 backdrop-blur-md border border-emerald-400 text-xs font-bold text-white flex items-center gap-2 transition-all">
                             <div className="w-2 h-2 rounded-full bg-white"></div>
-                            SAN SANG CHO DON HANG TIEP THEO
+                            Sẵn sàng
                           </div>
                         )}
                       </div>
@@ -1149,13 +1416,17 @@ function App() {
                           {record.record_mode}
                         </span>
                         {record.status && record.status !== 'READY' && (
-                          <span className={`px-2 py-1 rounded uppercase text-[10px] font-bold tracking-wider ${
+                          <span className={`px-2 py-1 rounded text-[10px] font-bold tracking-wider ${
                             record.status === 'RECORDING' ? 'bg-red-500/30 text-red-300 animate-pulse' :
                             record.status === 'PROCESSING' ? 'bg-amber-500/30 text-amber-300 animate-pulse' :
                             record.status === 'FAILED' ? 'bg-red-500/30 text-red-300' :
                             'bg-white/10 text-slate-300'
                           }`}>
-                            {record.status}
+                            {record.status === 'RECORDING' ? 'Đang ghi hình' :
+                             record.status === 'PROCESSING' ? 'Đang xử lý' :
+                             record.status === 'FAILED' ? 'Lỗi' :
+                             record.status === 'DELETED' ? 'Đã xoá' :
+                             record.status}
                           </span>
                         )}
                        <span className="px-2 py-1 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded text-[10px] font-bold">

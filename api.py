@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.0.0
+# V-Pack Monitor - CamDongHang v2.1.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -17,7 +17,7 @@ import urllib.error
 import io
 import csv
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
@@ -410,7 +410,15 @@ async def lifespan(app: FastAPI):
     # Kích hoạt Telegram Bot 2 chiều (Lắng nghe)
     telegram_bot.start_polling()
 
+    async def _periodic_audit_cleanup():
+        while True:
+            await asyncio.sleep(86400)  # 24 hours
+            database.cleanup_audit_log()
+
+    cleanup_task = asyncio.create_task(_periodic_audit_cleanup())
+
     yield
+    cleanup_task.cancel()
     for manager in stream_managers.values():
         manager.stop()
     for recorder in active_recorders.values():
@@ -477,6 +485,9 @@ def get_settings(admin: AdminUser):
 @app.post("/api/settings")
 def update_settings(payload: SettingsUpdate, admin: AdminUser):
     database.set_settings(payload.dict())
+    database.log_audit(
+        admin["id"], "SETTINGS_UPDATE", f"keys={list(payload.dict().keys())}"
+    )
 
     # Restart Telegram Bot polling if tokens change
     if payload.TELEGRAM_BOT_TOKEN and payload.TELEGRAM_CHAT_ID:
@@ -608,6 +619,11 @@ def update_user_api(user_id: int, payload: UserUpdatePayload, admin: AdminUser):
     kwargs = {k: v for k, v in payload.dict().items() if v is not None}
     if not kwargs:
         return {"status": "error", "message": "Không có dữ liệu cập nhật."}
+    if payload.is_active is not None:
+        old_user = database.get_user_by_id(user_id)
+        if old_user and old_user["is_active"] != payload.is_active:
+            action = "LOCK_USER" if payload.is_active == 0 else "UNLOCK_USER"
+            database.log_audit(admin["id"], action, f"user_id={user_id}")
     database.update_user(user_id, **kwargs)
     database.log_audit(admin["id"], "UPDATE_USER", f"user_id={user_id}")
     return {"status": "success"}
@@ -650,6 +666,7 @@ def get_stations_api():
 @app.post("/api/stations")
 def create_station(payload: StationPayload, admin: AdminUser):
     new_id = database.add_station(payload.dict())
+    database.log_audit(admin["id"], "STATION_CREATE", f"name={payload.name}")
     url = get_rtsp_sub_url(
         payload.ip_camera_1, payload.safety_code, channel=1, brand=payload.camera_brand
     )
@@ -670,6 +687,7 @@ def create_station(payload: StationPayload, admin: AdminUser):
 @app.put("/api/stations/{station_id}")
 def update_station(station_id: int, payload: StationPayload, admin: AdminUser):
     database.update_station(station_id, payload.dict())
+    database.log_audit(admin["id"], "STATION_UPDATE", f"station_id={station_id}")
     if station_id in stream_managers:
         url = get_rtsp_sub_url(
             payload.ip_camera_1,
@@ -693,6 +711,7 @@ def update_station(station_id: int, payload: StationPayload, admin: AdminUser):
 @app.delete("/api/stations/{station_id}")
 def delete_station(station_id: int, admin: AdminUser):
     database.delete_station(station_id)
+    database.log_audit(admin["id"], "STATION_DELETE", f"station_id={station_id}")
     if station_id in stream_managers:
         stream_managers[station_id].stop()
         del stream_managers[station_id]
@@ -842,6 +861,25 @@ def force_end_session(session_id: int, admin: AdminUser):
     database.end_session_by_id(session_id)
     database.log_audit(admin["id"], "FORCE_END_SESSION", f"Kicked session {session_id}")
     return {"status": "success"}
+
+
+@app.get("/api/sessions/station-status")
+def get_station_status(current_user: CurrentUser):
+    database.expire_stale_sessions()
+    stations = database.get_stations()
+    result = []
+    for st in stations:
+        session = database.get_active_session(st["id"])
+        result.append(
+            {
+                "station_id": st["id"],
+                "station_name": st["name"],
+                "occupied": session is not None,
+                "occupied_by": session["username"] if session else None,
+                "occupied_by_name": session["full_name"] if session else None,
+            }
+        )
+    return {"data": result}
 
 
 @app.get("/api/audit-logs")
@@ -1175,7 +1213,7 @@ def mtx_status(current_user: CurrentUser):
         resp = urllib.request.urlopen(req, timeout=3)
         return json.loads(resp.read())
     except Exception:
-        return {"status": "error", "message": "MediaMTX not running"}
+        raise HTTPException(status_code=503, detail="MediaMTX not running")
 
 
 @app.get("/api/events")
