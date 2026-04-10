@@ -1,16 +1,18 @@
 /**
- * V-Pack Monitor - CamDongHang v2.1.0
+ * V-Pack Monitor - CamDongHang v2.2.0
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { BarChart3, HardDrive, Download, TrendingUp, Clock, PieChart as PieChartIcon, Calendar } from 'lucide-react';
+import { BarChart3, HardDrive, Download, TrendingUp, Clock, PieChart as PieChartIcon, Calendar, Activity } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
+
+import SystemHealth from './SystemHealth';
 
 const API_BASE = window.location.hostname === 'localhost' && ['3000', '3001', '5173'].includes(window.location.port)
   ? 'http://localhost:8001'
@@ -71,6 +73,8 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
   const [loading, setLoading] = useState({ hourly: true, trend: true, comparison: true });
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedStation, setSelectedStation] = useState('all');
+
+  const [dashTab, setDashTab] = useState('analytics');
 
   const todayAnalytics = analytics || { total_today: 0, station_today: 0 };
 
@@ -148,6 +152,28 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
 
   return (
     <div className="space-y-6">
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => setDashTab('analytics')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${dashTab === 'analytics' ? 'bg-blue-500/20 border border-blue-500/50 text-blue-300' : 'bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10'}`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          Thống kê
+        </button>
+        <button
+          onClick={() => setDashTab('health')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${dashTab === 'health' ? 'bg-amber-500/20 border border-amber-500/50 text-amber-300' : 'bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10'}`}
+        >
+          <Activity className="w-4 h-4" />
+          Sức khỏe hệ thống
+        </button>
+      </div>
+
+      {dashTab === 'health' ? (
+        <SystemHealth currentUser={currentUser} />
+      ) : (
+      <>
 
       <div className="flex flex-col lg:flex-row gap-4 items-stretch">
         <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -310,7 +336,9 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
             </PieChart>
           </ResponsiveContainer>
         )}
-      </ChartCard>
+       </ChartCard>
+      </>
+      )}
     </div>
   );
 }

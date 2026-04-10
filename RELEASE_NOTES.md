@@ -2,6 +2,36 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v2.2.0] - 2026-04-11 (Video Pipeline Reliability & UI Refactor)
+
+### 🎥 Video Pipeline — Xử Lý Đa Đơn Hàng
+- **Processing Counter:** Thay `_processing_stations` (set) bằng `_processing_count` (dict counter) — cho phép operator quét mã mới ngay khi nhấn STOP, không cần chờ video đơn trước xử lý xong.
+- **Station Lock:** Thêm `_station_locks` — mỗi trạm có `threading.Lock` riêng, ngăn double-scan tạo 2 records khi barcode scanner gửi 2 lần liên tiếp.
+- **VideoWorker Cleanup:** Bỏ `active_waybills.pop()` / `active_record_ids.pop()` khỏi worker thread — chống race condition khi đơn mới bắt đầu trước khi đơn cũ convert xong.
+
+### 🔄 SSE Single Source of Truth
+- **SSE là nguồn duy nhất:** `packingStatus` chỉ thay đổi qua SSE events, HTTP scan response chỉ set `activeRecordIdRef` (optimistic update cho guard).
+- **Strict Record ID Guard:** SSE handler chỉ reset state khi `data.record_id === activeRecordIdRef.current`. SSE events của đơn cũ bị ignore hoàn toàn khi đang ghi đơn mới.
+- **SSE Polling 500ms → 100ms:** Giảm delay event delivery xuống 5 lần.
+
+### 🎨 UI Refactor — Header Tối Giản
+- **Header cleanup:** Xoá Analytics badge, Storage badge, System Health button khỏi header. Chuyển tất cả vào Dashboard.
+- **Dashboard 2-tab:** Tab "Thống kê" (Analytics + Charts) + Tab "Sức khỏe hệ thống" (SystemHealth component).
+- **Admin menu vào User Dropdown:** Cloud Sync, Cài đặt Trạm, Quản lý người dùng chuyển từ header buttons sang user dropdown menu.
+- **Uniform button sizes:** Tất cả header elements đồng nhất `h-10` + `rounded-xl`.
+
+### 🐛 Bug Fixes
+- **Double-scan tạo 2 records:** Station lock serialize tất cả scan requests cho cùng 1 trạm.
+- **Status nhảy loạn ở đơn thứ 3:** `activeRecordIdRef` guard strict match — SSE events cũ bị block hoàn toàn.
+- **Toast "Đang xử lý video" khi scan mới:** Xoá `_processing_count` check khỏi scan flow — operator luôn có thể bắt đầu đơn mới.
+- **Barcode scanner cho ADMIN:** ADMIN không còn nhận keypress từ barcode scanner (tránh tạo records).
+
+### 📁 Files Thay Đổi
+- `api.py`: `_processing_stations` → `_processing_count`, `_station_locks`, SSE `waybill` field, SSE polling 100ms
+- `video_worker.py`: Helper functions `_decrement_processing()` / `_notify_sse_safe()`, bỏ `active_waybills.pop()`
+- `web-ui/src/App.jsx`: `activeRecordIdRef`, SSE strict guard, header cleanup, admin dropdown menu
+- `web-ui/src/Dashboard.jsx`: 2-tab layout, SystemHealth integration
+
 ## [v2.1.0] - 2026-04-10 (Station Assignment & Bug Fixes)
 
 ### 🔐 Tính Năng Lớn

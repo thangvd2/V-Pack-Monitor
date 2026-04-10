@@ -1,10 +1,10 @@
 /**
- * V-Pack Monitor - CamDongHang v2.1.0
+ * V-Pack Monitor - CamDongHang v2.2.0
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Trash2, HardDrive, Plus, Monitor, ShieldCheck, BarChart3, CloudUpload, LogOut, User, Users, LayoutGrid, Maximize2, Activity } from 'lucide-react';
 import SetupModal from './SetupModal';
@@ -195,12 +195,14 @@ function App() {
   const [changePasswordError, setChangePasswordError] = useState('');
   const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
   const [mtxAvailable, setMtxAvailable] = useState(null);
+  const [toast, setToast] = useState(null);
 
   // Station Session State (OPERATOR)
   const [stationAssigned, setStationAssigned] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [pipCamSwap, setPipCamSwap] = useState(false);
   const [stationStatusList, setStationStatusList] = useState([]);
+  const activeRecordIdRef = useRef(null);
 
   useEffect(() => {
     const token = localStorage.getItem('vpack_token');
@@ -265,17 +267,25 @@ function App() {
         const data = JSON.parse(evt.data);
         
         if (viewMode === 'grid') {
-          const isPacking = data.status === 'RECORDING';
+          const isRecording = data.status === 'RECORDING';
           const waybill = data.waybill || '';
           setStationStatuses(prev => ({
             ...prev,
-            [data.station_id]: { status: isPacking ? 'packing' : 'idle', waybill }
+            [data.station_id]: { status: isRecording ? 'packing' : 'idle', waybill }
           }));
-          if (data.station_id === activeStationId && isPacking) {
-            setPackingStatus('packing');
-            setCurrentWaybill(waybill);
-          }
-          if ((data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') && data.station_id === activeStationId) {
+          if (data.station_id === activeStationId) {
+            if (isRecording) {
+              setPackingStatus('packing');
+              setCurrentWaybill(waybill);
+              activeRecordIdRef.current = data.record_id;
+            }
+            if (data.status === 'PROCESSING' || data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
+              if (data.record_id === activeRecordIdRef.current) {
+                setPackingStatus('idle');
+                setCurrentWaybill('');
+                activeRecordIdRef.current = null;
+              }
+            }
             fetchRecords(searchTerm, activeStationId);
           }
         } else {
@@ -284,7 +294,21 @@ function App() {
           if (data.status === 'RECORDING') {
             setPackingStatus('packing');
             setCurrentWaybill(data.waybill || '');
+            activeRecordIdRef.current = data.record_id;
+            fetchRecords(searchTerm, activeStationId);
+          } else if (data.status === 'PROCESSING') {
+            if (data.record_id === activeRecordIdRef.current) {
+              setPackingStatus('idle');
+              setCurrentWaybill('');
+              activeRecordIdRef.current = null;
+            }
+            fetchRecords(searchTerm, activeStationId);
           } else if (data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
+            if (data.record_id === activeRecordIdRef.current) {
+              setPackingStatus('idle');
+              setCurrentWaybill('');
+              activeRecordIdRef.current = null;
+            }
             fetchRecords(searchTerm, activeStationId);
           }
         }
@@ -410,10 +434,10 @@ function App() {
 
   // Fetch records
   useEffect(() => {
-    if (activeStationId) {
+    if (activeStationId && currentUser) {
       fetchRecords(searchTerm, activeStationId);
     }
-  }, [searchTerm, activeStationId]);
+  }, [searchTerm, activeStationId, currentUser]);
 
   const fetchRecords = async (query = '', sid = activeStationId) => {
     try {
@@ -492,16 +516,23 @@ function App() {
         station_id: activeStationId
       });
       if (res.data.status === 'recording') {
-        if (packingStatus !== 'packing') {
-          setPackingStatus('packing');
-          setCurrentWaybill(finalBarcode);
+        activeRecordIdRef.current = res.data.record_id || null;
+        if (res.data.message) {
+          setToast(res.data.message);
+          setTimeout(() => setToast(null), 3000);
         }
-      } else if (res.data.status === 'stopped' || res.data.status === 'exit') {
+      } else if (res.data.status === 'error') {
+        if (res.data.message) {
+          setToast(res.data.message);
+          setTimeout(() => setToast(null), 3000);
+        }
         setPackingStatus('idle');
         setCurrentWaybill('');
         fetchRecords(searchTerm, activeStationId); 
-      } else if (res.data.status === 'busy' || res.data.status === 'processing') {
-        if (res.data.message) alert(res.data.message);
+      } else if (res.data.status === 'processing') {
+        setPackingStatus('idle');
+        setCurrentWaybill('');
+        fetchRecords(searchTerm, activeStationId);
       }
     } catch (err) {
       console.error("Barcode Lỗi", err);
@@ -601,6 +632,8 @@ function App() {
 
   // --- BARCODE SCANNER LISTENER ---
   useEffect(() => {
+    if (currentUser?.role === 'ADMIN') return;
+
     let barcodeBuffer = '';
     let timeoutId = null;
 
@@ -634,7 +667,7 @@ function App() {
       window.removeEventListener('keydown', handleKeyDown);
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [searchTerm, activeStationId]); 
+  }, [searchTerm, activeStationId, currentUser]); 
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
@@ -703,7 +736,7 @@ function App() {
             </button>
           </form>
           <p className="text-center text-xs text-slate-500 mt-6">
-            V-Pack Monitor v2.1.0 • VDT
+            V-Pack Monitor v2.2.0 • VDT
           </p>
         </div>
       </div>
@@ -876,10 +909,10 @@ function App() {
             </div>
           </div>
           
-          <div className="mt-6 md:mt-0 flex items-center gap-4 w-full md:w-auto">
+          <div className="mt-6 md:mt-0 flex items-center gap-3 w-full md:w-auto">
           {/* Station Selector Dropdown */}
           {!(viewMode === 'grid' && stations.length >= 2) && (
-          <div className="relative group flex items-center border border-white/10 rounded-2xl bg-white/5 py-2 px-3 shadow-lg">
+          <div className="relative group flex items-center border border-white/10 rounded-xl bg-white/5 h-10 px-3 shadow-lg">
              <Monitor className="w-5 h-5 text-indigo-400 mr-2" />
               <select 
                 value={activeStationId} 
@@ -914,26 +947,26 @@ function App() {
                 }}
                 className="bg-transparent text-slate-200 focus:outline-none appearance-none font-semibold cursor-pointer pr-4"
              >
-               {stations.map(st => (
-                 <option key={st.id} value={st.id} className="bg-slate-800">
-                   Trạm: {st.name}
-                 </option>
-               ))}
-               {stations.length === 0 && <option value={0} disabled>Chưa có trạm nào</option>}
-             </select>
-               {currentUser?.role === 'ADMIN' && (
-                 <button title="Thêm Trạm Mới" onClick={() => requestAdminAccess({ type: 'setup', isNew: true })} className="ml-2 p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition">
-                    <Plus className="w-4 h-4" />
-                 </button>
-               )}
+                {stations.map(st => (
+                  <option key={st.id} value={st.id} className="bg-slate-800">
+                    Trạm: {st.name}
+                  </option>
+                ))}
+                {stations.length === 0 && <option value={0} disabled>Chưa có trạm nào</option>}
+              </select>
+                {currentUser?.role === 'ADMIN' && (
+                  <button title="Thêm Trạm Mới" onClick={() => requestAdminAccess({ type: 'setup', isNew: true })} className="ml-2 h-8 w-8 flex items-center justify-center hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition">
+                     <Plus className="w-4 h-4" />
+                  </button>
+                )}
           </div>
           )}
 
           {/* View Mode Toggle */}
-          {stations.length >= 2 && (
+          {stations.length >= 2 && currentUser?.role === 'ADMIN' && (
             <button
               onClick={() => setViewMode(prev => prev === 'single' ? 'grid' : 'single')}
-              className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/30 rounded-2xl transition-all shadow-lg text-slate-400 hover:text-blue-400"
+              className="h-10 w-10 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/30 rounded-xl transition-all shadow-lg text-slate-400 hover:text-blue-400"
               title={viewMode === 'single' ? 'Xem tổng quan tất cả trạm' : 'Xem trạm đơn lẻ'}
             >
               {viewMode === 'single' ? <LayoutGrid className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
@@ -942,89 +975,29 @@ function App() {
 
           <button
             onClick={() => setShowDashboard(prev => !prev)}
-            className={`p-3 border rounded-2xl transition-all shadow-lg ${showDashboard ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-blue-500/30 text-slate-400 hover:text-blue-400'}`}
+            className={`h-10 w-10 flex items-center justify-center border rounded-xl transition-all shadow-lg ${showDashboard ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-blue-500/30 text-slate-400 hover:text-blue-400'}`}
             title={showDashboard ? 'Quay lại giao diện chính' : 'Bảng điều khiển'}
           >
             <BarChart3 className="w-5 h-5" />
           </button>
 
-          {currentUser?.role === 'ADMIN' && (
-            <button
-              onClick={() => setShowSystemHealth(prev => !prev)}
-              className={`p-3 border rounded-2xl transition-all shadow-lg ${showSystemHealth ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-amber-500/30 text-slate-400 hover:text-amber-400'}`}
-              title={showSystemHealth ? 'Quay lại giao diện chính' : 'Sức khỏe hệ thống'}
-            >
-              <Activity className="w-5 h-5" />
-            </button>
-          )}
-
-          <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 hidden xl:flex">
-            <BarChart3 className="w-5 h-5 text-blue-400" />
-            <div className="flex flex-col">
-              <span className="text-xs text-slate-400 font-medium">Hôm nay</span>
-              <div className="flex gap-2 items-center text-sm">
-                <span className="text-blue-300 font-bold" title="Trạm hiện tại">{analytics.station_today} đơn</span>
-                <span className="text-slate-500">/</span>
-                <span className="text-slate-200 font-bold" title="Tổng TOÀN KHO">{analytics.total_today} đơn</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="relative w-full md:w-64 group hidden lg:block">
+          <div className="relative w-full md:w-64 group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Search className="h-5 w-5 text-slate-400 group-focus-within:text-blue-400 transition-colors" />
             </div>
             <input
               type="text"
-              className="block w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 backdrop-blur-md transition-all shadow-lg"
+              className="block w-full pl-11 pr-4 h-10 bg-white/5 border border-white/10 rounded-xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 backdrop-blur-md transition-all shadow-lg"
               placeholder="Tìm mã vận đơn..."
               value={searchTerm}
               onChange={handleSearch}
             />
           </div>
           
-          <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 hidden md:flex">
-            <HardDrive className="w-5 h-5 text-emerald-400" />
-            <div className="flex flex-col">
-              <span className="text-xs text-slate-400 font-medium">Đã Sử Dụng</span>
-              <span className="text-sm text-slate-200 font-bold">{storageInfo.size_str} ({storageInfo.file_count} file)</span>
-            </div>
-          </div>
-          
-          {currentUser?.role === 'ADMIN' && (
-            <button 
-              onClick={() => requestAdminAccess({ type: 'cloud_sync' })}
-              className="p-3 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-2xl transition-all shadow-lg hidden md:flex text-indigo-400"
-              title="Đẩy Video lên Cloud"
-            >
-              <CloudUpload className="w-6 h-6" />
-            </button>
-          )}
-          
-          {currentUser?.role === 'ADMIN' && (
-            <button 
-              onClick={() => requestAdminAccess({ type: 'setup' })}
-              className="p-3 bg-white/5 hover:bg-blue-500/20 border border-white/10 hover:border-blue-500/50 rounded-2xl transition-all shadow-lg hidden md:flex text-slate-400 hover:text-blue-400"
-              title="Cài đặt Camera & Hệ thống cho Trạm này"
-            >
-              <Settings className="w-6 h-6" />
-            </button>
-          )}
-
-          {currentUser?.role === 'ADMIN' && (
-            <button 
-              onClick={() => setShowUserModal(true)}
-              className="p-3 bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/50 rounded-2xl transition-all shadow-lg hidden md:flex text-slate-400 hover:text-emerald-400"
-              title="Quản lý người dùng"
-            >
-              <Users className="w-6 h-6" />
-            </button>
-          )}
-
           <div className="relative">
             <button
               onClick={() => setShowUserDropdown(!showUserDropdown)}
-              className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 hover:bg-white/10 transition-all"
+              className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-3 py-2 hover:bg-white/10 transition-all"
             >
               <User className="w-5 h-5 text-blue-400" />
               <div className="flex flex-col items-start">
@@ -1040,11 +1013,37 @@ function App() {
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowUserDropdown(false)} />
                 <div className="absolute right-0 top-full mt-2 w-56 bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-20 py-1 overflow-hidden">
+                  {currentUser?.role === 'ADMIN' && (
+                    <>
+                      <button
+                        onClick={() => { setShowUserDropdown(false); requestAdminAccess({ type: 'cloud_sync' }); }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-indigo-300 hover:bg-indigo-500/10 hover:text-indigo-200 transition-colors text-left"
+                      >
+                        <CloudUpload className="w-4 h-4" />
+                        Đẩy Video lên Cloud
+                      </button>
+                      <button
+                        onClick={() => { setShowUserDropdown(false); requestAdminAccess({ type: 'setup' }); }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-blue-300 hover:bg-blue-500/10 hover:text-blue-200 transition-colors text-left"
+                      >
+                        <Settings className="w-4 h-4" />
+                        Cài đặt Trạm
+                      </button>
+                      <button
+                        onClick={() => { setShowUserDropdown(false); setShowUserModal(true); }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 transition-colors text-left"
+                      >
+                        <Users className="w-4 h-4" />
+                        Quản lý người dùng
+                      </button>
+                      <div className="border-t border-white/5 my-1"></div>
+                    </>
+                  )}
                   <button
                     onClick={() => { setShowUserDropdown(false); setShowChangePassword(true); }}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors text-left"
                   >
-                    <Settings className="w-4 h-4 text-slate-400" />
+                    <ShieldCheck className="w-4 h-4 text-slate-400" />
                     Đổi mật khẩu
                   </button>
                   <button
@@ -1088,6 +1087,12 @@ function App() {
         )}
       </header>
 
+      {toast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-amber-500/90 backdrop-blur-md border border-amber-400/50 rounded-xl text-white text-sm font-medium shadow-2xl animate-pulse">
+          {toast}
+        </div>
+      )}
+
       {/* Main Content */}
       {showSystemHealth ? (
         <SystemHealth currentUser={currentUser} />
@@ -1100,10 +1105,10 @@ function App() {
           analytics={analytics}
         />
       ) : (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className={`grid gap-8 ${viewMode === 'grid' ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-3'}`}>
         
         {/* Left Column: Live Camera / Grid */}
-        <div className="lg:col-span-2 flex flex-col gap-4">
+        <div className={`${viewMode === 'grid' ? 'lg:col-span-1' : 'lg:col-span-2'} flex flex-col gap-4`}>
 
           {viewMode === 'grid' ? (
             <>
@@ -1190,7 +1195,7 @@ function App() {
                     <MonitorPlay className="w-5 h-5 text-red-400" />
                     Chế Độ Quan Sát Live
                   </h2>
-                  {stations.length >= 2 && (
+                  {stations.length >= 2 && currentUser?.role === 'ADMIN' && (
                     <button onClick={() => setViewMode('grid')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-slate-400 hover:text-white transition">
                       <LayoutGrid className="w-4 h-4" />
                       Tổng quan
@@ -1303,13 +1308,13 @@ function App() {
                         <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-mono text-white/90">
                            {activeStation?.name || "Đang tải"}
                         </div>
-                        {packingStatus === 'packing' && (
+                        {currentUser?.role !== 'ADMIN' && packingStatus === 'packing' && (
                           <div className="px-3 py-1.5 rounded-full bg-red-600/90 backdrop-blur-md border border-red-400 text-xs font-bold text-white flex items-center gap-2 animate-pulse transition-all">
                             <div className="w-2 h-2 rounded-full bg-white"></div>
                             Đang đóng hàng: {currentWaybill}
                           </div>
                         )}
-                        {packingStatus === 'idle' && (
+                        {currentUser?.role !== 'ADMIN' && packingStatus === 'idle' && (
                           <div className="px-3 py-1.5 rounded-full bg-emerald-600/90 backdrop-blur-md border border-emerald-400 text-xs font-bold text-white flex items-center gap-2 transition-all">
                             <div className="w-2 h-2 rounded-full bg-white"></div>
                             Sẵn sàng
@@ -1329,6 +1334,7 @@ function App() {
                 )}
               </div>
               
+              {currentUser?.role !== 'ADMIN' && (
               <div className="p-5 rounded-2xl bg-white/5 border border-purple-500/30 backdrop-blur-lg mt-2 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 bg-purple-500/20 text-purple-300 text-[10px] px-3 py-1 rounded-bl-xl font-mono border-l border-b border-purple-500/20">
                   DEV MODE
@@ -1374,12 +1380,13 @@ function App() {
                   * Sử dụng thanh công cụ này nếu bạn không có súng bắn mã vạch. Hệ thống sẽ kết nối với Camera ở Trạm đang chọn.
                 </p>
               </div>
+              )}
             </>
           )}
 
         </div>
 
-        {/* Right Column: History Records List */}
+        {viewMode !== 'grid' && (
         <div className="flex flex-col gap-4 h-[calc(100vh-200px)]">
           <div className="flex items-center justify-between pointer-events-none">
             <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -1477,8 +1484,9 @@ function App() {
                 </div>
               ))
             )}
-          </div>
+           </div>
         </div>
+        )}
         
       </div>
       )}

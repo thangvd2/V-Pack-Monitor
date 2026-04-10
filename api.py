@@ -38,7 +38,8 @@ _SERVER_START_TIME = time.time()
 active_recorders = {}
 active_waybills = {}
 active_record_ids = {}
-_processing_stations = set()
+_processing_count = {}  # {station_id: int} — counts pending video conversions
+_station_locks = {}  # {station_id: threading.Lock} — prevents double-scan per station
 stream_managers = {}
 
 reconnect_status = {}
@@ -240,12 +241,7 @@ def _preflight_checks(station_id):
     if station_id in active_recorders:
         return (
             False,
-            "Tr\u1ea1m \u0111ang ghi h\u00ecnh. Qu\u00e9t STOP tr\u01b0\u1edbc.",
-        )
-    if station_id in _processing_stations:
-        return (
-            False,
-            "\u0110ang x\u1eed l\u00fd video \u0111\u01a1n tr\u01b0\u1edbc. Vui l\u00f2ng \u0111\u1ee3i.",
+            "Trạm đang ghi hình. Quét STOP trước.",
         )
     _, _, free = shutil.disk_usage("recordings")
     if free < 500 * 1024 * 1024:
@@ -720,7 +716,7 @@ def delete_station(station_id: int, admin: AdminUser):
         del active_recorders[station_id]
         del active_waybills[station_id]
         active_record_ids.pop(station_id, None)
-    _processing_stations.discard(station_id)
+    _processing_count.pop(station_id, None)
     if station_id in reconnect_status:
         del reconnect_status[station_id]
     return {"status": "success"}
@@ -906,26 +902,31 @@ class ScanPayload(BaseModel):
 
 @app.post("/api/scan")
 def handle_scan(payload: ScanPayload, current_user: CurrentUser):
+    if current_user["role"] == "ADMIN":
+        return {
+            "status": "error",
+            "message": "Quản trị viên không thể ghi hình. Chỉ Người vận hành (OPERATOR) mới có quyền đóng hàng.",
+        }
+
     sid = payload.station_id
+    lock = _station_locks.setdefault(sid, threading.Lock())
+    with lock:
+        return _handle_scan_locked(payload, sid, current_user)
+
+
+def _handle_scan_locked(payload, sid, current_user):
     barcode = payload.barcode.strip().upper()
 
-    if current_user["role"] != "ADMIN":
-        session = database.get_active_session(sid)
-        if not session or session["user_id"] != current_user["id"]:
-            return {
-                "status": "error",
-                "message": "Bạn chưa mở session cho trạm này. Vui lòng chọn trạm và bấm 'Bắt đầu'.",
-            }
-        database.update_session_heartbeat(session["id"])
+    session = database.get_active_session(sid)
+    if not session or session["user_id"] != current_user["id"]:
+        return {
+            "status": "error",
+            "message": "Bạn chưa mở session cho trạm này. Vui lòng chọn trạm và bấm 'Bắt đầu'.",
+        }
+    database.update_session_heartbeat(session["id"])
 
     if not barcode:
         return {"status": "error", "message": "M\u00e3 v\u1ea1ch tr\u1ed1ng"}
-
-    if sid in _processing_stations:
-        return {
-            "status": "busy",
-            "message": "\u0110ang x\u1eed l\u00fd video \u0111\u01a1n h\u00e0ng tr\u01b0\u1edbc. Vui l\u00f2ng qu\u00e9t l\u1ea1i sau v\u00e0i gi\u00e2y.",
-        }
 
     station = database.get_station(sid)
     if not station:
@@ -937,7 +938,7 @@ def handle_scan(payload: ScanPayload, current_user: CurrentUser):
 
     if barcode == "EXIT":
         if current_recorder:
-            _processing_stations.add(sid)
+            _processing_count[sid] = _processing_count.get(sid, 0) + 1
             active_recorders.pop(sid, None)
             video_worker.submit_stop_and_save(
                 current_record_id, current_recorder, current_waybill, sid, save=False
@@ -950,7 +951,7 @@ def handle_scan(payload: ScanPayload, current_user: CurrentUser):
 
     if barcode == "STOP":
         if current_recorder:
-            _processing_stations.add(sid)
+            _processing_count[sid] = _processing_count.get(sid, 0) + 1
             active_recorders.pop(sid, None)
             database.log_audit(
                 current_user["id"],
@@ -1034,18 +1035,24 @@ def handle_scan(payload: ScanPayload, current_user: CurrentUser):
 
     notify_sse(
         "video_status",
-        {"station_id": sid, "status": "RECORDING", "record_id": record_id},
+        {
+            "station_id": sid,
+            "status": "RECORDING",
+            "record_id": record_id,
+            "waybill": barcode,
+        },
     )
 
     return {
         "status": "recording",
-        "message": f"B\u1eaft \u0111\u1ea7u ghi h\u00ecnh \u0111\u01a1n {barcode} t\u1ea1i Tr\u1ea1m {sid}...",
+        "record_id": record_id,
+        "message": f"Bắt đầu ghi hình đơn {barcode} tại Trạm {sid}...",
     }
 
 
 @app.get("/api/status")
 def get_status(station_id: int, current_user: CurrentUser):
-    if station_id in _processing_stations:
+    if station_id in _processing_count:
         return {"status": "processing", "waybill": active_waybills.get(station_id, "")}
     return {
         "status": "recording" if station_id in active_recorders else "idle",
@@ -1231,7 +1238,7 @@ async def sse_events(stations: str = ""):
                     msg = q.get_nowait()
                     yield msg
                 except queue.Empty:
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.1)
         except asyncio.CancelledError:
             pass
         finally:

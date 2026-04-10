@@ -42,67 +42,56 @@ def _verify_video(filepath):
     return False
 
 
+def _decrement_processing(station_id):
+    try:
+        import api
+
+        count = api._processing_count.get(station_id, 0)
+        if count <= 1:
+            api._processing_count.pop(station_id, None)
+        else:
+            api._processing_count[station_id] = count - 1
+    except Exception:
+        pass
+
+
+def _notify_sse_safe(station_id, status, record_id):
+    try:
+        import api
+
+        api.notify_sse(
+            "video_status",
+            {
+                "station_id": station_id,
+                "status": status,
+                "record_id": record_id,
+            },
+        )
+    except Exception:
+        pass
+
+
 def _process_stop_and_save(record_id, rec, waybill, station_id, save=True):
     try:
         database.update_record_status(record_id, "PROCESSING")
-        try:
-            import api
-
-            api.notify_sse(
-                "video_status",
-                {
-                    "station_id": station_id,
-                    "status": "PROCESSING",
-                    "record_id": record_id,
-                },
-            )
-        except Exception:
-            pass
+        _notify_sse_safe(station_id, "PROCESSING", record_id)
 
         saved_files = rec.stop_recording()
 
         if not save or not saved_files:
             if not save:
                 database.delete_record(record_id)
-                try:
-                    import api
-
-                    api._processing_stations.discard(station_id)
-                    api.active_waybills.pop(station_id, None)
-                    api.active_record_ids.pop(station_id, None)
-                    api.notify_sse(
-                        "video_status",
-                        {
-                            "station_id": station_id,
-                            "status": "DELETED",
-                            "record_id": record_id,
-                        },
-                    )
-                except Exception:
-                    pass
+                _decrement_processing(station_id)
+                _notify_sse_safe(station_id, "DELETED", record_id)
                 return
             database.update_record_status(record_id, "FAILED")
             _send_failed_alert(
                 record_id,
                 waybill,
-                "FFmpeg kh\u00f4ng t\u1ea1o \u0111\u01b0\u1ee3c file video.",
+                "FFmpeg không tạo được file video.",
             )
-            try:
-                import api
-
-                api._processing_stations.discard(station_id)
-                api.active_waybills.pop(station_id, None)
-                api.active_record_ids.pop(station_id, None)
-                api.notify_sse(
-                    "video_status",
-                    {
-                        "station_id": station_id,
-                        "status": "FAILED",
-                        "record_id": record_id,
-                    },
-                )
-            except Exception:
-                pass
+            _decrement_processing(station_id)
+            _notify_sse_safe(station_id, "FAILED", record_id)
             return
 
         all_valid = True
@@ -113,68 +102,24 @@ def _process_stop_and_save(record_id, rec, waybill, station_id, save=True):
 
         if all_valid:
             database.update_record_status(record_id, "READY", video_paths=saved_files)
-            try:
-                import api
-
-                api._processing_stations.discard(station_id)
-                api.active_waybills.pop(station_id, None)
-                api.active_record_ids.pop(station_id, None)
-                api.notify_sse(
-                    "video_status",
-                    {
-                        "station_id": station_id,
-                        "status": "READY",
-                        "record_id": record_id,
-                    },
-                )
-            except Exception:
-                pass
+            _decrement_processing(station_id)
+            _notify_sse_safe(station_id, "READY", record_id)
         else:
             database.update_record_status(record_id, "FAILED", video_paths=saved_files)
             _send_failed_alert(
                 record_id,
                 waybill,
-                "Video kh\u00f4ng h\u1ee3p l\u1ec7 (ffprobe verify th\u1ea5t b\u1ea1i).",
+                "Video không hợp lệ (ffprobe verify thất bại).",
             )
-            try:
-                import api
-
-                api._processing_stations.discard(station_id)
-                api.active_waybills.pop(station_id, None)
-                api.active_record_ids.pop(station_id, None)
-                api.notify_sse(
-                    "video_status",
-                    {
-                        "station_id": station_id,
-                        "status": "FAILED",
-                        "record_id": record_id,
-                    },
-                )
-            except Exception:
-                pass
+            _decrement_processing(station_id)
+            _notify_sse_safe(station_id, "FAILED", record_id)
     except Exception as e:
         print(f"VideoWorker error for record {record_id}: {e}")
         try:
             database.update_record_status(record_id, "FAILED")
-            _send_failed_alert(
-                record_id, waybill, f"L\u1ed7i x\u1eed l\u00fd video: {e}"
-            )
-            try:
-                import api
-
-                api._processing_stations.discard(station_id)
-                api.active_waybills.pop(station_id, None)
-                api.active_record_ids.pop(station_id, None)
-                api.notify_sse(
-                    "video_status",
-                    {
-                        "station_id": station_id,
-                        "status": "FAILED",
-                        "record_id": record_id,
-                    },
-                )
-            except Exception:
-                pass
+            _send_failed_alert(record_id, waybill, f"Lỗi xử lý video: {e}")
+            _decrement_processing(station_id)
+            _notify_sse_safe(station_id, "FAILED", record_id)
         except Exception:
             pass
 
