@@ -17,7 +17,7 @@ import urllib.error
 import io
 import csv
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
@@ -1181,8 +1181,22 @@ def get_stations_comparison_api(current_user: CurrentUser):
 
 @app.get("/api/export/csv")
 def export_csv(
-    current_user: CurrentUser, date: str | None = None, station_id: int | None = None
+    request: Request,
+    date: str | None = None,
+    station_id: int | None = None,
 ):
+    token = request.query_params.get("token") or request.headers.get(
+        "Authorization", ""
+    ).replace("Bearer ", "")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = auth.decode_token(token)
+        user = database.get_user_by_id(int(payload.get("sub")))
+        if not user or not user.get("is_active"):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     records = database.get_records_for_export(date=date, station_id=station_id)
 
     output = io.StringIO()

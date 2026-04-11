@@ -123,8 +123,9 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
   useEffect(() => { fetchStationsComparison(); }, [fetchStationsComparison]);
 
   const handleExportCSV = () => {
+    const token = localStorage.getItem('vpack_token');
     const stationParam = selectedStation === 'all' ? '' : `&station_id=${selectedStation}`;
-    window.open(`${API_BASE}/api/export/csv?date=${selectedDate}${stationParam}`, '_blank');
+    window.open(`${API_BASE}/api/export/csv?date=${selectedDate}${stationParam}&token=${token}`, '_blank');
   };
 
   const stationSelect = (
