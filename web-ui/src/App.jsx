@@ -181,6 +181,7 @@ function App() {
   const [cameraMode, setCameraMode] = useState('single-cam'); // 'single-cam' | 'dual' | 'pip'
   const [showDashboard, setShowDashboard] = useState(false);
   const [stationStatusList, setStationStatusList] = useState([]);
+  const [showAllRecords, setShowAllRecords] = useState(false);
   const activeRecordIdRef = useRef(null);
 
   useEffect(() => {
@@ -649,7 +650,7 @@ function App() {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 md:p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center border border-blue-400/30 mx-auto mb-4">
@@ -660,7 +661,7 @@ function App() {
             </h1>
             <p className="text-slate-400 mt-2">Đăng nhập để tiếp tục</p>
           </div>
-          <form onSubmit={handleLogin} className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-md shadow-2xl">
+          <form onSubmit={handleLogin} className="bg-white/5 border border-white/10 rounded-3xl p-4 md:p-8 backdrop-blur-md shadow-2xl">
             {loginError && (
               <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-sm">
                 {loginError}
@@ -672,7 +673,7 @@ function App() {
                 type="text"
                 value={loginForm.username}
                 onChange={(e) => setLoginForm(f => ({ ...f, username: e.target.value }))}
-                className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+                className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
                 placeholder="Nhập tên đăng nhập"
                 autoFocus
               />
@@ -683,13 +684,13 @@ function App() {
                 type="password"
                 value={loginForm.password}
                 onChange={(e) => setLoginForm(f => ({ ...f, password: e.target.value }))}
-                className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+                className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
                 placeholder="Nhập mật khẩu"
               />
             </div>
             <button
               type="submit"
-              className="w-full py-3 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 rounded-xl font-semibold text-white shadow-lg transition-all"
+              className="w-full py-3 min-h-[44px] bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 rounded-xl font-semibold text-white shadow-lg transition-all"
             >
               Đăng Nhập
             </button>
@@ -738,7 +739,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen p-6 md:p-10 font-sans">
+    <div className="min-h-screen p-3 md:p-6 lg:p-10 font-sans">
       {showSetupModal && (
         <SetupModal 
           isOpen={showSetupModal}
@@ -854,7 +855,7 @@ function App() {
       )}
       
       {/* Header */}
-      <header className="flex flex-col mb-8">
+      <header className="flex flex-col mb-4 md:mb-8">
         <div className="flex flex-col md:flex-row items-center justify-between pb-6 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center border border-blue-400/30">
@@ -868,10 +869,10 @@ function App() {
             </div>
           </div>
           
-          <div className="mt-6 md:mt-0 flex items-center gap-3 w-full md:w-auto">
+          <div className="mt-4 md:mt-6 flex items-center gap-2 md:gap-3 w-full md:w-auto flex-wrap">
           {/* Station Selector Dropdown */}
           {!(viewMode === 'grid' && stations.length >= 2) && (
-          <div className="relative group flex items-center border border-white/10 rounded-xl bg-white/5 h-10 px-3 shadow-lg">
+          <div className="relative group flex items-center border border-white/10 rounded-xl bg-white/5 h-10 min-h-[44px] px-2 md:px-3 shadow-lg">
              <Monitor className="w-5 h-5 text-indigo-400 mr-2" />
               <select 
                 value={activeStationId} 
@@ -904,7 +905,7 @@ function App() {
                     setActiveStationId(newId);
                   }
                 }}
-                className="bg-transparent text-slate-200 focus:outline-none appearance-none font-semibold cursor-pointer pr-4"
+                className="bg-transparent text-slate-200 focus:outline-none appearance-none font-semibold cursor-pointer pr-4 min-h-[44px]"
              >
                 {stations.map(st => (
                   <option key={st.id} value={st.id} className="bg-slate-800">
@@ -925,7 +926,7 @@ function App() {
           {stations.length >= 2 && currentUser?.role === 'ADMIN' && (
             <button
               onClick={() => setViewMode(prev => prev === 'single' ? 'grid' : 'single')}
-              className="h-10 w-10 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/30 rounded-xl transition-all shadow-lg text-slate-400 hover:text-blue-400"
+              className="hidden md:flex h-10 w-10 items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/30 rounded-xl transition-all shadow-lg text-slate-400 hover:text-blue-400"
               title={viewMode === 'single' ? 'Xem tổng quan tất cả trạm' : 'Xem trạm đơn lẻ'}
             >
               {viewMode === 'single' ? <LayoutGrid className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
@@ -934,19 +935,19 @@ function App() {
 
           <button
             onClick={() => setShowDashboard(prev => !prev)}
-            className={`h-10 w-10 flex items-center justify-center border rounded-xl transition-all shadow-lg ${showDashboard ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-blue-500/30 text-slate-400 hover:text-blue-400'}`}
+            className={`hidden md:flex h-10 w-10 items-center justify-center border rounded-xl transition-all shadow-lg ${showDashboard ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-blue-500/30 text-slate-400 hover:text-blue-400'}`}
             title={showDashboard ? 'Quay lại giao diện chính' : 'Bảng điều khiển'}
           >
             <BarChart3 className="w-5 h-5" />
           </button>
 
-          <div className="relative w-full md:w-64 group">
+          <div className="relative w-full md:w-64 group order-last md:order-none">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Search className="h-5 w-5 text-slate-400 group-focus-within:text-blue-400 transition-colors" />
             </div>
             <input
               type="text"
-              className="block w-full pl-11 pr-4 h-10 bg-white/5 border border-white/10 rounded-xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 backdrop-blur-md transition-all shadow-lg"
+              className="block w-full pl-11 pr-4 h-10 min-h-[44px] bg-white/5 border border-white/10 rounded-xl text-base md:text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 backdrop-blur-md transition-all shadow-lg"
               placeholder="Tìm mã vận đơn..."
               value={searchTerm}
               onChange={handleSearch}
@@ -956,13 +957,14 @@ function App() {
           <div className="relative">
             <button
               onClick={() => setShowUserDropdown(!showUserDropdown)}
-              className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-3 py-2 hover:bg-white/10 transition-all"
+              className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-3 py-2 min-h-[44px] hover:bg-white/10 transition-all"
             >
               <User className="w-5 h-5 text-blue-400" />
-              <div className="flex flex-col items-start">
+              <div className="hidden sm:flex flex-col items-start">
                 <span className="text-sm text-slate-200 font-medium">{currentUser.full_name || currentUser.username}</span>
                 <span className="text-[10px] text-slate-400 uppercase">{currentUser.role}</span>
               </div>
+              <span className="sm:hidden text-xs text-slate-300 font-medium">{currentUser.username}</span>
               <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -1036,7 +1038,7 @@ function App() {
           analytics={analytics}
         />
       ) : (
-      <div className={`grid gap-8 ${viewMode === 'grid' ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-3'}`}>
+      <div className={`grid gap-4 md:gap-8 ${viewMode === 'grid' ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-3'}`}>
         
         {/* Left Column: Live Camera / Grid */}
         <div className={`${viewMode === 'grid' ? 'lg:col-span-1' : 'lg:col-span-2'} flex flex-col gap-4`}>
@@ -1155,7 +1157,7 @@ function App() {
                 </span>
               </div>
               
-              <div className="relative group rounded-3xl overflow-hidden bg-zinc-900 border border-white/10 shadow-2xl shadow-blue-900/20 aspect-video flex items-center justify-center">
+              <div className="relative group rounded-3xl overflow-hidden bg-zinc-900 border border-white/10 shadow-2xl shadow-blue-900/20 aspect-[4/3] md:aspect-video flex items-center justify-center">
                 {activeStationId ? (
                     <>
                     {reconnectInfo && reconnectInfo.status === 'searching' && (
@@ -1266,21 +1268,24 @@ function App() {
               </div>
               
               {currentUser?.role !== 'ADMIN' && (
-              <div className="p-5 rounded-2xl bg-white/5 border border-purple-500/30 backdrop-blur-lg mt-2 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 bg-purple-500/20 text-purple-300 text-[10px] px-3 py-1 rounded-bl-xl font-mono border-l border-b border-purple-500/20">
+              <div className="p-3 md:p-5 rounded-2xl bg-white/5 border border-purple-500/30 backdrop-blur-lg mt-2 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 bg-purple-500/20 text-purple-300 text-[10px] px-3 py-1 rounded-bl-xl font-mono border-l border-b border-purple-500/20 hidden md:block">
                   DEV MODE
                 </div>
-                <h3 className="font-medium text-slate-200 mb-4 flex items-center gap-2">
+                <h3 className="font-medium text-slate-200 mb-3 md:mb-4 flex items-center gap-2">
                   <Box className="w-4 h-4 text-purple-400" />
-                  Công Cụ Giả Lập Máy Quét (Manual Simulator)
+                  <span className="md:hidden">Quét Mã Vạch</span>
+                  <span className="hidden md:inline">Công Cụ Giả Lập Máy Quét (Manual Simulator)</span>
                 </h3>
                 
                 <div className="flex flex-col sm:flex-row gap-3">
                    <input
                      type="text"
                      placeholder="Nhập mã vận đơn (VD: SPX12345)"
-                     className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500/50 font-mono text-sm"
+                     className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 md:py-2.5 text-base md:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500/50 font-mono min-h-[44px]"
                      id="simulated-barcode-input"
+                     inputMode="text"
+                     enterKeyHint="send"
                      onKeyDown={(e) => {
                         if (e.key === 'Enter' && e.target.value.trim()) {
                             sendScanAction(e.target.value.trim());
@@ -1288,26 +1293,29 @@ function App() {
                         }
                      }}
                    />
-                   <button 
-                     onClick={() => {
-                       const inputUI = document.getElementById('simulated-barcode-input');
-                       if(inputUI.value.trim()) {
-                         sendScanAction(inputUI.value.trim());
-                         inputUI.value = '';
-                       }
-                     }}
-                     className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl font-medium text-white shadow-lg transition-colors border border-purple-400/20"
-                   >
-                     Bắt Đầu Ghi
-                   </button>
-                   <button 
-                     onClick={() => sendScanAction('STOP')}
-                     className="px-6 py-2.5 bg-slate-800 hover:bg-rose-600 rounded-xl font-medium text-white shadow-lg transition-colors border border-white/10"
-                   >
-                     STOP (Chốt Đơn)
-                   </button>
+                   <div className="flex gap-2 sm:gap-3">
+                     <button 
+                       onClick={() => {
+                         const inputUI = document.getElementById('simulated-barcode-input');
+                         if(inputUI.value.trim()) {
+                           sendScanAction(inputUI.value.trim());
+                           inputUI.value = '';
+                         }
+                       }}
+                       className="flex-1 sm:flex-none px-4 md:px-6 py-3.5 md:py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl font-medium text-white shadow-lg transition-colors border border-purple-400/20 min-h-[44px] text-base md:text-sm"
+                     >
+                       <span className="md:hidden">Ghi</span>
+                       <span className="hidden md:inline">Bắt Đầu Ghi</span>
+                     </button>
+                     <button 
+                       onClick={() => sendScanAction('STOP')}
+                       className="flex-1 sm:flex-none px-4 md:px-6 py-3.5 md:py-2.5 bg-slate-800 hover:bg-rose-600 rounded-xl font-medium text-white shadow-lg transition-colors border border-white/10 min-h-[44px] text-base md:text-sm"
+                     >
+                       STOP
+                     </button>
+                   </div>
                 </div>
-                <p className="text-xs text-slate-500 mt-4 leading-relaxed italic">
+                <p className="text-xs text-slate-500 mt-3 md:mt-4 leading-relaxed italic">
                   * Sử dụng thanh công cụ này nếu bạn không có súng bắn mã vạch. Hệ thống sẽ kết nối với Camera ở Trạm đang chọn.
                 </p>
               </div>
@@ -1318,7 +1326,7 @@ function App() {
         </div>
 
         {viewMode !== 'grid' && (
-        <div className="flex flex-col gap-4 h-[calc(100vh-200px)]">
+        <div className="flex flex-col gap-4 h-[calc(100vh-160px)] md:h-[calc(100vh-200px)]">
           <div className="flex items-center justify-between pointer-events-none">
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <Calendar className="w-5 h-5 text-emerald-400" />
@@ -1329,7 +1337,7 @@ function App() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+          <div className="flex-1 overflow-y-auto pr-0 md:pr-2 space-y-3 md:space-y-4">
             {loading ? (
               <div className="flex items-center justify-center h-40">
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
@@ -1340,14 +1348,15 @@ function App() {
                 <p className="text-slate-400">Chưa có mã vận đơn nào được ghi lại tại Trạm này.</p>
               </div>
             ) : (
-              records.map((record) => (
+              <>
+                {(showAllRecords ? records : records.slice(0, 3)).map((record) => (
                 <div 
                   key={record.id} 
-                  className="group p-5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-400/30 backdrop-blur-md transition-all duration-300 shadow-lg cursor-pointer"
+                  className="group p-3 md:p-5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-400/30 backdrop-blur-md transition-all duration-300 shadow-lg cursor-pointer min-h-[44px]"
                 >
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-3">
-                       <h3 className="text-lg font-bold text-white group-hover:text-blue-300 transition-colors">
+                  <div className="flex justify-between items-start mb-2 md:mb-3">
+                    <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+                       <h3 className="text-base md:text-lg font-bold text-white group-hover:text-blue-300 transition-colors">
                          {record.waybill_code}
                        </h3>
                         <span className="px-2 py-1 bg-white/10 rounded uppercase text-[10px] font-bold tracking-wider text-slate-300">
@@ -1374,7 +1383,7 @@ function App() {
                     {currentUser?.role === 'ADMIN' && (
                       <button 
                         onClick={(e) => { e.stopPropagation(); handleDeleteRecord(record.id, record.waybill_code); }}
-                        className="p-2 -mr-2 -mt-2 text-slate-500 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors"
+                        className="p-2 -mr-2 -mt-2 text-slate-500 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="Xoá bản ghi lưu trữ dọn ổ đĩa"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1382,7 +1391,7 @@ function App() {
                     )}
                   </div>
                   
-                  <p className="text-xs text-slate-400 mb-4 font-mono">
+                  <p className="text-xs text-slate-400 mb-3 md:mb-4 font-mono">
                     {new Date(record.recorded_at).toLocaleString('vi-VN')}
                   </p>
                   
@@ -1400,7 +1409,7 @@ function App() {
                             setSelectedVideo({ url: videoUrl, waybillCode: record.waybill_code });
                             setVideoModalOpen(true);
                           }}
-                          className={`flex items-center gap-2 p-2 rounded-lg bg-black/20 border border-white/5 text-sm ${
+                          className={`flex items-center gap-2 p-2 rounded-lg bg-black/20 border border-white/5 text-sm min-h-[44px] ${
                             record.status === 'RECORDING' || record.status === 'PROCESSING' 
                               ? 'opacity-50 cursor-wait' 
                               : 'hover:bg-black/40 cursor-pointer transition-colors'
@@ -1413,7 +1422,24 @@ function App() {
                     })}
                   </div>
                 </div>
-              ))
+                ))}
+                {!showAllRecords && records.length > 3 && (
+                  <button
+                    onClick={() => setShowAllRecords(true)}
+                    className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-400/30 rounded-2xl text-sm text-slate-400 hover:text-blue-300 font-medium transition-all min-h-[44px]"
+                  >
+                    Xem thêm ({records.length - 3} bản ghi khác)
+                  </button>
+                )}
+                {showAllRecords && records.length > 3 && (
+                  <button
+                    onClick={() => setShowAllRecords(false)}
+                    className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs text-slate-500 hover:text-slate-300 transition-all"
+                  >
+                    Thu gọn
+                  </button>
+                )}
+              </>
             )}
            </div>
         </div>
