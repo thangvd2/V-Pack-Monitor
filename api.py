@@ -938,6 +938,15 @@ def _handle_scan_locked(payload, sid, current_user):
 
     if barcode == "EXIT":
         if current_recorder:
+            database.update_record_status(current_record_id, "PROCESSING")
+            notify_sse(
+                "video_status",
+                {
+                    "station_id": sid,
+                    "status": "PROCESSING",
+                    "record_id": current_record_id,
+                },
+            )
             _processing_count[sid] = _processing_count.get(sid, 0) + 1
             active_recorders.pop(sid, None)
             video_worker.submit_stop_and_save(
@@ -951,6 +960,15 @@ def _handle_scan_locked(payload, sid, current_user):
 
     if barcode == "STOP":
         if current_recorder:
+            database.update_record_status(current_record_id, "PROCESSING")
+            notify_sse(
+                "video_status",
+                {
+                    "station_id": sid,
+                    "status": "PROCESSING",
+                    "record_id": current_record_id,
+                },
+            )
             _processing_count[sid] = _processing_count.get(sid, 0) + 1
             active_recorders.pop(sid, None)
             database.log_audit(

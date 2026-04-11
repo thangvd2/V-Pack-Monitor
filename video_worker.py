@@ -73,9 +73,6 @@ def _notify_sse_safe(station_id, status, record_id):
 
 def _process_stop_and_save(record_id, rec, waybill, station_id, save=True):
     try:
-        database.update_record_status(record_id, "PROCESSING")
-        _notify_sse_safe(station_id, "PROCESSING", record_id)
-
         saved_files = rec.stop_recording()
 
         if not save or not saved_files:
