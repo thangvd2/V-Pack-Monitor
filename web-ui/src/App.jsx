@@ -1217,7 +1217,7 @@ function App() {
                         </div>
                       </div>
                     ) : hasCam2 && cameraMode === 'pip' ? (
-                      <div className="w-full h-full relative">
+                      <div className="absolute inset-0">
                         <iframe
                           key={`live-${activeStationId}-${pipCamSwap}`}
                           src={`http://${MTX_HOST}:8889/station_${activeStationId}${pipCamSwap ? '_cam2' : ''}?controls=false&muted=true&autoplay=true`}

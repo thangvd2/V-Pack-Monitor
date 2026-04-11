@@ -17,6 +17,8 @@
 - **Touch targets:** `min-h-[44px]` trên tất cả interactive elements.
 
 ### 🔧 Other Changes
+- **PIP overlay position:** FFmpeg overlay filter `y=10` (góc trên phải) → `y=main_h-overlay_h-10` (góc dưới phải). Camera 2 giờ hiển thị đúng vị trí góc dưới bên phải trong cả live view và video ghi lại.
+- **Live PIP wrapper:** `w-full h-full relative` → `absolute inset-0` — fix positioning trong flex container.
 - **`start.sh` + `Start V-Pack Monitor.command`:** Thêm `ulimit -n 4096` (tăng file descriptor limit cho MediaMTX + FFmpeg).
 
 ### ⚠️ Known Issue
