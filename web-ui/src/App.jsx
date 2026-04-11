@@ -11,7 +11,6 @@ import SetupModal from './SetupModal';
 import VideoPlayerModal from './VideoPlayerModal';
 import UserManagementModal from './UserManagementModal';
 import Dashboard from './Dashboard';
-import SystemHealth from './SystemHealth';
 
 const API_BASE = window.location.hostname === 'localhost' && ['3000', '3001', '5173'].includes(window.location.port) 
   ? 'http://localhost:8001' 
@@ -167,7 +166,6 @@ function App() {
   const [packingStatus, setPackingStatus] = useState('idle');
   const [currentWaybill, setCurrentWaybill] = useState('');
   const [storageInfo, setStorageInfo] = useState({ size_str: '0 MB', file_count: 0 });
-  const [diskHealth, setDiskHealth] = useState(null);
   
   // Auth State
   const [currentUser, setCurrentUser] = useState(null);
@@ -182,25 +180,6 @@ function App() {
   const [viewMode, setViewMode] = useState('single'); // 'single' | 'grid'
   const [cameraMode, setCameraMode] = useState('single-cam'); // 'single-cam' | 'dual' | 'pip'
   const [showDashboard, setShowDashboard] = useState(false);
-  const [showSystemHealth, setShowSystemHealth] = useState(false);
-  const [stationStatuses, setStationStatuses] = useState({}); // { [stationId]: { status, waybill } }
-  
-  // Custom Video Player State
-  const [videoModalOpen, setVideoModalOpen] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState({ url: '', waybillCode: '' });
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
-  const [changePasswordForm, setChangePasswordForm] = useState({ old_password: '', new_password: '', confirm_password: '' });
-  const [changePasswordError, setChangePasswordError] = useState('');
-  const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
-  const [mtxAvailable, setMtxAvailable] = useState(null);
-  const [toast, setToast] = useState(null);
-
-  // Station Session State (OPERATOR)
-  const [stationAssigned, setStationAssigned] = useState(false);
-  const [activeSessionId, setActiveSessionId] = useState(null);
-  const [pipCamSwap, setPipCamSwap] = useState(false);
   const [stationStatusList, setStationStatusList] = useState([]);
   const activeRecordIdRef = useRef(null);
 
@@ -324,23 +303,7 @@ function App() {
   useEffect(() => {
     if (!currentUser) return;
     fetchStations();
-    fetchDiskHealth();
-    
-    // Refresh disk health every 60 seconds
-    const intervalId = setInterval(fetchDiskHealth, 60000);
-    return () => clearInterval(intervalId);
   }, [currentUser]);
-
-  const fetchDiskHealth = async () => {
-    try {
-      const res = await axios.get(`${API_BASE}/api/system/disk`);
-      if (res.data.status === 'success') {
-        setDiskHealth(res.data);
-      }
-    } catch (e) {
-      console.error('Disk health error', e);
-    }
-  };
 
   const fetchStations = async () => {
     try {

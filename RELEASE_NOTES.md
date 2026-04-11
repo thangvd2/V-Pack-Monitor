@@ -27,6 +27,10 @@
 - **Đơn B stuck "Đang ghi hình" khi A đang xử lý:** Chuyển `database.update_record_status(PROCESSING)` + SSE PROCESSING lên main thread (trước khi queue VideoWorker). Record B chuyển "Đang xử lý" ngay lập tức khi STOP, không cần chờ A convert xong.
 - **Toast thỡ "Bắt đầu ghi hình..." khi scan mới:** Xoá toast cho status `recording` — chỉ hiện toast khi có error thực sự. SSE RECORDING lo việc update UI.
 - **Barcode scanner cho ADMIN:** ADMIN không còn nhận keypress từ barcode scanner (tránh tạo records).
+- **CSV Export 401:** `window.open()` không gửi Authorization header → truyền JWT token qua query param.
+- **System Health Permission:** OPERATOR không còn thấy được tab "Sức khỏe hệ thống" (ADMIN only).
+- **Disk Usage sai số liệu:** `psutil.disk_usage("/")` → `psutil.disk_usage("recordings")` — hiện đúng partition chứa video.
+- **Dead code cleanup:** Xoá `showSystemHealth` state, `diskHealth` state, `fetchDiskHealth`, `SystemHealth` import khỏi App.jsx.
 
 ### 📁 Files Thay Đổi
 - `api.py`: `_processing_stations` → `_processing_count`, `_station_locks`, SSE `waybill` field, SSE polling 100ms, PROCESSING status update trong main thread
