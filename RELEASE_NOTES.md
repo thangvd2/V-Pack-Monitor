@@ -24,12 +24,14 @@
 - **Double-scan tạo 2 records:** Station lock serialize tất cả scan requests cho cùng 1 trạm.
 - **Status nhảy loạn ở đơn thứ 3:** `activeRecordIdRef` guard strict match — SSE events cũ bị block hoàn toàn.
 - **Toast "Đang xử lý video" khi scan mới:** Xoá `_processing_count` check khỏi scan flow — operator luôn có thể bắt đầu đơn mới.
+- **Đơn B stuck "Đang ghi hình" khi A đang xử lý:** Chuyển `database.update_record_status(PROCESSING)` + SSE PROCESSING lên main thread (trước khi queue VideoWorker). Record B chuyển "Đang xử lý" ngay lập tức khi STOP, không cần chờ A convert xong.
+- **Toast thỡ "Bắt đầu ghi hình..." khi scan mới:** Xoá toast cho status `recording` — chỉ hiện toast khi có error thực sự. SSE RECORDING lo việc update UI.
 - **Barcode scanner cho ADMIN:** ADMIN không còn nhận keypress từ barcode scanner (tránh tạo records).
 
 ### 📁 Files Thay Đổi
-- `api.py`: `_processing_stations` → `_processing_count`, `_station_locks`, SSE `waybill` field, SSE polling 100ms
-- `video_worker.py`: Helper functions `_decrement_processing()` / `_notify_sse_safe()`, bỏ `active_waybills.pop()`
-- `web-ui/src/App.jsx`: `activeRecordIdRef`, SSE strict guard, header cleanup, admin dropdown menu
+- `api.py`: `_processing_stations` → `_processing_count`, `_station_locks`, SSE `waybill` field, SSE polling 100ms, PROCESSING status update trong main thread
+- `video_worker.py`: Helper functions `_decrement_processing()` / `_notify_sse_safe()`, bỏ `active_waybills.pop()`, bỏ duplicate PROCESSING update
+- `web-ui/src/App.jsx`: `activeRecordIdRef`, SSE strict guard, header cleanup, admin dropdown menu, xoá toast cho recording
 - `web-ui/src/Dashboard.jsx`: 2-tab layout, SystemHealth integration
 
 ## [v2.1.0] - 2026-04-10 (Station Assignment & Bug Fixes)
