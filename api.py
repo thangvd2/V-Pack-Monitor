@@ -1290,7 +1290,7 @@ async def sse_events(stations: str = ""):
 def get_system_health(admin: AdminUser):
     cpu_percent = psutil.cpu_percent(interval=0.5)
     memory = psutil.virtual_memory()
-    disk = psutil.disk_usage("/")
+    disk = psutil.disk_usage("recordings")
 
     def _status(value, warn_threshold, crit_threshold):
         if value >= crit_threshold:
