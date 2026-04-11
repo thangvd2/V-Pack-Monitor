@@ -517,10 +517,6 @@ function App() {
       });
       if (res.data.status === 'recording') {
         activeRecordIdRef.current = res.data.record_id || null;
-        if (res.data.message) {
-          setToast(res.data.message);
-          setTimeout(() => setToast(null), 3000);
-        }
       } else if (res.data.status === 'error') {
         if (res.data.message) {
           setToast(res.data.message);
