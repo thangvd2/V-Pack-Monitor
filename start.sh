@@ -4,6 +4,7 @@ echo " KHOY DONG V-PACK MONITOR SERIES"
 echo "====================================="
 echo "Dang bat may chu Backend va Web..."
 
+ulimit -n 4096 2>/dev/null
 mkdir -p recordings
 
 MTX_PID=""

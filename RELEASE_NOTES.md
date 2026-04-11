@@ -2,6 +2,28 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v2.2.1] - 2026-04-11 (Mobile Responsive Phase 1 & Critical Bug Fix)
+
+### 🐛 Critical Bug Fix
+- **Restore missing useState declarations:** Commit `82b5c7c` ("dead code cleanup") đã vô tình xoá 16 `useState` declarations khỏi `App.jsx` (chỉ nên xoá 3: `diskHealth`, `showSystemHealth`, `SystemHealth` import). Các state bị xoá nhầm bao gồm: `stationStatuses`, `videoModalOpen`, `selectedVideo`, `showUserModal`, `showUserDropdown`, `showChangePassword`, `changePasswordForm`, `changePasswordError`, `changePasswordSuccess`, `mtxAvailable`, `toast`, `stationAssigned`, `activeSessionId`, `pipCamSwap`. Gây crash `ReferenceError` khi load UI sau login. Đã restore tất cả.
+
+### 📱 Mobile Responsive — Phase 1 (CSS-only)
+- **Login page:** Responsive padding (`p-4 md:p-8`), `text-base` inputs (iOS zoom fix), `min-h-[44px]` touch targets.
+- **Header:** Compact 2-row layout trên mobile, search full-width (`order-last md:order-none`), user info rút gọn trên small screens.
+- **Live view:** Aspect ratio `4:3` trên mobile (taller), `16:9` trên desktop.
+- **Barcode simulator:** Mobile-first inputs (larger, 44px touch targets), `inputMode="text"` + `enterKeyHint="send"`, buttons "Ghi" / "STOP" rút gọn trên mobile.
+- **History:** `showAllRecords` — hiện 3 records + nút "Xem thêm" (chỉ mobile), full list trên desktop.
+- **Grid view toggle + Dashboard button:** `hidden md:flex` — ẩn trên mobile.
+- **Touch targets:** `min-h-[44px]` trên tất cả interactive elements.
+
+### 🔧 Other Changes
+- **`start.sh` + `Start V-Pack Monitor.command`:** Thêm `ulimit -n 4096` (tăng file descriptor limit cho MediaMTX + FFmpeg).
+
+### ⚠️ Known Issue
+- `showAllRecords` giới hạn 3 records trên CẢ desktop lẫn mobile — cần fix chỉ limit trên mobile.
+
+---
+
 ## [v2.2.0] - 2026-04-11 (Video Pipeline Reliability & UI Refactor)
 
 ### 🎥 Video Pipeline — Xử Lý Đa Đơn Hàng
