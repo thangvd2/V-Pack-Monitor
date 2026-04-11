@@ -161,6 +161,7 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
           <BarChart3 className="w-4 h-4" />
           Thống kê
         </button>
+        {currentUser?.role === 'ADMIN' && (
         <button
           onClick={() => setDashTab('health')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${dashTab === 'health' ? 'bg-amber-500/20 border border-amber-500/50 text-amber-300' : 'bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10'}`}
@@ -168,6 +169,7 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
           <Activity className="w-4 h-4" />
           Sức khỏe hệ thống
         </button>
+        )}
       </div>
 
       {dashTab === 'health' ? (

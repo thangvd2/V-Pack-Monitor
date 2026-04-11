@@ -1055,32 +1055,6 @@ function App() {
           </div>
         </div>
         </div>
-
-        {/* Cảnh Báo Bình Xăng Ổ Cứng */}
-        {diskHealth && (
-          <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-4 w-full">
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex items-center gap-2">
-                <HardDrive className={`w-5 h-5 ${diskHealth.percentage > 90 ? 'text-red-500 animate-pulse' : 'text-emerald-400'}`} />
-                <span className="font-semibold text-slate-200">
-                  {diskHealth.percentage > 90 ? 'Cảnh Báo: Ổ Cứng Sắp Đầy!' : 'Dung lượng máy tính'}
-                </span>
-              </div>
-              <span className="text-sm text-slate-400">
-                {(diskHealth.used / 1024 / 1024 / 1024).toFixed(1)} GB / {(diskHealth.total / 1024 / 1024 / 1024).toFixed(1)} GB
-              </span>
-            </div>
-            <div className="w-full bg-slate-800 rounded-full h-3">
-              <div 
-                className={`h-3 rounded-full ${diskHealth.percentage > 90 ? 'bg-red-500 animate-pulse box-shadow-red' : 'bg-gradient-to-r from-emerald-500 to-blue-500'}`}
-                style={{ width: `${Math.min(diskHealth.percentage, 100)}%` }}
-              ></div>
-            </div>
-            <div className="flex justify-end mt-1">
-              <span className="text-xs text-slate-500">Đã dùng: {diskHealth.percentage}%</span>
-            </div>
-          </div>
-        )}
       </header>
 
       {toast && (
@@ -1090,9 +1064,7 @@ function App() {
       )}
 
       {/* Main Content */}
-      {showSystemHealth ? (
-        <SystemHealth currentUser={currentUser} />
-      ) : showDashboard ? (
+      {showDashboard ? (
         <Dashboard
           stations={stations}
           activeStationId={activeStationId}
