@@ -180,6 +180,24 @@ function App() {
   const [viewMode, setViewMode] = useState('single'); // 'single' | 'grid'
   const [cameraMode, setCameraMode] = useState('single-cam'); // 'single-cam' | 'dual' | 'pip'
   const [showDashboard, setShowDashboard] = useState(false);
+  const [stationStatuses, setStationStatuses] = useState({}); // { [stationId]: { status, waybill } }
+  
+  // Custom Video Player State
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState({ url: '', waybillCode: '' });
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [changePasswordForm, setChangePasswordForm] = useState({ old_password: '', new_password: '', confirm_password: '' });
+  const [changePasswordError, setChangePasswordError] = useState('');
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
+  const [mtxAvailable, setMtxAvailable] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  // Station Session State (OPERATOR)
+  const [stationAssigned, setStationAssigned] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [pipCamSwap, setPipCamSwap] = useState(false);
   const [stationStatusList, setStationStatusList] = useState([]);
   const [showAllRecords, setShowAllRecords] = useState(false);
   const activeRecordIdRef = useRef(null);
