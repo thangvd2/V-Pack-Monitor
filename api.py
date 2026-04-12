@@ -16,6 +16,7 @@ import urllib.request
 import urllib.error
 import io
 import csv
+import jwt as _jwt
 import platform as _platform
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
@@ -429,9 +430,26 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="CamDongHang API Multi-Station", lifespan=lifespan)
 
+def _get_cors_origins():
+    origins = [
+        "http://localhost:8001",
+        "http://127.0.0.1:8001",
+    ]
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        origins.append(f"http://{local_ip}:8001")
+    except Exception:
+        pass
+    return origins
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8001", "http://127.0.0.1:8001"],
+    allow_origins=_get_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -452,7 +470,24 @@ except BaseException:
 
 
 @app.get("/api/records/{record_id}/download/{file_index}")
-def download_record_file(record_id: int, file_index: int, current_user: CurrentUser):
+def download_record_file(request: Request, record_id: int, file_index: int):
+    token = request.query_params.get("token") or request.headers.get(
+        "Authorization", ""
+    ).replace("Bearer ", "")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = auth.decode_token(token)
+        jti = payload.get("jti")
+        if jti and auth.is_token_revoked(jti):
+            raise HTTPException(status_code=401, detail="Token revoked")
+        user_id = payload.get("sub")
+        user = database.get_user_by_id(int(user_id)) if user_id else None
+        if not user or not user.get("is_active"):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
     from fastapi.responses import FileResponse as _FR
 
     record = database.get_record_by_id(record_id)
@@ -505,8 +540,7 @@ def get_settings(admin: AdminUser):
     settings = database.get_all_settings()
     for k in _SENSITIVE_KEYS:
         if k in settings and settings[k]:
-            val = str(settings[k])
-            settings[k] = "*" * max(0, len(val) - 4) + val[-4:] if len(val) > 4 else "****"
+            settings[k] = "****"
     return {"data": settings}
 
 
@@ -515,7 +549,7 @@ def update_settings(payload: SettingsUpdate, admin: AdminUser):
     data = payload.dict()
     current = database.get_all_settings()
     for k in _SENSITIVE_KEYS:
-        if k in data and data[k] and all(c == "*" for c in str(data[k])):
+        if k in data and data[k] == "****":
             data[k] = current.get(k, "")
     database.set_settings(data)
     database.log_audit(

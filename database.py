@@ -14,6 +14,10 @@ from datetime import datetime
 _ENCRYPT_PREFIX = "enc:v1:"
 
 
+_DB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recordings")
+os.makedirs(_DB_DIR, exist_ok=True)
+
+
 def _get_enc_key():
     try:
         from auth import SECRET_KEY
