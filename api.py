@@ -467,6 +467,7 @@ def get_disk_health(current_user: CurrentUser):
 
 class SettingsUpdate(BaseModel):
     RECORD_KEEP_DAYS: int
+    RECORD_STREAM_TYPE: str = "main"
     CLOUD_PROVIDER: str = "NONE"
     GDRIVE_FOLDER_ID: str = ""
     S3_ENDPOINT: str = ""
@@ -718,11 +719,11 @@ def delete_station(station_id: int, admin: AdminUser):
     database.log_audit(admin["id"], "STATION_DELETE", f"station_id={station_id}")
     if station_id in stream_managers:
         stream_managers[station_id].stop()
-        del stream_managers[station_id]
+        stream_managers.pop(station_id, None)
     if station_id in active_recorders:
         active_recorders[station_id].stop_recording()
-        del active_recorders[station_id]
-        del active_waybills[station_id]
+        active_recorders.pop(station_id, None)
+        active_waybills.pop(station_id, None)
         active_record_ids.pop(station_id, None)
     _processing_count.pop(station_id, None)
     if station_id in reconnect_status:
@@ -1027,14 +1028,19 @@ def _handle_scan_locked(payload, sid, current_user):
             brand = station.get("camera_brand", "imou")
             code = station.get("safety_code", "")
             new_url = get_rtsp_sub_url(ip1, code, channel=1, brand=brand)
-            if sid in stream_managers:
-                stream_managers[sid].update_url(new_url)
 
-    url1 = get_rtsp_url(ip1, code, channel=1, brand=brand)
+    record_stream = database.get_setting("RECORD_STREAM_TYPE", "main")
+    if record_stream == "sub":
+        url1 = get_rtsp_sub_url(ip1, code, channel=1, brand=brand)
+    else:
+        url1 = get_rtsp_url(ip1, code, channel=1, brand=brand)
     if c_mode in ["dual_file", "pip"]:
-        url2 = get_rtsp_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
+        if record_stream == "sub":
+            url2 = get_rtsp_sub_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
+        else:
+            url2 = get_rtsp_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
     elif c_mode in ["dual_file_sim", "pip_sim"]:
-        url2 = get_rtsp_url(ip1, code, channel=1, brand=brand)
+        url2 = url1
     else:
         url2 = url1
 

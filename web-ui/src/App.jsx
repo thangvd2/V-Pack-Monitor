@@ -200,6 +200,7 @@ function App() {
   const [pipCamSwap, setPipCamSwap] = useState(false);
   const [stationStatusList, setStationStatusList] = useState([]);
   const [showAllRecords, setShowAllRecords] = useState(false);
+  const [recordStreamType, setRecordStreamType] = useState('main');
   const activeRecordIdRef = useRef(null);
   const searchTermRef = useRef(searchTerm);
   useEffect(() => { searchTermRef.current = searchTerm; }, [searchTerm]);
@@ -324,6 +325,7 @@ function App() {
   useEffect(() => {
     if (!currentUser) return;
     fetchStations();
+    if (currentUser.role === 'ADMIN') checkSettings();
   }, [currentUser]);
 
   const fetchStations = async () => {
@@ -486,9 +488,26 @@ function App() {
     try {
       const response = await axios.get(`${API_BASE}/api/settings`);
       setInitialSettings(response.data.data || {});
+      if (response.data.data?.RECORD_STREAM_TYPE) {
+        setRecordStreamType(response.data.data.RECORD_STREAM_TYPE);
+      }
     } catch (error) {
       console.log('API not reachable yet', error);
     }
+  };
+
+  const toggleRecordStream = async () => {
+    const newType = recordStreamType === 'main' ? 'sub' : 'main';
+    try {
+      const settings = (await axios.get(`${API_BASE}/api/settings`)).data.data || {};
+      await axios.post(`${API_BASE}/api/settings`, {
+        ...settings,
+        RECORD_STREAM_TYPE: newType,
+      });
+      setRecordStreamType(newType);
+      setToast(newType === 'sub' ? 'Record: 480p (Sub-stream)' : 'Record: 1080p (Main-stream)');
+      setTimeout(() => setToast(null), 2000);
+    } catch {}
   };
 
   // --- Hàm gọi API Scan ---
@@ -1169,6 +1188,20 @@ function App() {
                         className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${cameraMode === 'pip' ? 'bg-blue-500/20 text-blue-300' : 'text-slate-400 hover:text-white'}`}
                       >PIP</button>
                     </div>
+                  )}
+                  {currentUser?.role === 'ADMIN' && (
+                    <button
+                      onClick={toggleRecordStream}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium border transition-all ${
+                        recordStreamType === 'sub'
+                          ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                          : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                      }`}
+                      title={recordStreamType === 'sub' ? 'Đang ghi sub-stream (480p)' : 'Đang ghi main-stream (1080p)'}
+                    >
+                      <Video className="w-3.5 h-3.5" />
+                      Rec: {recordStreamType === 'sub' ? '480p' : '1080p'}
+                    </button>
                   )}
                 </div>
                 <span className="flex h-3 w-3">
