@@ -2,6 +2,56 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v2.2.4] - 2026-04-12 (Security Hardening — 26 Vulnerabilities Fixed)
+
+### 🔒 CRITICAL Fixes
+- **VULN-01:** Xóa static mount `/recordings/` — video download qua authenticated endpoint `/api/records/{id}/download/{idx}` (JWT required)
+- **VULN-02:** CORS thu hẹp `allow_origins=["*"]` → chỉ `localhost:8001` + `127.0.0.1:8001`
+- **VULN-03:** Default admin password `admin/08012011` — thêm cờ `must_change_password`, bắt buộc đổi password lần đầu login, không in password ra console
+- **VULN-04:** OPERATOR không xem được `safety_code` (camera password) — chỉ ADMIN thấy
+
+### 🛡️ HIGH Fixes
+- **VULN-05:** Login rate limiting — 5 lần sai / 5 phút / IP
+- **VULN-06:** JWT token revocation — thêm bảng `revoked_tokens`, logout thu hồi token bằng `jti`
+- **VULN-07:** SSE `/api/events` yêu cầu authentication (token qua query param)
+- **VULN-08:** Credentials upload validate JSON structure trước khi ghi file
+- **VULN-09:** SQL injection prevention — whitelist column names trong `update_station_ip`
+- **VULN-10:** Sensitive settings mask trong GET response (S3 keys, Telegram token — chỉ hiện 4 ký tự cuối)
+
+### 🔧 MEDIUM Fixes
+- **VULN-12:** `/api/reconnect-status` yêu cầu authentication
+- **VULN-13:** Server-side password validation ≥ 6 ký tự (Pydantic validator)
+- **VULN-14:** Session heartbeat kiểm tra ownership — không heartbeat session của user khác
+- **VULN-15:** Sensitive settings (S3_SECRET_KEY, TELEGRAM_BOT_TOKEN) encrypted at rest trong SQLite (XOR + base64, key derive từ JWT secret)
+- **VULN-16:** Telegram bot token không nhúng trong f-string URL
+- **VULN-18:** Generic error messages thay raw exception trong cloud sync + delete record
+
+### 📝 LOW Fixes
+- **VULN-22:** JWT leeway giảm 30s → 5s
+- **VULN-25:** Barcode input length limit 200 ký tự
+- **VULN-26:** FFmpeg command lines redact credentials (regex `://***@`)
+
+### ⚠️ Not Applicable / Deferred
+- **VULN-11:** TLS/HTTPS — cần nginx reverse proxy (env var `VPACK_HOST` để customize bind host)
+- **VULN-17:** Không có RTSP URL log statements — đã redact qua VULN-26
+- **VULN-19:** Sequential IDs — không ưu tiên, ảnh hưởng toàn bộ schema
+- **VULN-21:** CSRF — đã fixed khi CORS fixed
+
+### 📁 Files Thay Đổi
+- `api.py`: 15 vulnerabilities fixed + authenticated download endpoint + rate limiting + SSE auth + mask settings
+- `auth.py`: JWT `jti` claim + token revocation + leeway fix
+- `database.py`: `revoked_tokens` table + `must_change_password` column + encrypt at rest + `get_record_by_id` + SQL whitelist
+- `telegram_bot.py`: Token không nhúng URL literal
+- `web-ui/src/App.jsx`: SSE token auth + force change password modal + authenticated video URL
+- `web-ui/src/VideoPlayerModal.jsx`: Authenticated download URL
+
+## [v2.2.3] - 2026-04-12 (Record Stream Toggle)
+
+### 🎥 Record Stream Toggle
+- **"Rec: 1080p / 480p" toggle button** (ADMIN only) — chọn main-stream hoặc sub-stream cho recording
+- **Backend:** `RECORD_STREAM_TYPE` setting lưu DB, recording flow đọc setting
+- **Bug fix:** `delete_station` race condition (`del` → `pop`)
+
 ## [v2.2.2] - 2026-04-12 (Security & Stability Patch)
 
 ### 🔒 Security Fixes (CRITICAL)

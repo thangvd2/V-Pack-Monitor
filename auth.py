@@ -8,6 +8,7 @@ import os
 import secrets
 import jwt
 import bcrypt
+import time as _time
 from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -34,6 +35,21 @@ ACCESS_TOKEN_EXPIRE_HOURS = 8
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
+def revoke_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"leeway": 5})
+        jti = payload.get("jti")
+        exp = payload.get("exp", 0)
+        if jti and exp:
+            database.revoke_jti(jti, exp)
+    except Exception:
+        pass
+
+
+def is_token_revoked(jti: str) -> bool:
+    return database.is_jti_revoked(jti)
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(
         plain_password.encode("utf-8"), hashed_password.encode("utf-8")
@@ -46,13 +62,14 @@ def hash_password(password: str) -> str:
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
+    to_encode["jti"] = secrets.token_hex(16)
     expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def decode_token(token: str) -> dict:
-    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"leeway": 30})
+    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"leeway": 5})
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
@@ -64,7 +81,10 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     try:
         payload = decode_token(token)
         user_id = payload.get("sub")
+        jti = payload.get("jti")
         if user_id is None:
+            raise credentials_exception
+        if jti and is_token_revoked(jti):
             raise credentials_exception
     except jwt.InvalidTokenError:
         raise credentials_exception

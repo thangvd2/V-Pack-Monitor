@@ -126,7 +126,7 @@ def send_telegram_message(message: str):
     try:
         import requests
 
-        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        url = "https://api.telegram.org/bot{}/sendMessage".format(bot_token)
         payload = {"chat_id": chat_id, "text": message, "parse_mode": "HTML"}
         response = requests.post(url, json=payload, timeout=10)
         response.raise_for_status()

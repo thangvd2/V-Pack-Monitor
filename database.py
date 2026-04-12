@@ -6,7 +6,42 @@
 
 import sqlite3
 import os
+import time as _time
+import hashlib
+import base64
 from datetime import datetime
+
+_ENCRYPT_PREFIX = "enc:v1:"
+
+
+def _get_enc_key():
+    try:
+        from auth import SECRET_KEY
+        if SECRET_KEY:
+            return hashlib.sha256(SECRET_KEY.encode()).digest()
+    except (ImportError, AttributeError):
+        pass
+    fallback = os.environ.get("VPACK_SECRET", "vpack-default-encryption-key")
+    return hashlib.sha256(fallback.encode()).digest()
+
+
+def _encrypt_value(plaintext: str) -> str:
+    key = _get_enc_key()
+    raw = plaintext.encode("utf-8")
+    encrypted = bytes(a ^ b for a, b in zip(raw, (key * (len(raw) // len(key) + 1))[:len(raw)]))
+    return _ENCRYPT_PREFIX + base64.b64encode(encrypted).decode()
+
+
+def _decrypt_value(ciphertext: str) -> str:
+    if not ciphertext.startswith(_ENCRYPT_PREFIX):
+        return ciphertext
+    key = _get_enc_key()
+    encrypted = base64.b64decode(ciphertext[len(_ENCRYPT_PREFIX):])
+    decrypted = bytes(a ^ b for a, b in zip(encrypted, (key * (len(encrypted) // len(key) + 1))[:len(encrypted)]))
+    return decrypted.decode("utf-8")
+
+
+_SENSITIVE_KEYS = {"S3_SECRET_KEY", "S3_ACCESS_KEY", "TELEGRAM_BOT_TOKEN"}
 
 DB_FILE = "recordings/packing_records.db"
 
@@ -110,9 +145,16 @@ def init_db():
                 role TEXT NOT NULL DEFAULT 'OPERATOR',
                 full_name TEXT NOT NULL DEFAULT '',
                 is_active INTEGER DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                must_change_password INTEGER DEFAULT 0
             )
         """)
+        cursor.execute("PRAGMA table_info(users);")
+        user_cols = [col[1] for col in cursor.fetchall()]
+        if "must_change_password" not in user_cols:
+            cursor.execute(
+                "ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0;"
+            )
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
@@ -135,10 +177,10 @@ def init_db():
                 "08012011".encode("utf-8"), _bcrypt.gensalt()
             ).decode("utf-8")
             cursor.execute(
-                "INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, 'ADMIN', 'Administrator')",
+                "INSERT INTO users (username, password_hash, role, full_name, must_change_password) VALUES (?, ?, 'ADMIN', 'Administrator', 1)",
                 ("admin", hashed),
             )
-            print("Default admin created: admin/08012011")
+            print("Default admin created. Please login and change password.")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS audit_log (
@@ -157,6 +199,14 @@ def init_db():
             "DELETE FROM audit_log WHERE created_at < datetime('now', '-90 days')"
         )
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS revoked_tokens (
+                jti TEXT PRIMARY KEY,
+                expires_at REAL NOT NULL
+            )
+        """)
+        cursor.execute("DELETE FROM revoked_tokens WHERE expires_at < ?", (_time.time(),))
+
         # Expire all stale sessions on startup
         cursor.execute("UPDATE sessions SET status = 'EXPIRED' WHERE status = 'ACTIVE'")
 
@@ -171,11 +221,14 @@ def get_setting(key, default=None):
         )
         row = cursor.fetchone()
         if row:
-            return row[0]
+            return _decrypt_value(row[0])
         return default
 
 
 def set_setting(key, value):
+    str_val = str(value)
+    if key in _SENSITIVE_KEYS and str_val:
+        str_val = _encrypt_value(str_val)
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -184,7 +237,7 @@ def set_setting(key, value):
             VALUES (?, ?)
             ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value
         """,
-            (key, str(value)),
+            (key, str_val),
         )
         conn.commit()
 
@@ -194,20 +247,23 @@ def get_all_settings():
         cursor = conn.cursor()
         cursor.execute("SELECT config_key, config_value FROM system_settings")
         rows = cursor.fetchall()
-        return {k: v for k, v in rows}
+        return {k: _decrypt_value(v) for k, v in rows}
 
 
 def set_settings(settings_dict):
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         for k, v in settings_dict.items():
+            str_val = str(v)
+            if k in _SENSITIVE_KEYS and str_val:
+                str_val = _encrypt_value(str_val)
             cursor.execute(
                 """
                 INSERT INTO system_settings (config_key, config_value)
                 VALUES (?, ?)
                 ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value
             """,
-                (k, str(v)),
+                (k, str_val),
             )
         conn.commit()
 
@@ -297,6 +353,27 @@ def get_records(search="", station_id=None):
         cursor.execute(query, params)
         records = cursor.fetchall()
     return records
+
+
+def get_record_by_id(record_id):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, waybill_code, video_paths, record_mode, recorded_at, station_id, status FROM packing_video WHERE id = ?",
+            (record_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "id": row[0],
+            "waybill_code": row[1],
+            "video_paths": row[2],
+            "record_mode": row[3],
+            "recorded_at": row[4],
+            "station_id": row[5],
+            "status": row[6],
+        }
 
 
 def cleanup_old_records(days=7):
@@ -410,6 +487,9 @@ def update_station(station_id, data):
 
 
 def update_station_ip(station_id, field, new_ip):
+    allowed_fields = {"ip_camera_1", "ip_camera_2"}
+    if field not in allowed_fields:
+        return
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -452,7 +532,7 @@ def get_user_by_username(username):
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, username, password_hash, role, full_name, is_active FROM users WHERE username = ?",
+            "SELECT id, username, password_hash, role, full_name, is_active, must_change_password FROM users WHERE username = ?",
             (username,),
         )
         row = cursor.fetchone()
@@ -464,8 +544,19 @@ def get_user_by_username(username):
                 "role": row[3],
                 "full_name": row[4],
                 "is_active": row[5],
+                "must_change_password": row[6] if len(row) > 6 else 0,
             }
         return None
+
+
+def clear_must_change_password(user_id):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE users SET must_change_password = 0 WHERE id = ?",
+            (user_id,),
+        )
+        conn.commit()
 
 
 def get_user_by_id(user_id):
@@ -838,3 +929,22 @@ def get_records_for_export(
             }
             for r in rows
         ]
+
+
+def revoke_jti(jti: str, expires_at: float):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT OR IGNORE INTO revoked_tokens (jti, expires_at) VALUES (?, ?)",
+            (jti, expires_at),
+        )
+        conn.commit()
+
+
+def is_jti_revoked(jti: str) -> bool:
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT 1 FROM revoked_tokens WHERE jti = ?", (jti,)
+        )
+        return cursor.fetchone() is not None

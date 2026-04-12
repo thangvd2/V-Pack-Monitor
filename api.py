@@ -21,8 +21,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from fastapi.responses import StreamingResponse, FileResponse
+from pydantic import BaseModel, Field
 import database
 import recorder
 from recorder import CameraRecorder
@@ -431,7 +431,7 @@ app = FastAPI(title="CamDongHang API Multi-Station", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8001", "http://127.0.0.1:8001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -439,7 +439,6 @@ app.add_middleware(
 
 if not os.path.exists("recordings"):
     os.makedirs("recordings")
-app.mount("/recordings", StaticFiles(directory="recordings"), name="recordings")
 
 # Tự động dọn dẹp các video cũ
 try:
@@ -447,6 +446,26 @@ try:
     database.cleanup_old_records(keep_days)
 except BaseException:
     pass
+
+
+# --- VIDEO DOWNLOAD API ---
+
+
+@app.get("/api/records/{record_id}/download/{file_index}")
+def download_record_file(record_id: int, file_index: int, current_user: CurrentUser):
+    from fastapi.responses import FileResponse as _FR
+
+    record = database.get_record_by_id(record_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    paths_str = record.get("video_paths") or ""
+    paths = [p.strip() for p in paths_str.split(",") if p.strip()]
+    if file_index < 0 or file_index >= len(paths):
+        raise HTTPException(status_code=404, detail="File not found")
+    filepath = paths[file_index]
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="File deleted")
+    return _FR(filepath, media_type="video/mp4", filename=os.path.basename(filepath))
 
 
 # --- SYSTEM HEALTH API ---
@@ -478,16 +497,29 @@ class SettingsUpdate(BaseModel):
     TELEGRAM_CHAT_ID: str = ""
 
 
+_SENSITIVE_KEYS = {"S3_SECRET_KEY", "S3_ACCESS_KEY", "TELEGRAM_BOT_TOKEN"}
+
+
 @app.get("/api/settings")
 def get_settings(admin: AdminUser):
-    return {"data": database.get_all_settings()}
+    settings = database.get_all_settings()
+    for k in _SENSITIVE_KEYS:
+        if k in settings and settings[k]:
+            val = str(settings[k])
+            settings[k] = "*" * max(0, len(val) - 4) + val[-4:] if len(val) > 4 else "****"
+    return {"data": settings}
 
 
 @app.post("/api/settings")
 def update_settings(payload: SettingsUpdate, admin: AdminUser):
-    database.set_settings(payload.dict())
+    data = payload.dict()
+    current = database.get_all_settings()
+    for k in _SENSITIVE_KEYS:
+        if k in data and data[k] and all(c == "*" for c in str(data[k])):
+            data[k] = current.get(k, "")
+    database.set_settings(data)
     database.log_audit(
-        admin["id"], "SETTINGS_UPDATE", f"keys={list(payload.dict().keys())}"
+        admin["id"], "SETTINGS_UPDATE", f"keys={list(data.keys())}"
     )
 
     # Restart Telegram Bot polling if tokens change
@@ -506,6 +538,12 @@ def update_settings(payload: SettingsUpdate, admin: AdminUser):
 @app.post("/api/credentials")
 async def upload_credentials(admin: AdminUser, file: UploadFile = File(...)):
     contents = await file.read()
+    try:
+        data = json.loads(contents)
+        if not isinstance(data, dict) or "type" not in data:
+            raise ValueError("Not a valid service account JSON")
+    except (json.JSONDecodeError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=f"File không hợp lệ: {e}")
     with open("credentials.json", "wb") as f:
         f.write(contents)
     return {"status": "success", "message": "Đã cập nhật credentials.json"}
@@ -516,8 +554,8 @@ def trigger_cloud_sync(admin: AdminUser):
     try:
         msg = cloud_sync.process_cloud_sync()
         return {"status": "success", "message": msg}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    except Exception:
+        return {"status": "error", "message": "Lỗi đồng bộ cloud. Vui lòng kiểm tra cấu hình."}
 
 
 # --- AUTH API ---
@@ -528,10 +566,21 @@ class LoginPayload(BaseModel):
     password: str
 
 
+_login_attempts = {}
+_LOGIN_MAX = 5
+_LOGIN_WINDOW = 300
+
+
 @app.post("/api/auth/login")
-def login(payload: LoginPayload):
+def login(payload: LoginPayload, request: Request):
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    attempts = [t for t in _login_attempts.get(ip, []) if now - t < _LOGIN_WINDOW]
+    if len(attempts) >= _LOGIN_MAX:
+        return {"status": "error", "message": "Quá nhiều lần đăng nhập sai. Thử lại sau 5 phút."}
     user = database.get_user_by_username(payload.username)
     if not user or not auth.verify_password(payload.password, user["password_hash"]):
+        _login_attempts.setdefault(ip, []).append(now)
         return {"status": "error", "message": "Sai tên đăng nhập hoặc mật khẩu."}
     if not user.get("is_active"):
         return {"status": "error", "message": "Tài khoản đã bị khóa."}
@@ -546,6 +595,7 @@ def login(payload: LoginPayload):
             "username": user["username"],
             "role": user["role"],
             "full_name": user["full_name"],
+            "must_change_password": user.get("must_change_password", 0),
         },
     }
 
@@ -556,7 +606,11 @@ def get_me(current_user: CurrentUser):
 
 
 @app.post("/api/auth/logout")
-def logout(current_user: CurrentUser):
+def logout(current_user: CurrentUser, request: Request):
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else ""
+    if token:
+        auth.revoke_token(token)
     database.log_audit(current_user["id"], "LOGOUT")
     return {"status": "success", "message": "Đã đăng xuất."}
 
@@ -564,6 +618,16 @@ def logout(current_user: CurrentUser):
 class ChangePasswordPayload(BaseModel):
     old_password: str
     new_password: str
+
+    @staticmethod
+    def _validate_pwd(v):
+        if len(v) < 6:
+            raise ValueError("Mật khẩu phải có ít nhất 6 ký tự.")
+        return v
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._validate_pwd(self.new_password)
 
 
 @app.put("/api/auth/change-password")
@@ -577,6 +641,7 @@ def change_password(payload: ChangePasswordPayload, current_user: CurrentUser):
     ):
         return {"status": "error", "message": "Mật khẩu cũ không đúng."}
     database.update_user_password(user["id"], payload.new_password)
+    database.clear_must_change_password(user["id"])
     database.log_audit(user["id"], "CHANGE_PASSWORD")
     return {"status": "success", "message": "Đã đổi mật khẩu thành công."}
 
@@ -633,6 +698,11 @@ def update_user_api(user_id: int, payload: UserUpdatePayload, admin: AdminUser):
 class ResetPasswordPayload(BaseModel):
     password: str
 
+    def __init__(self, **data):
+        super().__init__(**data)
+        if len(self.password) < 6:
+            raise ValueError("Mật khẩu phải có ít nhất 6 ký tự.")
+
 
 @app.put("/api/users/{user_id}/password")
 def reset_password(user_id: int, payload: ResetPasswordPayload, admin: AdminUser):
@@ -665,7 +735,11 @@ class StationPayload(BaseModel):
 
 @app.get("/api/stations")
 def get_stations_api(current_user: CurrentUser):
-    return {"data": database.get_stations()}
+    stations = database.get_stations()
+    if current_user.get("role") != "ADMIN":
+        for s in stations:
+            s.pop("safety_code", None)
+    return {"data": stations}
 
 
 @app.post("/api/stations")
@@ -799,7 +873,7 @@ def discover_camera(station_id: int, current_user: AdminUser):
 
 
 @app.get("/api/reconnect-status")
-def get_reconnect_status(station_id: int | None = None):
+def get_reconnect_status(current_user: CurrentUser, station_id: int | None = None):
     if station_id:
         return {"data": reconnect_status.get(station_id, None)}
     return {"data": reconnect_status}
@@ -837,6 +911,9 @@ def acquire_session(station_id: int, current_user: CurrentUser):
 
 @app.post("/api/sessions/heartbeat")
 def heartbeat_session(session_id: int, current_user: CurrentUser):
+    session = database.get_session_by_id(session_id)
+    if not session or session["user_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not your session")
     database.update_session_heartbeat(session_id)
     return {"status": "success"}
 
@@ -905,7 +982,7 @@ def get_audit_logs_api(
 
 
 class ScanPayload(BaseModel):
-    barcode: str
+    barcode: str = Field(..., max_length=200)
     station_id: int
 
 
@@ -1120,8 +1197,8 @@ def delete_record(record_id: int, admin: AdminUser):
     try:
         database.delete_record(record_id)
         return {"status": "success"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    except Exception:
+        return {"status": "error", "message": "Không thể xoá bản ghi."}
 
 
 @app.get("/api/storage/info")
@@ -1259,7 +1336,16 @@ def mtx_status(current_user: CurrentUser):
 
 
 @app.get("/api/events")
-async def sse_events(stations: str = ""):
+async def sse_events(request: Request, stations: str = ""):
+    token = request.query_params.get("token") or request.headers.get(
+        "Authorization", ""
+    ).replace("Bearer ", "")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        auth.decode_token(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
     import queue
 
     q = queue.Queue()
@@ -1345,11 +1431,14 @@ def get_system_processes(admin: AdminUser):
             name = proc.info["name"] or ""
             if "ffmpeg" in name.lower():
                 cmdline = proc.info.get("cmdline") or []
+                cmdline_str = " ".join(cmdline)[:120] if cmdline else ""
+                import re as _re
+                cmdline_str = _re.sub(r'://[^@]+@', '://***@', cmdline_str)
                 ffmpeg_procs.append(
                     {
                         "pid": proc.info["pid"],
                         "name": name,
-                        "cmdline_short": " ".join(cmdline)[:120] if cmdline else "",
+                        "cmdline_short": cmdline_str,
                         "cpu_percent": proc.info.get("cpu_percent") or 0,
                         "memory_percent": round(
                             proc.info.get("memory_percent") or 0, 1
@@ -1430,4 +1519,5 @@ if os.path.exists(dist_dir):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    bind_host = os.environ.get("VPACK_HOST", "0.0.0.0")
+    uvicorn.run(app, host=bind_host, port=8001)

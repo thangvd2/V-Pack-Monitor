@@ -216,6 +216,9 @@ function App() {
         if (user.role === 'ADMIN') {
           setStationAssigned(true);
         }
+        if (user.must_change_password) {
+          setShowChangePassword(true);
+        }
       } catch {
         localStorage.removeItem('vpack_token');
         localStorage.removeItem('vpack_user');
@@ -261,7 +264,8 @@ function App() {
     const stationIds = viewMode === 'grid'
       ? stations.map(s => s.id).join(',')
       : String(activeStationId);
-    const es = new EventSource(`${API_BASE}/api/events?stations=${stationIds}`);
+    const sseToken = localStorage.getItem('vpack_token');
+    const es = new EventSource(`${API_BASE}/api/events?stations=${stationIds}${sseToken ? '&token=' + encodeURIComponent(sseToken) : ''}`);
     
     es.addEventListener('video_status', (evt) => {
       try {
@@ -576,6 +580,9 @@ function App() {
         if (user.role === 'ADMIN') {
           setStationAssigned(true);
         }
+        if (user.must_change_password) {
+          setShowChangePassword(true);
+        }
         setLoginForm({ username: '', password: '' });
       } else {
         setLoginError(res.data.message || 'Đăng nhập thất bại.');
@@ -814,14 +821,14 @@ function App() {
       />
 
       {showChangePassword && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowChangePassword(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => { if (!currentUser?.must_change_password) setShowChangePassword(false); setChangePasswordError(''); setChangePasswordSuccess(''); }}>
           <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Settings className="w-5 h-5 text-blue-400" />
                 Đổi Mật Khẩu
               </h3>
-              <button onClick={() => { setShowChangePassword(false); setChangePasswordError(''); setChangePasswordSuccess(''); }} className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition">
+              <button onClick={() => { if (!currentUser?.must_change_password) { setShowChangePassword(false); setChangePasswordError(''); setChangePasswordSuccess(''); } }} className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -868,7 +875,13 @@ function App() {
                         if (changePasswordForm.new_password.length < 6) { setChangePasswordError('Mật khẩu mới phải có ít nhất 6 ký tự.'); return; }
                         if (changePasswordForm.new_password !== changePasswordForm.confirm_password) { setChangePasswordError('Mật khẩu xác nhận không khớp.'); return; }
                         axios.put(`${API_BASE}/api/auth/change-password`, { old_password: changePasswordForm.old_password, new_password: changePasswordForm.new_password })
-                          .then(() => { setChangePasswordSuccess('Đổi mật khẩu thành công!'); setChangePasswordForm({ old_password: '', new_password: '', confirm_password: '' }); })
+                          .then(() => {
+                            setChangePasswordSuccess('Đổi mật khẩu thành công!');
+                            setChangePasswordForm({ old_password: '', new_password: '', confirm_password: '' });
+                            const updatedUser = { ...currentUser, must_change_password: 0 };
+                            setCurrentUser(updatedUser);
+                            localStorage.setItem('vpack_user', JSON.stringify(updatedUser));
+                          })
                           .catch(err => { setChangePasswordError(err.response?.data?.detail || 'Mật khẩu cũ không đúng.'); });
                       }
                     }}
@@ -880,7 +893,13 @@ function App() {
                     if (changePasswordForm.new_password.length < 6) { setChangePasswordError('Mật khẩu mới phải có ít nhất 6 ký tự.'); return; }
                     if (changePasswordForm.new_password !== changePasswordForm.confirm_password) { setChangePasswordError('Mật khẩu xác nhận không khớp.'); return; }
                     axios.put(`${API_BASE}/api/auth/change-password`, { old_password: changePasswordForm.old_password, new_password: changePasswordForm.new_password })
-                      .then(() => { setChangePasswordSuccess('Đổi mật khẩu thành công!'); setChangePasswordForm({ old_password: '', new_password: '', confirm_password: '' }); })
+                      .then(() => {
+                        setChangePasswordSuccess('Đổi mật khẩu thành công!');
+                        setChangePasswordForm({ old_password: '', new_password: '', confirm_password: '' });
+                        const updatedUser = { ...currentUser, must_change_password: 0 };
+                        setCurrentUser(updatedUser);
+                        localStorage.setItem('vpack_user', JSON.stringify(updatedUser));
+                      })
                       .catch(err => { setChangePasswordError(err.response?.data?.detail || 'Mật khẩu cũ không đúng.'); });
                   }}
                   className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 rounded-xl font-semibold text-white shadow-lg transition-all text-sm"
@@ -1452,7 +1471,7 @@ function App() {
                   <div className="space-y-2">
                     {record.video_paths.map((path, idx) => {
                       const fileName = path.split('/').pop() || path.split('\\').pop();
-                      const videoUrl = `${API_BASE}/${path.replace(/\\/g, '/')}`;
+                      const videoUrl = `${API_BASE}/api/records/${record.id}/download/${idx}`;
                       return (
                         <div 
                           key={idx}
