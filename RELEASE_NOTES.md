@@ -5,18 +5,18 @@
 ## [v2.2.4] - 2026-04-12 (Security Hardening — 26 Vulnerabilities Fixed)
 
 ### 🔒 CRITICAL Fixes
-- **VULN-01:** Xóa static mount `/recordings/` — video download qua authenticated endpoint `/api/records/{id}/download/{idx}` (JWT required)
-- **VULN-02:** CORS thu hẹp `allow_origins=["*"]` → chỉ `localhost:8001` + `127.0.0.1:8001`
-- **VULN-03:** Default admin password `admin/08012011` — thêm cờ `must_change_password`, bắt buộc đổi password lần đầu login, không in password ra console
+- **VULN-01:** Xóa static mount `/recordings/` — video download qua authenticated endpoint `/api/records/{id}/download/{idx}` (JWT token qua query param, hỗ trợ `<video>` tag)
+- **VULN-02:** CORS thu hẹp — auto-detect local IP, chỉ cho phép `localhost` + `127.0.0.1` + LAN IP
+- **VULN-03:** Default admin password `admin/08012011` — thêm cờ `must_change_password`, bắt buộc đổi password lần đầu login, không in password ra console, không thể đóng modal
 - **VULN-04:** OPERATOR không xem được `safety_code` (camera password) — chỉ ADMIN thấy
 
 ### 🛡️ HIGH Fixes
 - **VULN-05:** Login rate limiting — 5 lần sai / 5 phút / IP
-- **VULN-06:** JWT token revocation — thêm bảng `revoked_tokens`, logout thu hồi token bằng `jti`
+- **VULN-06:** JWT token revocation — thêm bảng `revoked_tokens`, logout thu hồi token bằng `jti`, cleanup expired tokens khi startup
 - **VULN-07:** SSE `/api/events` yêu cầu authentication (token qua query param)
 - **VULN-08:** Credentials upload validate JSON structure trước khi ghi file
 - **VULN-09:** SQL injection prevention — whitelist column names trong `update_station_ip`
-- **VULN-10:** Sensitive settings mask trong GET response (S3 keys, Telegram token — chỉ hiện 4 ký tự cuối)
+- **VULN-10:** Sensitive settings mask `"****"` trong GET response, preservation check khi PUT
 
 ### 🔧 MEDIUM Fixes
 - **VULN-12:** `/api/reconnect-status` yêu cầu authentication
@@ -37,12 +37,18 @@
 - **VULN-19:** Sequential IDs — không ưu tiên, ảnh hưởng toàn bộ schema
 - **VULN-21:** CSRF — đã fixed khi CORS fixed
 
+### 🐛 Side Effect Fixes (Post-Audit)
+- **Settings mask preservation:** Đổi mask thành `"****"` (all-star) + check chính xác, tránh corrupt sensitive settings khi save
+- **Video playback auth:** Download endpoint nhận token qua query param (hỗ trợ `<video>` tag không gửi header)
+- **First-run crash:** `os.makedirs("recordings")` chạy trước DB access, tránh crash lần đầu clone
+- **CORS LAN access:** Auto-detect local IP qua UDP socket → thêm vào allowed origins
+
 ### 📁 Files Thay Đổi
-- `api.py`: 15 vulnerabilities fixed + authenticated download endpoint + rate limiting + SSE auth + mask settings
+- `api.py`: 15 vulnerabilities fixed + authenticated download endpoint + rate limiting + SSE auth + mask settings + CORS auto-detect
 - `auth.py`: JWT `jti` claim + token revocation + leeway fix
-- `database.py`: `revoked_tokens` table + `must_change_password` column + encrypt at rest + `get_record_by_id` + SQL whitelist
+- `database.py`: `revoked_tokens` table + `must_change_password` column + encrypt at rest + `get_record_by_id` + SQL whitelist + makedirs guard
 - `telegram_bot.py`: Token không nhúng URL literal
-- `web-ui/src/App.jsx`: SSE token auth + force change password modal + authenticated video URL
+- `web-ui/src/App.jsx`: SSE token auth + force change password modal + authenticated video URL with token
 - `web-ui/src/VideoPlayerModal.jsx`: Authenticated download URL
 
 ## [v2.2.3] - 2026-04-12 (Record Stream Toggle)

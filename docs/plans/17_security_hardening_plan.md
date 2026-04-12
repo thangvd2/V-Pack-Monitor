@@ -161,13 +161,26 @@ Không trả raw exception cho client.
 
 ## Testing Checklist
 
-- [ ] `/recordings/` trả 404 (không serve static nữa)
-- [ ] Download video qua API cần JWT token
-- [ ] OPERATOR không thấy safety_code
-- [ ] ADMIN thấy safety_code
-- [ ] CORS block request từ origin khác
-- [ ] Login fail 5 lần → lock 5 phút
-- [ ] SSE cần token
-- [ ] Settings API mask S3_SECRET_KEY
-- [ ] Password mới < 6 ký tự → rejected server-side
-- [ ] Default admin phải đổi password lần đầu
+- [x] `/recordings/` trả 404 (không serve static nữa)
+- [x] Download video qua API cần JWT token (qua query param)
+- [x] OPERATOR không thấy safety_code
+- [x] ADMIN thấy safety_code
+- [x] CORS block request từ origin lạ + cho phép LAN IP
+- [x] Login fail 5 lần → lock 5 phút
+- [x] SSE cần token
+- [x] Settings API mask sensitive keys (`****`)
+- [x] Settings save không corrupt masked values
+- [x] Password mới < 6 ký tự → rejected server-side
+- [x] Default admin phải đổi password lần đầu
+- [x] JWT token revoked khi logout
+- [x] Video playback hoạt động qua authenticated endpoint
+- [x] First-run không crash (recordings/ dir auto-created)
+
+## Post-Audit Side Effect Fixes
+
+Sau khi verify, phát hiện 4 side effects critical đã được fix:
+
+1. **Settings mask preservation:** Mask `"****"` (all-star) + check chính xác `"****" == data[k]` → tránh corrupt sensitive settings khi save hoặc toggle record stream
+2. **Video playback auth:** Download endpoint nhận token qua query param `?token=xxx` → `<video>` tag hoạt động (không gửi Authorization header)
+3. **First-run crash:** `os.makedirs("recordings", exist_ok=True)` trong database.py → tránh crash lần đầu clone khi recordings/ chưa tồn tại
+4. **CORS LAN access:** Auto-detect local IP qua UDP socket → thêm vào allowed origins → truy cập từ máy khác trên LAN không bị block
