@@ -13,3 +13,4 @@ bin/
 InnoSetup/
 credentials.json
 install_log.txt
+*.db.bak

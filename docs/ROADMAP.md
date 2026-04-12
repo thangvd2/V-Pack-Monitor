@@ -1,7 +1,9 @@
-# V-Pack Monitor — Roadmap & Backlog (Updated 2026-04-12)
+# V-Pack Monitor — Roadmap & Backlog (Updated 2026-04-13)
 
 ## COMPLETED
-- [x] v2.2.2 — Security & Stability Patch (9 critical/high bugs fixed)
+- [x] v2.3.0 — Auto-Update System (1-click update, version badge, progress UI)
+- [x] v2.2.4 — Security Hardening (26 vulnerabilities fixed)
+- [x] v2.2.3 — Record Stream Toggle
 - [x] v2.2.1 — Mobile Responsive Phase 1
 - [x] v2.2.0 — Video Pipeline Reliability & UI Refactor
 - [x] WebRTC Live View via MediaMTX
@@ -37,7 +39,7 @@
 - Chỉ 1 tab active per station, tab cũ bị kick + dialog cảnh báo
 - Reconnect flow mượt khi tab bị kick
 
-### 4. Auto-Update System
+### 4. ~~Auto-Update System~~ ✅ DONE (v2.3.0)
 - Check GitHub release mới khi startup
 - 1-click update (download zip + extract + restart)
 - Version badge trên UI header

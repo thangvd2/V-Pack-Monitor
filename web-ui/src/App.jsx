@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Trash2, HardDrive, Plus, Monitor, ShieldCheck, BarChart3, CloudUpload, LogOut, User, Users, LayoutGrid, Maximize2, Activity } from 'lucide-react';
+import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Trash2, HardDrive, Plus, Monitor, ShieldCheck, BarChart3, CloudUpload, LogOut, User, Users, LayoutGrid, Maximize2, Activity, RefreshCw } from 'lucide-react';
 import SetupModal from './SetupModal';
 import VideoPlayerModal from './VideoPlayerModal';
 import UserManagementModal from './UserManagementModal';
@@ -201,6 +201,10 @@ function App() {
   const [stationStatusList, setStationStatusList] = useState([]);
   const [showAllRecords, setShowAllRecords] = useState(false);
   const [recordStreamType, setRecordStreamType] = useState('main');
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState(null);
+  const [updating, setUpdating] = useState(false);
   const activeRecordIdRef = useRef(null);
   const searchTermRef = useRef(searchTerm);
   useEffect(() => { searchTermRef.current = searchTerm; }, [searchTerm]);
@@ -320,6 +324,18 @@ function App() {
       } catch {}
     });
 
+    es.addEventListener('update_progress', (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        setUpdateProgress(data);
+        if (data.stage === 'restarting') {
+          setTimeout(() => {
+            window.location.reload();
+          }, 5000);
+        }
+      } catch {}
+    });
+
     es.onerror = () => {};
 
     return () => es.close();
@@ -329,8 +345,20 @@ function App() {
   useEffect(() => {
     if (!currentUser) return;
     fetchStations();
-    if (currentUser.role === 'ADMIN') checkSettings();
+    if (currentUser.role === 'ADMIN') {
+      checkSettings();
+      checkForUpdate();
+    }
   }, [currentUser]);
+
+  const checkForUpdate = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/api/system/update-check`);
+      if (res.data) {
+        setUpdateInfo(res.data);
+      }
+    } catch {}
+  };
 
   const fetchStations = async () => {
     try {
@@ -912,6 +940,95 @@ function App() {
         </div>
       )}
       
+      {showUpdateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-blue-400" />
+                Cập Nhật Hệ Thống
+              </h3>
+              {!updating && (
+                <button onClick={() => setShowUpdateModal(false)} className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-3 mb-5">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Phiên bản hiện tại:</span>
+                <span className="text-white font-mono">{updateInfo?.current_version}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Phiên bản mới:</span>
+                <span className="text-amber-300 font-mono font-semibold">{updateInfo?.latest_version}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Chế độ:</span>
+                <span className="text-slate-200">{updateInfo?.mode === 'dev' ? 'Development (Git)' : 'Production (Release)'}</span>
+              </div>
+            </div>
+
+            {updateInfo?.changelog && (
+              <div className="mb-4 p-3 bg-black/30 border border-white/5 rounded-xl text-xs text-slate-300 max-h-32 overflow-y-auto whitespace-pre-wrap">
+                {updateInfo.changelog}
+              </div>
+            )}
+
+            {updateProgress && (
+              <div className="mb-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500"></div>
+                  <span className="text-slate-300">{updateProgress.message}</span>
+                </div>
+                <div className="w-full bg-white/10 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-blue-500 to-emerald-500 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${updateProgress.progress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200 mb-4">
+              Hệ thống sẽ khởi động lại sau khi cập nhật. Video đang ghi sẽ được lưu tự động.
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowUpdateModal(false)}
+                disabled={updating}
+                className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm text-slate-300 transition-all disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={async () => {
+                  setUpdating(true);
+                  try {
+                    const res = await axios.post(`${API_BASE}/api/system/update`);
+                    if (res.data.status === 'error') {
+                      setUpdating(false);
+                      setUpdateProgress({ stage: 'error', message: res.data.message, progress: 0 });
+                    }
+                  } catch (err) {
+                    if (!updateProgress || updateProgress.stage !== 'restarting') {
+                      setUpdating(false);
+                      setUpdateProgress({ stage: 'error', message: 'Lỗi kết nối server.', progress: 0 });
+                    }
+                  }
+                }}
+                disabled={updating}
+                className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 rounded-xl font-semibold text-white shadow-lg transition-all text-sm disabled:opacity-50"
+              >
+                {updating ? 'Đang cập nhật...' : 'Cập Nhật Ngay'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <header className="flex flex-col mb-4 md:mb-8">
         <div className="flex flex-col md:flex-row items-center justify-between pb-6 border-b border-white/10">
@@ -988,6 +1105,22 @@ function App() {
               title={viewMode === 'single' ? 'Xem tổng quan tất cả trạm' : 'Xem trạm đơn lẻ'}
             >
               {viewMode === 'single' ? <LayoutGrid className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            </button>
+          )}
+
+          {currentUser?.role === 'ADMIN' && updateInfo && (
+            <button
+              onClick={() => { if (updateInfo.update_available) { setUpdateProgress(null); setUpdating(false); setShowUpdateModal(true); } }}
+              className={`hidden md:flex items-center gap-1.5 px-3 h-10 rounded-xl border text-xs font-semibold transition-all shadow-lg ${
+                updateInfo.update_available
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 cursor-pointer'
+                  : 'bg-white/5 border-white/10 text-slate-500 cursor-default'
+              }`}
+              title={updateInfo.update_available ? `Có bản mới: ${updateInfo.latest_version}` : `Phiên bản mới nhất: ${updateInfo.current_version}`}
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              {updateInfo.current_version}
+              {updateInfo.update_available && <span className="text-amber-200">({updateInfo.latest_version})</span>}
             </button>
           )}
 

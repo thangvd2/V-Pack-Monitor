@@ -36,6 +36,15 @@ from auth import CurrentUser, AdminUser, oauth2_scheme
 
 _SERVER_START_TIME = time.time()
 
+
+def _read_version():
+    try:
+        vpath = os.path.join(os.path.dirname(__file__) or ".", "VERSION")
+        with open(vpath, "r") as f:
+            return f.read().strip()
+    except Exception:
+        return "unknown"
+
 # --- Quản lý Trạng thái Ghi hình Đa Trạm ---
 active_recorders = {}
 active_waybills = {}
@@ -1540,6 +1549,380 @@ def get_network_info(admin: AdminUser):
         "local_ip": local_ip,
         "cameras": camera_status,
     }
+
+
+# --- AUTO-UPDATE API ---
+
+_update_lock = threading.Lock()
+_is_updating = False
+_update_check_cache = {"result": None, "timestamp": 0}
+_UPDATE_CHECK_TTL = 3600
+
+
+def _read_version():
+    try:
+        vpath = os.path.join(os.path.dirname(__file__) or ".", "VERSION")
+        with open(vpath, "r") as f:
+            return f.read().strip()
+    except Exception:
+        return "unknown"
+
+
+def _get_git_branch():
+    try:
+        import subprocess as _sp
+        r = _sp.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode == 0:
+            branch = r.stdout.strip()
+            if branch and branch != "HEAD":
+                return branch
+        r2 = _sp.run(
+            ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r2.returncode == 0:
+            return r2.stdout.strip().replace("refs/remotes/origin/", "")
+    except Exception:
+        pass
+    return "master"
+
+
+@app.get("/api/system/update-check")
+def check_update(admin: AdminUser):
+    now = time.time()
+    if _update_check_cache["result"] and (now - _update_check_cache["timestamp"]) < _UPDATE_CHECK_TTL:
+        return _update_check_cache["result"]
+
+    import subprocess as _sp
+
+    current = _read_version()
+    mode = "dev" if os.path.exists(".git") else "production"
+    latest = current
+    update_available = False
+    changelog = ""
+
+    try:
+        if mode == "dev":
+            branch = _get_git_branch()
+            _sp.run(
+                ["git", "fetch", "origin", branch],
+                capture_output=True, timeout=30,
+            )
+            r = _sp.run(
+                ["git", "describe", "--tags", "--abbrev=0", f"origin/{branch}"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                latest = r.stdout.strip()
+            else:
+                r2 = _sp.run(
+                    ["git", "rev-parse", "--short", f"origin/{branch}"],
+                    capture_output=True, text=True, timeout=10,
+                )
+                if r2.returncode == 0:
+                    latest = r2.stdout.strip()
+            r3 = _sp.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True, text=True, timeout=10,
+            )
+            local_head = r3.stdout.strip() if r3.returncode == 0 else ""
+            r4 = _sp.run(
+                ["git", "rev-parse", f"origin/{branch}"],
+                capture_output=True, text=True, timeout=10,
+            )
+            remote_head = r4.stdout.strip() if r4.returncode == 0 else ""
+            update_available = local_head != remote_head and remote_head != ""
+        else:
+            import urllib.request as _ur
+            req = _ur.Request(
+                "https://api.github.com/repos/thangvd2/V-Pack-Monitor/releases/latest",
+                headers={"User-Agent": "V-Pack-Monitor"},
+            )
+            resp = _ur.urlopen(req, timeout=10)
+            release = json.loads(resp.read())
+            tag = release.get("tag_name", "")
+            if tag:
+                latest = tag
+                changelog = release.get("body", "")
+            update_available = latest != current and latest != "unknown"
+    except Exception:
+        pass
+
+    result = {
+        "current_version": current,
+        "latest_version": latest,
+        "update_available": update_available,
+        "mode": mode,
+        "changelog": changelog,
+    }
+    _update_check_cache["result"] = result
+    _update_check_cache["timestamp"] = now
+    return result
+
+
+def _notify_update_progress(stage, message, progress=0):
+    notify_sse("update_progress", {
+        "stage": stage,
+        "message": message,
+        "progress": progress,
+    })
+
+
+def _do_graceful_restart():
+    time.sleep(1.5)
+    try:
+        for rec in active_recorders.values():
+            try:
+                rec.stop_recording()
+            except Exception:
+                pass
+        video_worker.shutdown()
+        _notify_update_progress("restarting", "Đang khởi động lại...", 100)
+        time.sleep(1.5)
+        if _platform.system() == "Windows":
+            bat_content = "@echo off\r\n"
+            bat_content += "timeout /t 3 /nobreak >nul\r\n"
+            bat_content += 'cd /d "' + os.getcwd() + '"\r\n'
+            bat_content += 'call start_windows.bat\r\n'
+            bat_content += 'del "%~f0"\r\n'
+            bat_path = os.path.join(os.getcwd(), "_update_restart.bat")
+            with open(bat_path, "w") as f:
+                f.write(bat_content)
+            import subprocess as _sp
+            _sp.Popen(["cmd", "/c", bat_path], creationflags=0x00000008)
+        else:
+            sh_content = "#!/bin/bash\n"
+            sh_content += "sleep 3\n"
+            sh_content += 'cd "' + os.getcwd() + '"\n'
+            sh_content += "bash start.sh\n"
+            sh_content += 'rm -- "$0"\n'
+            sh_path = os.path.join(os.getcwd(), "_update_restart.sh")
+            with open(sh_path, "w") as f:
+                f.write(sh_content)
+            import subprocess as _sp
+            _sp.run(["chmod", "+x", sh_path])
+            _sp.Popen(["bash", sh_path], start_new_session=True)
+    except Exception:
+        pass
+    finally:
+        os._exit(0)
+
+
+def _update_dev():
+    import subprocess as _sp
+
+    try:
+        _notify_update_progress("checking", "Đang kiểm tra bản cập nhật...", 10)
+        branch = _get_git_branch()
+
+        stash_result = _sp.run(
+            ["git", "stash"], capture_output=True, text=True, timeout=30,
+        )
+        had_stash = "No local changes" not in (stash_result.stdout or "")
+
+        _notify_update_progress("downloading", "Đang tải bản cập nhật (git pull)...", 30)
+        r = _sp.run(
+            ["git", "pull", "origin", branch],
+            capture_output=True, text=True, timeout=120,
+        )
+        if r.returncode != 0:
+            if had_stash:
+                _sp.run(["git", "stash", "pop"], capture_output=True, timeout=30)
+            return {
+                "status": "error",
+                "message": f"Git pull thất bại: {r.stderr[:200]}",
+            }
+
+        if had_stash:
+            _sp.run(["git", "stash", "pop"], capture_output=True, timeout=30)
+
+        _notify_update_progress("installing", "Đang cài đặt npm dependencies...", 50)
+        if _platform.system() == "Windows":
+            _sp.run(
+                ["cmd", "/c", "npm", "install"],
+                cwd="web-ui", capture_output=True, timeout=120,
+            )
+        else:
+            _sp.run(
+                ["npm", "install"],
+                cwd="web-ui", capture_output=True, timeout=120,
+            )
+
+        _notify_update_progress("building", "Đang build frontend...", 70)
+        if _platform.system() == "Windows":
+            _sp.run(
+                ["cmd", "/c", "npm", "run", "build"],
+                cwd="web-ui", capture_output=True, timeout=120,
+            )
+        else:
+            _sp.run(
+                ["npm", "run", "build"],
+                cwd="web-ui", capture_output=True, timeout=120,
+            )
+
+        _notify_update_progress("restarting", "Đang chuẩn bị khởi động lại...", 90)
+        return {"status": "restarting", "message": "Cập nhật thành công. Đang khởi động lại..."}
+    except Exception as e:
+        return {"status": "error", "message": f"Lỗi cập nhật: {e}"}
+
+
+def _update_production():
+    import subprocess as _sp
+    import tempfile
+    import zipfile
+
+    try:
+        _notify_update_progress("checking", "Đang kiểm tra GitHub Release...", 5)
+        req = urllib.request.Request(
+            "https://api.github.com/repos/thangvd2/V-Pack-Monitor/releases/latest",
+            headers={"User-Agent": "V-Pack-Monitor"},
+        )
+        resp = urllib.request.urlopen(req, timeout=10)
+        release = json.loads(resp.read())
+        tag = release.get("tag_name", "")
+        if not tag:
+            return {"status": "error", "message": "Không tìm thấy bản release."}
+
+        _notify_update_progress("downloading", f"Đang tải {tag}...", 20)
+        zip_url = f"https://github.com/thangvd2/V-Pack-Monitor/archive/refs/tags/{tag}.zip"
+        zip_resp = urllib.request.urlopen(zip_url, timeout=120)
+        tmp_dir = tempfile.mkdtemp()
+        zip_path = os.path.join(tmp_dir, f"{tag}.zip")
+        with open(zip_path, "wb") as f:
+            while True:
+                chunk = zip_resp.read(65536)
+                if not chunk:
+                    break
+                f.write(chunk)
+
+        _notify_update_progress("extracting", "Đang giải nén...", 40)
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            zf.extractall(tmp_dir)
+        tag_ver = tag[1:] if tag.startswith("v") else tag
+        src_dir = os.path.join(tmp_dir, f"V-Pack-Monitor-{tag_ver}")
+        if not os.path.isdir(src_dir):
+            for d in os.listdir(tmp_dir):
+                dp = os.path.join(tmp_dir, d)
+                if os.path.isdir(dp) and "V-Pack" in d:
+                    src_dir = dp
+                    break
+        if not os.path.isdir(src_dir):
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return {"status": "error", "message": "Không tìm thấy thư mục giải nén."}
+
+        _notify_update_progress("backup", "Đang sao lưu database...", 50)
+        db_path = os.path.join("recordings", "packing_records.db")
+        if os.path.exists(db_path):
+            shutil.copy2(db_path, db_path + ".bak")
+
+        _notify_update_progress("installing", "Đang cài đặt...", 60)
+        excludes = {
+            "recordings", "venv", "bin", "credentials.json",
+            ".env", "install_log.txt", "__pycache__", ".git",
+            "_update_restart.bat", "_update_restart.sh",
+        }
+        for item in os.listdir(src_dir):
+            if item in excludes:
+                continue
+            src = os.path.join(src_dir, item)
+            dst = os.path.join(".", item)
+            if os.path.isdir(src):
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+            else:
+                shutil.copy2(src, dst)
+
+        _notify_update_progress("dependencies", "Đang cài đặt dependencies...", 75)
+        _sp.run(
+            [sys.executable, "-m", "pip", "install", "-r", "requirements.txt", "-q"],
+            capture_output=True, timeout=120,
+        )
+
+        _notify_update_progress("building", "Đang build frontend...", 85)
+        has_npm = False
+        if _platform.system() == "Windows":
+            has_npm = _sp.run(
+                ["cmd", "/c", "where", "npm"],
+                capture_output=True, timeout=5,
+            ).returncode == 0
+        else:
+            has_npm = shutil.which("npm") is not None
+        if has_npm:
+            if _platform.system() == "Windows":
+                _sp.run(
+                    ["cmd", "/c", "npm", "install"],
+                    cwd="web-ui", capture_output=True, timeout=120,
+                )
+                _sp.run(
+                    ["cmd", "/c", "npm", "run", "build"],
+                    cwd="web-ui", capture_output=True, timeout=120,
+                )
+            else:
+                _sp.run(
+                    ["npm", "install"],
+                    cwd="web-ui", capture_output=True, timeout=120,
+                )
+                _sp.run(
+                    ["npm", "run", "build"],
+                    cwd="web-ui", capture_output=True, timeout=120,
+                )
+        else:
+            _notify_update_progress("building", "Bỏ qua npm build (không có Node.js). Dùng dist/ có sẵn.", 85)
+
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        db_bak = os.path.join("recordings", "packing_records.db.bak")
+        if os.path.exists(db_bak):
+            try:
+                os.remove(db_bak)
+            except OSError:
+                pass
+
+        _notify_update_progress("restarting", "Đang chuẩn bị khởi động lại...", 95)
+        return {"status": "restarting", "message": "Cập nhật thành công. Đang khởi động lại..."}
+    except Exception as e:
+        db_path = os.path.join("recordings", "packing_records.db")
+        if os.path.exists(db_path + ".bak"):
+            shutil.copy2(db_path + ".bak", db_path)
+        return {"status": "error", "message": f"Lỗi cập nhật: {e}"}
+
+
+@app.post("/api/system/update")
+def perform_update(admin: AdminUser):
+    global _is_updating
+
+    if not _update_lock.acquire(blocking=False):
+        return {"status": "error", "message": "Cập nhật đang chạy. Vui lòng đợi..."}
+
+    if _is_updating:
+        _update_lock.release()
+        return {"status": "error", "message": "Cập nhật đang chạy. Vui lòng đợi..."}
+
+    _is_updating = True
+    try:
+        _update_check_cache["result"] = None
+        _update_check_cache["timestamp"] = 0
+        mode = "dev" if os.path.exists(".git") else "production"
+        if mode == "dev":
+            result = _update_dev()
+        else:
+            result = _update_production()
+
+        if result.get("status") == "error":
+            _is_updating = False
+            _update_lock.release()
+            return result
+
+        restart_thread = threading.Thread(target=_do_graceful_restart, daemon=False)
+        restart_thread.start()
+
+        _update_lock.release()
+        return result
+    except Exception as e:
+        _is_updating = False
+        _update_lock.release()
+        return {"status": "error", "message": f"Lỗi cập nhật: {e}"}
 
 
 # --- SERVE FRONTEND (PRODUCTION BUILD) ---

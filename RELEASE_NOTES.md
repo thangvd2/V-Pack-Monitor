@@ -2,6 +2,48 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v2.3.0] - 2026-04-13 (Auto-Update System)
+
+### 🔄 Tính Năng Lớn
+- **Auto-Update System:** Admin bấm 1 nút → server tự update + restart. Hỗ trợ 2 mode:
+  - **Dev Mode** (phát hiện bằng `.git/` folder): `git stash` → `git pull` → `npm install` → `npm run build` → restart
+  - **Production Mode** (không có `.git/`): Download GitHub Release ZIP → backup DB → extract (skip recordings/venv/bin) → pip install → npm build → restart
+- **Version Badge:** Header hiển thị version hiện tại (ADMIN only). Badge vàng khi có bản mới, click → modal xác nhận.
+- **Real-time Progress:** SSE push progress events (checking → downloading → extracting → installing → building → restarting) với progress bar.
+- **Auto-check on startup:** ADMIN login → tự động check bản mới qua `GET /api/system/update-check` (cache 1 giờ).
+- **DB Backup & Rollback:** Production mode backup `packing_records.db` trước khi update. Restore backup nếu update thất bại.
+- **Cross-platform Restart:** Windows (`_update_restart.bat` tự xoá) + macOS/Linux (`_update_restart.sh` tự xoá).
+
+### 🔒 Hardening (24 issues fixed qua code review)
+- **CRITICAL:** `os._exit(0)` trong background thread thay vì `sys.exit(0)` từ threadpool worker — tránh process không chết
+- **CRITICAL:** Graceful shutdown recorder + video_worker trước khi restart — tránh corrupt video
+- **CRITICAL:** HTTP response trả về TRƯỚC khi restart — tránh client nhận connection error
+- **CRITICAL:** `_update_lock` + `_is_updating` chống concurrent update
+- **HIGH:** `git stash pop` khi `git pull` thất bại — không mất local changes
+- **HIGH:** `_do_graceful_restart` bọc `try/finally` — luôn `os._exit(0)`, không bao giờ lock update
+- **MEDIUM:** Auto-detect git branch (`_get_git_branch()`) thay vì hardcoded `master`
+- **MEDIUM:** Cache update-check 1 giờ (`_update_check_ttl=3600`) — tránh GitHub API rate limit
+- **MEDIUM:** `tag[1:] if tag.startswith('v')` thay vì `tag.lstrip('v')` — tránh strip sai
+- **MEDIUM:** Check npm availability trong production → skip build gracefully nếu không có Node.js
+- **MEDIUM:** SSE `time.sleep(1.5)` delays — đảm bảo event delivery trước khi process exit
+- **LOW:** Temp restart scripts tự xoá (`del "%~f0"` / `rm -- "$0"`)
+- **LOW:** Frontend: không reset `updating` state khi network error (server đang restart)
+- **LOW:** Frontend: reset `updateProgress` khi mở modal lần mới
+- **LOW:** DB `.bak` cleanup sau update thành công
+
+### 🏗️ Kiến Trúc
+- **`VERSION`** (mới): File chứa version string (`v2.3.0`), đọc bởi backend, commit vào repo.
+- **`api.py`**: 2 endpoints mới, `_get_git_branch()`, `_update_dev()`, `_update_production()`, `_do_graceful_restart()` (try/finally), SSE `update_progress` events, cache 1 giờ, concurrent update lock.
+- **`web-ui/src/App.jsx`**: Version badge, Update Modal với progress bar, SSE `update_progress` listener, auto-reload sau restart.
+- **`.gitignore`**: Thêm `*.db.bak` (DB backup không commit).
+
+### 📁 Files Thay Đổi
+- `VERSION` (mới): Version tracking file
+- `api.py`: 2 update endpoints + restart mechanism + SSE progress + cache + lock
+- `web-ui/src/App.jsx`: Version badge + update modal + SSE listener
+- `.gitignore`: Thêm `*.db.bak`
+- `docs/plans/18_auto_update_plan.md`: Trạng thái → COMPLETED
+
 ## [v2.2.4] - 2026-04-12 (Security Hardening — 26 Vulnerabilities Fixed)
 
 ### 🔒 CRITICAL Fixes
