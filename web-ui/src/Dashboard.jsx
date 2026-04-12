@@ -122,10 +122,25 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
   useEffect(() => { fetchTrend(); }, [fetchTrend]);
   useEffect(() => { fetchStationsComparison(); }, [fetchStationsComparison]);
 
-  const handleExportCSV = () => {
-    const token = localStorage.getItem('vpack_token');
-    const stationParam = selectedStation === 'all' ? '' : `&station_id=${selectedStation}`;
-    window.open(`${API_BASE}/api/export/csv?date=${selectedDate}${stationParam}&token=${token}`, '_blank');
+  const handleExportCSV = async () => {
+    try {
+      const params = new URLSearchParams();
+      params.set('date', selectedDate);
+      if (selectedStation !== 'all') params.set('station_id', selectedStation);
+      const res = await axios.get(`${API_BASE}/api/export/csv?${params.toString()}`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `vpack_export_${selectedDate}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export CSV failed:', err);
+    }
   };
 
   const stationSelect = (

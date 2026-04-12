@@ -345,6 +345,7 @@ class CameraRecorder:
                 continue
 
             is_hevc = _is_hevc(ts_path)
+            transcode_ok = False
             try:
                 if is_hevc:
                     cmd = _build_transcode_cmd(ts_path, final_path)
@@ -366,16 +367,26 @@ class CameraRecorder:
                     stderr=subprocess.DEVNULL,
                     timeout=120,
                 )
+                transcode_ok = True
             except Exception:
                 pass
 
-            for _ in range(3):
+            if transcode_ok:
+                for _ in range(3):
+                    try:
+                        if os.path.exists(ts_path):
+                            os.remove(ts_path)
+                        break
+                    except PermissionError:
+                        time.sleep(1)
+            else:
+                failed_path = final_path + ".FAILED.ts"
                 try:
-                    if os.path.exists(ts_path):
-                        os.remove(ts_path)
-                    break
-                except PermissionError:
-                    time.sleep(1)
+                    if os.path.exists(ts_path) and not os.path.exists(failed_path):
+                        os.rename(ts_path, failed_path)
+                        print(f"Transcode failed, kept raw TS: {failed_path}")
+                except Exception:
+                    pass
 
         self.processes = []
 

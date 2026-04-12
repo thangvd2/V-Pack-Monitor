@@ -2,6 +2,43 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v2.2.2] - 2026-04-12 (Security & Stability Patch)
+
+### 🔒 Security Fixes (CRITICAL)
+- **JWT Secret auto-generate:** Xóa hardcoded fallback `"vpack-monitor-secret-key-2026-change-in-production"`. Secret key giờ tự generate random 64-char hex (`secrets.token_hex(32)`), lưu trong DB `system_settings` table. Hỗ trợ env var `VPACK_SECRET` cho deployment chuyên nghiệp. (auth.py)
+- **`GET /api/stations` auth required:** Thêm `CurrentUser` dependency — fix leak toàn bộ camera IPs, safety codes, MAC addresses cho unauthenticated users. (api.py:666)
+- **Password reset via request body:** Đổi từ query param `?password=xxx` (bị log trong access log, browser history, proxy) sang Pydantic model `ResetPasswordPayload`. Frontend gửi password trong request body. (api.py:632-640, UserManagementModal.jsx:206-207)
+- **CSV export Blob download:** Thay `window.open(url + token)` bằng `axios.get` + Blob download. Auth qua Authorization header (tự động), không lộ JWT token trong URL. Backend dùng `CurrentUser` thay vì manual token parsing. (Dashboard.jsx:125-142, api.py:1190-1195)
+
+### 🛡️ Data Integrity Fixes (HIGH)
+- **`.ts` temp file retained on transcode failure:** Khi HEVC→H.264 transcode thất bại, raw `.ts` file được rename thành `.FAILED.ts` thay vì bị xóa — cho phép manual recovery, chống mất dữ liệu vĩnh viễn. (recorder.py:374-389)
+- **`video_worker.shutdown(wait=True)`:** Đổi từ `wait=False` → `wait=True` — server shutdown chờ video đang xử lý hoàn tất, chống file corrupt. (video_worker.py:150)
+- **UTC/local timestamp consistency:** Tất cả analytics queries (hourly, trend, stations-comparison, CSV export, cleanup) dùng `datetime('now', 'localtime')` đồng bộ với `datetime.now()` (Python local time) dùng khi insert records. Tránh xóa record sớm 7 giờ (offset UTC+7). (database.py)
+
+### 🔧 Compatibility Fixes (CRITICAL)
+- **Windows ping command:** Camera reachability check dùng `ping -n 1 -w 1000` (Windows) hoặc `ping -c 1 -W 1` (Linux/macOS) dựa trên `platform.system()`. Fix camera luôn hiển thị "Unreachable" trên production Windows. (api.py:1396-1407)
+
+### 🐛 Bug Fixes (HIGH/LOW)
+- **MediaMTX re-register on IP change:** `update_url()` giờ gọi `_mtx_remove_path()` + `_mtx_register()` khi URL thay đổi. Fix live view stale sau khi camera IP update. (api.py:198-200)
+- **SSE stale closure fix:** SSE handler dùng `searchTermRef.current` (ref) thay vì `searchTerm` (closure capture). Records list filter đúng khi search term thay đổi mà không cần reconnect SSE. (App.jsx:204-205, 289, 298, 305, 312)
+
+### 🌐 Frontend
+- **UTF-8 BOM for CSV export:** Thêm `\ufeff` BOM vào đầu file CSV — Excel Windows hiển thị đúng font tiếng Việt (Mã vận đơn, Trạm, Trạng thái...). (api.py:1217)
+- **Missing `recharts` dependency:** Thêm `recharts` vào `package.json` — fix build error `rolldown failed to resolve import "recharts"`.
+
+### 📁 Files Thay Đổi
+- `auth.py`: `_load_or_create_secret()` — auto-generate JWT secret, lưu DB
+- `database.py`: `set_setting()` function mới, `localtime` cho tất cả analytics queries + cleanup
+- `api.py`: Stations auth, Windows ping, MediaMTX re-register, password body, CSV auth+BOM
+- `recorder.py`: `transcode_ok` flag, `.FAILED.ts` recovery
+- `video_worker.py`: `shutdown(wait=True)`
+- `web-ui/src/App.jsx`: `searchTermRef` cho SSE handler
+- `web-ui/src/UserManagementModal.jsx`: Password gửi qua request body
+- `web-ui/src/Dashboard.jsx`: Blob download thay vì `window.open` + token
+- `web-ui/package.json`: Thêm `recharts`
+
+---
+
 ## [v2.2.1] - 2026-04-11 (Mobile Responsive Phase 1 & Critical Bug Fix)
 
 ### 🐛 Critical Bug Fix

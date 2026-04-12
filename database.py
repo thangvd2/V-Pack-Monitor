@@ -175,6 +175,20 @@ def get_setting(key, default=None):
         return default
 
 
+def set_setting(key, value):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO system_settings (config_key, config_value)
+            VALUES (?, ?)
+            ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value
+        """,
+            (key, str(value)),
+        )
+        conn.commit()
+
+
 def get_all_settings():
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
@@ -290,7 +304,7 @@ def cleanup_old_records(days=7):
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            f"SELECT id, video_paths FROM packing_video WHERE recorded_at <= datetime('now', '-{days} days')"
+            f"SELECT id, video_paths FROM packing_video WHERE recorded_at <= datetime('now', 'localtime', '-{days} days')"
         )
         old_records = cursor.fetchall()
 
@@ -739,7 +753,7 @@ def get_hourly_stats(
         cursor = conn.cursor()
         query = (
             "SELECT CAST(strftime('%H', recorded_at) AS INTEGER) as hour, COUNT(*) as count "
-            "FROM packing_video WHERE status = 'READY' AND date(recorded_at) = ?"
+            "FROM packing_video WHERE status = 'READY' AND date(recorded_at, 'localtime') = ?"
         )
         params: list[str | int] = [target_date]
         if station_id is not None:
@@ -761,9 +775,9 @@ def get_daily_trend(days: int = 7) -> list[dict]:
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            f"SELECT date(recorded_at) as d, COUNT(*) as count "
+            f"SELECT date(recorded_at, 'localtime') as d, COUNT(*) as count "
             f"FROM packing_video WHERE status = 'READY' "
-            f"AND date(recorded_at) >= date('now', '-{days} days') "
+            f"AND date(recorded_at, 'localtime') >= date('now', 'localtime', '-{days} days') "
             f"GROUP BY d ORDER BY d"
         )
         rows = cursor.fetchall()
@@ -786,7 +800,7 @@ def get_stations_comparison() -> list[dict]:
         cursor.execute(
             "SELECT s.id, s.name, COUNT(p.id) as count "
             "FROM stations s LEFT JOIN packing_video p "
-            "ON s.id = p.station_id AND date(p.recorded_at) = date('now', 'localtime') AND p.status = 'READY' "
+            "ON s.id = p.station_id AND date(p.recorded_at, 'localtime') = date('now', 'localtime') AND p.status = 'READY' "
             "GROUP BY s.id ORDER BY count DESC"
         )
         rows = cursor.fetchall()
@@ -806,7 +820,7 @@ def get_records_for_export(
         )
         params = []
         if date is not None:
-            query += " AND date(p.recorded_at) = ?"
+            query += " AND date(p.recorded_at, 'localtime') = ?"
             params.append(date)
         if station_id is not None:
             query += " AND p.station_id = ?"

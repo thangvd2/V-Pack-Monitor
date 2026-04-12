@@ -5,6 +5,7 @@
 # =============================================================================
 
 import os
+import secrets
 import jwt
 import bcrypt
 from datetime import datetime, timedelta, timezone
@@ -13,9 +14,20 @@ from fastapi.security import OAuth2PasswordBearer
 from typing import Annotated
 import database
 
-SECRET_KEY = os.environ.get(
-    "VPACK_SECRET", "vpack-monitor-secret-key-2026-change-in-production"
-)
+
+def _load_or_create_secret():
+    env_secret = os.environ.get("VPACK_SECRET")
+    if env_secret:
+        return env_secret
+    db_secret = database.get_setting("JWT_SECRET")
+    if db_secret:
+        return db_secret
+    new_secret = secrets.token_hex(32)
+    database.set_setting("JWT_SECRET", new_secret)
+    return new_secret
+
+
+SECRET_KEY = _load_or_create_secret()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 8
 

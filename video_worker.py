@@ -147,5 +147,5 @@ def shutdown():
     global _executor
     with _lock:
         if _executor:
-            _executor.shutdown(wait=False)
+            _executor.shutdown(wait=True)
             _executor = None

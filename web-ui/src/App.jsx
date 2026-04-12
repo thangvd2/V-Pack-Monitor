@@ -201,6 +201,8 @@ function App() {
   const [stationStatusList, setStationStatusList] = useState([]);
   const [showAllRecords, setShowAllRecords] = useState(false);
   const activeRecordIdRef = useRef(null);
+  const searchTermRef = useRef(searchTerm);
+  useEffect(() => { searchTermRef.current = searchTerm; }, [searchTerm]);
 
   useEffect(() => {
     const token = localStorage.getItem('vpack_token');
@@ -284,7 +286,7 @@ function App() {
                 activeRecordIdRef.current = null;
               }
             }
-            fetchRecords(searchTerm, activeStationId);
+            fetchRecords(searchTermRef.current, activeStationId);
           }
         } else {
           if (data.station_id !== activeStationId) return;
@@ -293,21 +295,21 @@ function App() {
             setPackingStatus('packing');
             setCurrentWaybill(data.waybill || '');
             activeRecordIdRef.current = data.record_id;
-            fetchRecords(searchTerm, activeStationId);
+            fetchRecords(searchTermRef.current, activeStationId);
           } else if (data.status === 'PROCESSING') {
             if (data.record_id === activeRecordIdRef.current) {
               setPackingStatus('idle');
               setCurrentWaybill('');
               activeRecordIdRef.current = null;
             }
-            fetchRecords(searchTerm, activeStationId);
+            fetchRecords(searchTermRef.current, activeStationId);
           } else if (data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
             if (data.record_id === activeRecordIdRef.current) {
               setPackingStatus('idle');
               setCurrentWaybill('');
               activeRecordIdRef.current = null;
             }
-            fetchRecords(searchTerm, activeStationId);
+            fetchRecords(searchTermRef.current, activeStationId);
           }
         }
       } catch {}

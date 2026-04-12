@@ -203,7 +203,9 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
       return;
     }
     try {
-      await axios.put(`${API_BASE}/api/users/${passwordModalId}/password?password=${encodeURIComponent(newPassword)}`);
+      await axios.put(`${API_BASE}/api/users/${passwordModalId}/password`, {
+        password: newPassword
+      });
       setPasswordMsg('');
       setPasswordModalId(null);
       setNewPassword('');

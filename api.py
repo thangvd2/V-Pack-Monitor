@@ -16,6 +16,7 @@ import urllib.request
 import urllib.error
 import io
 import csv
+import platform as _platform
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -194,6 +195,9 @@ class CameraStreamManager:
     def update_url(self, new_url):
         with self._lock:
             self.url = new_url
+        if self.station_id:
+            _mtx_remove_path(self.station_id)
+            self._mtx_register()
 
     def update_cam2_url(self, new_url):
         with self._lock:
@@ -625,9 +629,13 @@ def update_user_api(user_id: int, payload: UserUpdatePayload, admin: AdminUser):
     return {"status": "success"}
 
 
+class ResetPasswordPayload(BaseModel):
+    password: str
+
+
 @app.put("/api/users/{user_id}/password")
-def reset_password(user_id: int, password: str, admin: AdminUser):
-    database.update_user_password(user_id, password)
+def reset_password(user_id: int, payload: ResetPasswordPayload, admin: AdminUser):
+    database.update_user_password(user_id, payload.password)
     database.log_audit(admin["id"], "RESET_PASSWORD", f"user_id={user_id}")
     return {"status": "success"}
 
@@ -655,7 +663,7 @@ class StationPayload(BaseModel):
 
 
 @app.get("/api/stations")
-def get_stations_api():
+def get_stations_api(current_user: CurrentUser):
     return {"data": database.get_stations()}
 
 
@@ -1181,22 +1189,10 @@ def get_stations_comparison_api(current_user: CurrentUser):
 
 @app.get("/api/export/csv")
 def export_csv(
-    request: Request,
+    current_user: CurrentUser,
     date: str | None = None,
     station_id: int | None = None,
 ):
-    token = request.query_params.get("token") or request.headers.get(
-        "Authorization", ""
-    ).replace("Bearer ", "")
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        payload = auth.decode_token(token)
-        user = database.get_user_by_id(int(payload.get("sub")))
-        if not user or not user.get("is_active"):
-            raise HTTPException(status_code=401, detail="Not authenticated")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Not authenticated")
     records = database.get_records_for_export(date=date, station_id=station_id)
 
     output = io.StringIO()
@@ -1219,10 +1215,11 @@ def export_csv(
         )
 
     output.seek(0)
+    csv_bytes = ("\ufeff" + output.getvalue()).encode("utf-8-sig")
     filename = f"vpack_export_{date or 'all'}.csv"
     return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
+        iter([csv_bytes]),
+        media_type="text/csv; charset=utf-8-sig",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
@@ -1385,9 +1382,18 @@ def get_network_info(admin: AdminUser):
             try:
                 import subprocess
 
-                result = subprocess.run(
-                    ["ping", "-c", "1", "-W", "1", ip], capture_output=True, timeout=2
-                )
+                if _platform.system() == "Windows":
+                    result = subprocess.run(
+                        ["ping", "-n", "1", "-w", "1000", ip],
+                        capture_output=True,
+                        timeout=3,
+                    )
+                else:
+                    result = subprocess.run(
+                        ["ping", "-c", "1", "-W", "1", ip],
+                        capture_output=True,
+                        timeout=3,
+                    )
                 alive = result.returncode == 0
             except Exception:
                 pass
