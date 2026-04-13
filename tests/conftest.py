@@ -2,6 +2,7 @@ import os
 import sys
 import pytest
 import tempfile
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -31,6 +32,11 @@ def admin_token(admin_user_id):
 
 
 @pytest.fixture
+def admin_headers(admin_token):
+    return {"Authorization": f"Bearer {admin_token}"}
+
+
+@pytest.fixture
 def operator_user_id():
     uid = database.create_user("operator1", "TestPass123!", "OPERATOR", "Test Op")
     assert uid is not None
@@ -40,6 +46,11 @@ def operator_user_id():
 @pytest.fixture
 def operator_token(operator_user_id):
     return auth.create_access_token({"sub": str(operator_user_id), "role": "OPERATOR"})
+
+
+@pytest.fixture
+def operator_headers(operator_token):
+    return {"Authorization": f"Bearer {operator_token}"}
 
 
 @pytest.fixture
@@ -53,3 +64,23 @@ def sample_station_id():
         "camera_brand": "imou",
         "mac_address": "AA:BB:CC:DD:EE:FF",
     })
+
+
+@pytest.fixture
+def client(isolate_db, monkeypatch):
+    import api
+    monkeypatch.setattr(api, "stream_managers", {})
+    monkeypatch.setattr(api, "active_recorders", {})
+    monkeypatch.setattr(api, "active_waybills", {})
+    monkeypatch.setattr(api, "active_record_ids", {})
+    monkeypatch.setattr(api, "_processing_count", {})
+    monkeypatch.setattr(api, "_station_locks", {})
+    monkeypatch.setattr(api, "reconnect_status", {})
+    monkeypatch.setattr(api, "_login_attempts", {})
+    with patch.object(api.CameraStreamManager, "start"), \
+         patch.object(api.CameraStreamManager, "stop"), \
+         patch.object(api.CameraStreamManager, "update_url"), \
+         patch.object(api.CameraStreamManager, "update_cam2_url"):
+        from starlette.testclient import TestClient
+        with TestClient(api.app) as c:
+            yield c

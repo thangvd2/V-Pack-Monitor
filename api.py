@@ -871,7 +871,7 @@ def check_station_conflict(admin: AdminUser, ip: str = "", ip2: str = "", mac: s
 
 @app.post("/api/stations")
 def create_station(payload: StationPayload, admin: AdminUser):
-    new_id = database.create_station(payload.dict())
+    new_id = database.add_station(payload.dict())
     database.log_audit(admin["id"], "STATION_CREATE", f"station_id={new_id}")
     live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
     url_fn = get_rtsp_url if live_quality == "main" else get_rtsp_sub_url
