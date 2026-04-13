@@ -82,8 +82,20 @@ def _mtx_add_path(station_id, rtsp_url, suffix=""):
         "rtspTransport": "tcp",
     }
     try:
+        data = json.dumps(conf).encode()
         req = urllib.request.Request(
-            f"{MTX_API}/v3/config/paths/remove/{name}",
+            f"{MTX_API}/v3/config/paths/replace/{name}",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5)
+        return
+    except Exception as e:
+        print(f"[MTX] replace {name} failed: {e}")
+    try:
+        req = urllib.request.Request(
+            f"{MTX_API}/v3/config/paths/delete/{name}",
             method="POST",
         )
         urllib.request.urlopen(req, timeout=3)
@@ -98,20 +110,20 @@ def _mtx_add_path(station_id, rtsp_url, suffix=""):
             method="POST",
         )
         urllib.request.urlopen(req, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[MTX] ERROR: add {name} failed after all retries: {e}")
 
 
 def _mtx_remove_path(station_id, suffix=""):
     name = f"station_{station_id}{suffix}"
     try:
         req = urllib.request.Request(
-            f"{MTX_API}/v3/config/paths/remove/{name}",
+            f"{MTX_API}/v3/config/paths/delete/{name}",
             method="POST",
         )
         urllib.request.urlopen(req, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[MTX] delete {name} failed: {e}")
 
 
 class CameraStreamManager:
@@ -199,8 +211,8 @@ class CameraStreamManager:
                     cam2_found = any(p.get("name") == cam2_path_name for p in items)
                     if not cam2_found:
                         _mtx_add_path(self.station_id, self.cam2_url, suffix="_cam2")
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[MTX] monitor loop error for station_{self.station_id}: {e}")
 
     def update_url(self, new_url):
         with self._lock:
@@ -350,8 +362,8 @@ def _recover_pending_records():
                         if _verify_video_external(path):
                             recovered = True
                             break
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[RECOVERY] transcode failed for record {rid}: {e}")
                 elif os.path.exists(path) and _verify_video_external(path):
                     recovered = True
                     break
@@ -597,8 +609,9 @@ def trigger_cloud_sync(admin: AdminUser):
     try:
         msg = cloud_sync.process_cloud_sync()
         return {"status": "success", "message": msg}
-    except Exception:
-        return {"status": "error", "message": "Lỗi đồng bộ cloud. Vui lòng kiểm tra cấu hình."}
+    except Exception as e:
+        print(f"[CLOUD] sync failed: {e}")
+        return {"status": "error", "message": f"Lỗi đồng bộ cloud: {e}"}
 
 
 # --- AUTH API ---
@@ -1240,8 +1253,9 @@ def delete_record(record_id: int, admin: AdminUser):
     try:
         database.delete_record(record_id)
         return {"status": "success"}
-    except Exception:
-        return {"status": "error", "message": "Không thể xoá bản ghi."}
+    except Exception as e:
+        print(f"[DB] delete record {record_id} failed: {e}")
+        return {"status": "error", "message": f"Không thể xoá bản ghi: {e}"}
 
 
 @app.get("/api/storage/info")
@@ -1559,14 +1573,6 @@ _update_check_cache = {"result": None, "timestamp": 0}
 _UPDATE_CHECK_TTL = 3600
 
 
-def _read_version():
-    try:
-        vpath = os.path.join(os.path.dirname(__file__) or ".", "VERSION")
-        with open(vpath, "r") as f:
-            return f.read().strip()
-    except Exception:
-        return "unknown"
-
 
 def _get_git_branch():
     try:
@@ -1648,8 +1654,8 @@ def check_update(admin: AdminUser):
                 latest = tag
                 changelog = release.get("body", "")
             update_available = latest != current and latest != "unknown"
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[UPDATE] check failed: {e}")
 
     result = {
         "current_version": current,
@@ -1677,8 +1683,8 @@ def _do_graceful_restart():
         for rec in active_recorders.values():
             try:
                 rec.stop_recording()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[RESTART] stop recorder failed: {e}")
         video_worker.shutdown()
         _notify_update_progress("restarting", "Đang khởi động lại...", 100)
         time.sleep(1.5)
@@ -1705,8 +1711,8 @@ def _do_graceful_restart():
             import subprocess as _sp
             _sp.run(["chmod", "+x", sh_path])
             _sp.Popen(["bash", sh_path], start_new_session=True)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[RESTART] CRITICAL: graceful restart failed: {e}")
     finally:
         os._exit(0)
 
