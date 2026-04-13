@@ -846,6 +846,7 @@ def get_stations_api(current_user: CurrentUser):
 def check_station_conflict(admin: AdminUser, ip: str = "", ip2: str = "", mac: str = "", name: str = "", exclude_id: int = 0):
     stations = database.get_stations()
     warnings = []
+    mac_clean = mac.replace(":", "").replace("-", "").replace(".", "").upper() if mac else ""
     for s in stations:
         if s["id"] == exclude_id:
             continue
@@ -853,8 +854,10 @@ def check_station_conflict(admin: AdminUser, ip: str = "", ip2: str = "", mac: s
             warnings.append(f"IP {ip} đã được dùng ở trạm \"{s['name']}\"")
         if ip2 and (s.get("ip_camera_1") == ip2 or s.get("ip_camera_2") == ip2):
             warnings.append(f"IP {ip2} đã được dùng ở trạm \"{s['name']}\"")
-        if mac and s.get("mac_address", "").upper() == mac.upper():
-            warnings.append(f"MAC {mac} đã được gán cho trạm \"{s['name']}\"")
+        if mac_clean:
+            s_mac = s.get("mac_address", "").replace(":", "").replace("-", "").replace(".", "").upper()
+            if s_mac and s_mac == mac_clean:
+                warnings.append(f"MAC {mac} đã được gán cho trạm \"{s['name']}\"")
         if name and s.get("name", "").lower() == name.lower():
             warnings.append(f"Tên \"{name}\" đã tồn tại ở trạm khác")
     return {"warnings": warnings}
@@ -875,14 +878,6 @@ def create_station(payload: StationPayload, admin: AdminUser):
     cam2_url = None
     if payload.ip_camera_2:
         cam2_url = url_fn(
-            payload.ip_camera_2,
-            payload.safety_code,
-            channel=2,
-            brand=payload.camera_brand,
-        )
-    cam2_url = None
-    if payload.ip_camera_2:
-        cam2_url = get_rtsp_sub_url(
             payload.ip_camera_2,
             payload.safety_code,
             channel=2,

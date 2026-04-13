@@ -4,7 +4,7 @@
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Settings, Save, AlertCircle, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, Wifi, WifiOff, Loader2 } from 'lucide-react';
 
@@ -118,6 +118,16 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
   const [warnings, setWarnings] = useState([]);
   const [touched, setTouched] = useState({});
   const conflictTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      if (conflictTimerRef.current) clearTimeout(conflictTimerRef.current);
+      return;
+    }
+    const handler = (e) => { if (e.key === 'Escape') handleCancel(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, dirty]);
 
   const markDirty = useCallback(() => setDirty(true), []);
 
@@ -290,8 +300,6 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={(e) => { if (e.target === e.currentTarget) handleCancel(); }}
-      onKeyDown={(e) => { if (e.key === 'Escape') handleCancel(); }}
-      tabIndex={-1}
     >
       <div className="bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg relative overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 bg-blue-500/20 blur-3xl opacity-50 rounded-full pointer-events-none"></div>
@@ -381,7 +389,7 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
                   placeholder="Bỏ trống = dùng cùng camera chính"
                   value={ip2}
                   onChange={(e) => { setIp2(e.target.value); markDirty(); }}
-                  onBlur={() => touch('ip2')}
+                  onBlur={() => { touch('ip2'); checkConflicts(); }}
                   className={`w-full bg-black/40 border rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 ${fieldBorder('ip2', ip2 && ip2.trim() && !isValidIP(ip2))}`}
                 />
                 <ErrorHint show={touched.ip2 && ip2?.trim() && !isValidIP(ip2)} msg="IP không hợp lệ (cần IPv4 hoặc IPv6)" />
