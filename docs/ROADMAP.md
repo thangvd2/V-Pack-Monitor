@@ -59,6 +59,7 @@
 - Sort by date, station, status
 
 ### 7. UI/UX Polish
+- [PLAN] Setup Modal upgrade — frontend validation + UX (#19)
 - Dark/light theme toggle
 - Notifications panel (camera down, storage full, new user login)
 - Keyboard shortcuts reference panel
