@@ -46,11 +46,12 @@ def _decrement_processing(station_id):
     try:
         import api
 
-        count = api._processing_count.get(station_id, 0)
-        if count <= 1:
-            api._processing_count.pop(station_id, None)
-        else:
-            api._processing_count[station_id] = count - 1
+        with api._processing_lock:
+            count = api._processing_count.get(station_id, 0)
+            if count <= 1:
+                api._processing_count.pop(station_id, None)
+            else:
+                api._processing_count[station_id] = count - 1
     except Exception:
         pass
 

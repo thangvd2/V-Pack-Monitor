@@ -42,7 +42,10 @@ def _decrypt_value(ciphertext: str) -> str:
     key = _get_enc_key()
     encrypted = base64.b64decode(ciphertext[len(_ENCRYPT_PREFIX):])
     decrypted = bytes(a ^ b for a, b in zip(encrypted, (key * (len(encrypted) // len(key) + 1))[:len(encrypted)]))
-    return decrypted.decode("utf-8")
+    try:
+        return decrypted.decode("utf-8")
+    except UnicodeDecodeError:
+        return ciphertext
 
 
 _SENSITIVE_KEYS = {"S3_SECRET_KEY", "S3_ACCESS_KEY", "TELEGRAM_BOT_TOKEN"}
@@ -385,7 +388,8 @@ def cleanup_old_records(days=7):
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            f"SELECT id, video_paths FROM packing_video WHERE recorded_at <= datetime('now', 'localtime', '-{days} days')"
+            "SELECT id, video_paths FROM packing_video WHERE recorded_at <= datetime('now', 'localtime', '-' || ? || ' days')",
+            (days,)
         )
         old_records = cursor.fetchall()
 
@@ -870,10 +874,11 @@ def get_daily_trend(days: int = 7) -> list[dict]:
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            f"SELECT date(recorded_at, 'localtime') as d, COUNT(*) as count "
-            f"FROM packing_video WHERE status = 'READY' "
-            f"AND date(recorded_at, 'localtime') >= date('now', 'localtime', '-{days} days') "
-            f"GROUP BY d ORDER BY d"
+            "SELECT date(recorded_at, 'localtime') as d, COUNT(*) as count "
+            "FROM packing_video WHERE status = 'READY' "
+            "AND date(recorded_at, 'localtime') >= date('now', 'localtime', '-' || ? || ' days') "
+            "GROUP BY d ORDER BY d",
+            (days,)
         )
         rows = cursor.fetchall()
         date_map = {r[0]: r[1] for r in rows}

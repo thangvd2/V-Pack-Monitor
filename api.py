@@ -50,6 +50,7 @@ active_recorders = {}
 active_waybills = {}
 active_record_ids = {}
 _processing_count = {}  # {station_id: int} — counts pending video conversions
+_processing_lock = threading.Lock()
 _station_locks = {}  # {station_id: threading.Lock} — prevents double-scan per station
 stream_managers = {}
 
@@ -452,8 +453,8 @@ async def lifespan(app: FastAPI):
     cleanup_task.cancel()
     for manager in stream_managers.values():
         manager.stop()
-    for recorder in active_recorders.values():
-        recorder.stop_recording()
+    for rec in active_recorders.values():
+        rec.stop_recording()
     video_worker.shutdown()
     telegram_bot.stop_polling()
 
@@ -675,7 +676,12 @@ _LOGIN_WINDOW = 300
 def login(payload: LoginPayload, request: Request):
     ip = request.client.host if request.client else "unknown"
     now = time.time()
+    if len(_login_attempts) > 1000:
+        expired_ips = [k for k, v in _login_attempts.items() if not v or now - v[-1] > _LOGIN_WINDOW]
+        for k in expired_ips:
+            del _login_attempts[k]
     attempts = [t for t in _login_attempts.get(ip, []) if now - t < _LOGIN_WINDOW]
+    _login_attempts[ip] = attempts
     if len(attempts) >= _LOGIN_MAX:
         return {"status": "error", "message": "Quá nhiều lần đăng nhập sai. Thử lại sau 5 phút."}
     user = database.get_user_by_username(payload.username)
@@ -927,7 +933,10 @@ def delete_station(station_id: int, admin: AdminUser):
         active_recorders.pop(station_id, None)
         active_waybills.pop(station_id, None)
         active_record_ids.pop(station_id, None)
-    _processing_count.pop(station_id, None)
+    with _processing_lock:
+        _processing_count.pop(station_id, None)
+    if station_id in _station_locks:
+        del _station_locks[station_id]
     if station_id in reconnect_status:
         del reconnect_status[station_id]
     return {"status": "success"}
@@ -1163,7 +1172,8 @@ def _handle_scan_locked(payload, sid, current_user):
                     "record_id": current_record_id,
                 },
             )
-            _processing_count[sid] = _processing_count.get(sid, 0) + 1
+            with _processing_lock:
+                _processing_count[sid] = _processing_count.get(sid, 0) + 1
             active_recorders.pop(sid, None)
             video_worker.submit_stop_and_save(
                 current_record_id, current_recorder, current_waybill, sid, save=False
@@ -1185,7 +1195,8 @@ def _handle_scan_locked(payload, sid, current_user):
                     "record_id": current_record_id,
                 },
             )
-            _processing_count[sid] = _processing_count.get(sid, 0) + 1
+            with _processing_lock:
+                _processing_count[sid] = _processing_count.get(sid, 0) + 1
             active_recorders.pop(sid, None)
             database.log_audit(
                 current_user["id"],
@@ -1234,7 +1245,11 @@ def _handle_scan_locked(payload, sid, current_user):
             database.update_station_ip(sid, "ip_camera_1", ip1)
             brand = station.get("camera_brand", "imou")
             code = station.get("safety_code", "")
-            new_url = get_rtsp_sub_url(ip1, code, channel=1, brand=brand)
+            if sid in stream_managers:
+                live_quality = database.get_setting("LIVE_VIEW_STREAM") or "sub"
+                url_fn = get_rtsp_url if live_quality == "main" else get_rtsp_sub_url
+                live_url = url_fn(ip1, code, channel=1, brand=brand)
+                stream_managers[sid].update_url(live_url)
 
     url1 = get_rtsp_url(ip1, code, channel=1, brand=brand)
     if c_mode in ["dual_file", "pip"]:
@@ -1284,8 +1299,9 @@ def _handle_scan_locked(payload, sid, current_user):
 
 @app.get("/api/status")
 def get_status(station_id: int, current_user: CurrentUser):
-    if station_id in _processing_count:
-        return {"status": "processing", "waybill": active_waybills.get(station_id, "")}
+    with _processing_lock:
+        if station_id in _processing_count:
+            return {"status": "processing", "waybill": active_waybills.get(station_id, "")}
     return {
         "status": "recording" if station_id in active_recorders else "idle",
         "waybill": active_waybills.get(station_id, ""),
@@ -1305,7 +1321,7 @@ def get_records(current_user: CurrentUser, station_id: int = None, search: str =
             {
                 "id": r_id,
                 "waybill_code": waybill_code,
-                "video_paths": video_paths.split(","),
+                "video_paths": [p for p in video_paths.split(",") if p] if video_paths else [],
                 "record_mode": record_mode,
                 "recorded_at": recorded_at,
                 "station_name": s_name,
@@ -1467,7 +1483,15 @@ async def sse_events(request: Request, stations: str = ""):
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
-        auth.decode_token(token)
+        payload = auth.decode_token(token)
+        jti = payload.get("jti")
+        if jti and auth.is_token_revoked(jti):
+            raise HTTPException(status_code=401, detail="Token revoked")
+        user = database.get_user_by_id(int(payload.get("sub", 0)))
+        if not user or not user.get("is_active"):
+            raise HTTPException(status_code=401, detail="User inactive")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
     import queue
@@ -2018,6 +2042,8 @@ def perform_update(admin: AdminUser):
     except Exception as e:
         _is_updating = False
         _update_lock.release()
+        print(f"[UPDATE] Update failed: {e}")
+        import traceback; traceback.print_exc()
         return {"status": "error", "message": f"Lỗi cập nhật: {e}"}
 
 

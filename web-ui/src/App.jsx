@@ -1606,7 +1606,7 @@ function App() {
                   {/* Danh sách các file video lưu trữ */}
                   <div className="space-y-2">
                     {record.video_paths.map((path, idx) => {
-                      const fileName = path.split('/').pop() || path.split('\\').pop();
+                      const fileName = path.split(/[/\\]/).pop();
                       const videoUrl = `${API_BASE}/api/records/${record.id}/download/${idx}?token=${encodeURIComponent(localStorage.getItem('vpack_token') || '')}`;
                       return (
                         <div 
