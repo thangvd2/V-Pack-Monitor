@@ -1,6 +1,7 @@
-# V-Pack Monitor — Roadmap & Backlog (Updated 2026-04-13)
+# V-Pack Monitor — Roadmap & Backlog (Updated 2026-04-14)
 
 ## COMPLETED
+- [x] v2.3.1 — Comprehensive Bug Fix (12 bugs: SQL injection, race condition, auth bypass, memory leaks)
 - [x] v2.3.0 — Auto-Update System (1-click update, version badge, progress UI)
 - [x] v2.2.4 — Security Hardening (26 vulnerabilities fixed)
 - [x] v2.2.3 — Record Stream Toggle
@@ -17,14 +18,11 @@
 
 ## BACKLOG (Theo mức ưu tiên)
 
-### 1. Production Hardening (Security còn lại)
-- Rate limiting login endpoint (chống brute force)
-- CORS thu hẹp (không `allow_origins=["*"]` với `allow_credentials=True`)
-- SQLite WAL mode (concurrency under load)
-- SQL injection fix — f-string queries trong `database.py` (VD: `cleanup_old_records`, `get_daily_trend`)
-- JWT revoke on logout (blacklist table)
-- `import telebot` crash guard — wrap try/except khi package thiếu
-- Memory leaks frontend — uncleaned timeouts, no AbortController
+### 1. Unit Test Suite — Phase 3+4 (API Routes + Helpers)
+- **DONE (Phase 1+2):** 84 tests, 94% coverage on `database.py` + `auth.py`
+- Phase 3: API endpoint tests (login, stations, records, scan, sessions, SSE)
+- Phase 4: Helper tests (RTSP URLs, conflict check)
+- GitHub Actions CI: auto-run pytest on push
 
 ### 2. Smart Storage — 3-tier Video Management
 - **Tier 1:** SSD (H:) — recent 7 ngày (fast random access)

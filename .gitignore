@@ -14,3 +14,6 @@ InnoSetup/
 credentials.json
 install_log.txt
 *.db.bak
+.pytest_cache/
+.coverage
+htmlcov/
