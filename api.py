@@ -122,8 +122,11 @@ def _mtx_remove_path(station_id, suffix=""):
             method="POST",
         )
         urllib.request.urlopen(req, timeout=5)
-    except Exception as e:
-        print(f"[MTX] delete {name} failed: {e}")
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            print(f"[MTX] delete {name} failed: {e}")
+    except Exception:
+        pass
 
 
 class CameraStreamManager:
@@ -173,7 +176,9 @@ class CameraStreamManager:
             database.update_station_ip(self.station_id, "ip_camera_1", new_ip)
             brand = station.get("camera_brand", "imou")
             code = station.get("safety_code", "")
-            new_url = get_rtsp_sub_url(new_ip, code, channel=1, brand=brand)
+            live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
+            url_fn = get_rtsp_url if live_quality == "main" else get_rtsp_sub_url
+            new_url = url_fn(new_ip, code, channel=1, brand=brand)
             self.url = new_url
             self._mtx_register()
             reconnect_status[self.station_id] = {
@@ -408,23 +413,27 @@ async def lifespan(app: FastAPI):
     database.init_db()
     _recover_pending_records()
     stations = database.get_stations()
+    live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
     for st in stations:
-        sub_url = get_rtsp_sub_url(
-            st["ip_camera_1"],
-            st["safety_code"],
-            channel=1,
-            brand=st.get("camera_brand", "imou"),
-        )
-        cam2_sub_url = None
-        if st.get("ip_camera_2"):
-            cam2_sub_url = get_rtsp_sub_url(
-                st["ip_camera_2"],
-                st["safety_code"],
-                channel=2,
-                brand=st.get("camera_brand", "imou"),
+        brand = st.get("camera_brand", "imou")
+        code = st["safety_code"]
+        if live_quality == "main":
+            live_url = get_rtsp_url(
+                st["ip_camera_1"], code, channel=1, brand=brand,
             )
+        else:
+            live_url = get_rtsp_sub_url(
+                st["ip_camera_1"], code, channel=1, brand=brand,
+            )
+        cam2_url = None
+        if st.get("ip_camera_2"):
+            cam2_ip = st["ip_camera_2"]
+            if live_quality == "main":
+                cam2_url = get_rtsp_url(cam2_ip, code, channel=2, brand=brand)
+            else:
+                cam2_url = get_rtsp_sub_url(cam2_ip, code, channel=2, brand=brand)
         manager = CameraStreamManager(
-            sub_url, station_id=st["id"], cam2_url=cam2_sub_url
+            live_url, station_id=st["id"], cam2_url=cam2_url
         )
         stream_managers[st["id"]] = manager
         manager.start()
@@ -585,6 +594,41 @@ def update_settings(payload: SettingsUpdate, admin: AdminUser):
         telegram_bot.start_polling()
 
     return {"status": "success", "message": "Đã lưu cài đặt hệ thống."}
+
+
+@app.post("/api/live-stream-quality")
+def set_live_stream_quality(payload: dict, admin: AdminUser):
+    quality = payload.get("quality", "sub")
+    if quality not in ("main", "sub"):
+        quality = "sub"
+    database.set_setting("LIVE_VIEW_STREAM", quality)
+    for sid, sm in stream_managers.items():
+        station = database.get_station(sid)
+        if not station:
+            continue
+        ip = station["ip_camera_1"]
+        code = station["safety_code"]
+        brand = station.get("camera_brand", "imou")
+        if quality == "main":
+            new_url = get_rtsp_url(ip, code, channel=1, brand=brand)
+        else:
+            new_url = get_rtsp_sub_url(ip, code, channel=1, brand=brand)
+        sm.update_url(new_url)
+        if sm.cam2_url is not None:
+            cam2_ip = station.get("ip_camera_2") or ip
+            if quality == "main":
+                new_cam2 = get_rtsp_url(cam2_ip, code, channel=2, brand=brand)
+            else:
+                new_cam2 = get_rtsp_sub_url(cam2_ip, code, channel=2, brand=brand)
+            sm.update_cam2_url(new_cam2)
+    label = "1080p (main)" if quality == "main" else "480p (sub)"
+    return {"status": "success", "message": f"Live view: {label}"}
+
+
+@app.get("/api/live-stream-quality")
+def get_live_stream_quality(current_user: CurrentUser):
+    quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
+    return {"quality": quality}
 
 
 # --- CLOUD BACKUP API ---
@@ -800,11 +844,24 @@ def get_stations_api(current_user: CurrentUser):
 
 @app.post("/api/stations")
 def create_station(payload: StationPayload, admin: AdminUser):
-    new_id = database.add_station(payload.dict())
-    database.log_audit(admin["id"], "STATION_CREATE", f"name={payload.name}")
-    url = get_rtsp_sub_url(
-        payload.ip_camera_1, payload.safety_code, channel=1, brand=payload.camera_brand
+    new_id = database.create_station(payload.dict())
+    database.log_audit(admin["id"], "STATION_CREATE", f"station_id={new_id}")
+    live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
+    url_fn = get_rtsp_url if live_quality == "main" else get_rtsp_sub_url
+    url = url_fn(
+        payload.ip_camera_1,
+        payload.safety_code,
+        channel=1,
+        brand=payload.camera_brand,
     )
+    cam2_url = None
+    if payload.ip_camera_2:
+        cam2_url = url_fn(
+            payload.ip_camera_2,
+            payload.safety_code,
+            channel=2,
+            brand=payload.camera_brand,
+        )
     cam2_url = None
     if payload.ip_camera_2:
         cam2_url = get_rtsp_sub_url(
@@ -824,7 +881,9 @@ def update_station(station_id: int, payload: StationPayload, admin: AdminUser):
     database.update_station(station_id, payload.dict())
     database.log_audit(admin["id"], "STATION_UPDATE", f"station_id={station_id}")
     if station_id in stream_managers:
-        url = get_rtsp_sub_url(
+        live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
+        url_fn = get_rtsp_url if live_quality == "main" else get_rtsp_sub_url
+        url = url_fn(
             payload.ip_camera_1,
             payload.safety_code,
             channel=1,
@@ -833,7 +892,7 @@ def update_station(station_id: int, payload: StationPayload, admin: AdminUser):
         stream_managers[station_id].update_url(url)
         cam2_url = None
         if payload.ip_camera_2:
-            cam2_url = get_rtsp_sub_url(
+            cam2_url = url_fn(
                 payload.ip_camera_2,
                 payload.safety_code,
                 channel=2,
@@ -916,7 +975,9 @@ def discover_camera(station_id: int, current_user: AdminUser):
     database.update_station_ip(station_id, "ip_camera_1", new_ip)
     brand = station.get("camera_brand", "imou")
     code = station.get("safety_code", "")
-    new_url = get_rtsp_sub_url(new_ip, code, channel=1, brand=brand)
+    live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
+    url_fn = get_rtsp_url if live_quality == "main" else get_rtsp_sub_url
+    new_url = url_fn(new_ip, code, channel=1, brand=brand)
     if station_id in stream_managers:
         stream_managers[station_id].update_url(new_url)
 
@@ -1162,16 +1223,9 @@ def _handle_scan_locked(payload, sid, current_user):
             code = station.get("safety_code", "")
             new_url = get_rtsp_sub_url(ip1, code, channel=1, brand=brand)
 
-    record_stream = database.get_setting("RECORD_STREAM_TYPE", "main")
-    if record_stream == "sub":
-        url1 = get_rtsp_sub_url(ip1, code, channel=1, brand=brand)
-    else:
-        url1 = get_rtsp_url(ip1, code, channel=1, brand=brand)
+    url1 = get_rtsp_url(ip1, code, channel=1, brand=brand)
     if c_mode in ["dual_file", "pip"]:
-        if record_stream == "sub":
-            url2 = get_rtsp_sub_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
-        else:
-            url2 = get_rtsp_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
+        url2 = get_rtsp_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
     elif c_mode in ["dual_file_sim", "pip_sim"]:
         url2 = url1
     else:

@@ -200,7 +200,7 @@ function App() {
   const [pipCamSwap, setPipCamSwap] = useState(false);
   const [stationStatusList, setStationStatusList] = useState([]);
   const [showAllRecords, setShowAllRecords] = useState(false);
-  const [recordStreamType, setRecordStreamType] = useState('main');
+  const [recordStreamType, setRecordStreamType] = useState('sub');
   const [updateInfo, setUpdateInfo] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [updateProgress, setUpdateProgress] = useState(null);
@@ -347,6 +347,7 @@ function App() {
     fetchStations();
     if (currentUser.role === 'ADMIN') {
       checkSettings();
+      checkLiveQuality();
       checkForUpdate();
     }
   }, [currentUser]);
@@ -520,24 +521,26 @@ function App() {
     try {
       const response = await axios.get(`${API_BASE}/api/settings`);
       setInitialSettings(response.data.data || {});
-      if (response.data.data?.RECORD_STREAM_TYPE) {
-        setRecordStreamType(response.data.data.RECORD_STREAM_TYPE);
-      }
     } catch (error) {
       console.log('API not reachable yet', error);
     }
   };
 
+  const checkLiveQuality = async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/api/live-stream-quality`);
+      if (response.data.quality) {
+        setRecordStreamType(response.data.quality);
+      }
+    } catch {}
+  };
+
   const toggleRecordStream = async () => {
     const newType = recordStreamType === 'main' ? 'sub' : 'main';
     try {
-      const settings = (await axios.get(`${API_BASE}/api/settings`)).data.data || {};
-      await axios.post(`${API_BASE}/api/settings`, {
-        ...settings,
-        RECORD_STREAM_TYPE: newType,
-      });
+      const res = await axios.post(`${API_BASE}/api/live-stream-quality`, { quality: newType });
       setRecordStreamType(newType);
-      setToast(newType === 'sub' ? 'Record: 480p (Sub-stream)' : 'Record: 1080p (Main-stream)');
+      setToast(res.data.message || (newType === 'main' ? 'Live: 1080p (Main)' : 'Live: 480p (Sub)'));
       setTimeout(() => setToast(null), 2000);
     } catch {}
   };
@@ -1349,10 +1352,10 @@ function App() {
                           ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
                           : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
                       }`}
-                      title={recordStreamType === 'sub' ? 'Đang ghi sub-stream (480p)' : 'Đang ghi main-stream (1080p)'}
+                      title={recordStreamType === 'sub' ? 'Đang xem sub-stream (480p). Bấm để chuyển 1080p.' : 'Đang xem main-stream (1080p). Bấm để chuyển 480p.'}
                     >
                       <Video className="w-3.5 h-3.5" />
-                      Rec: {recordStreamType === 'sub' ? '480p' : '1080p'}
+                      Live: {recordStreamType === 'sub' ? '480p' : '1080p'}
                     </button>
                   )}
                 </div>
