@@ -25,16 +25,17 @@ Khi user bấm "LƯU TRẠM NÀY", kiểm tra trước khi gửi API:
 
 ### A2. IP Camera Chính (ip_camera_1)
 - **Bắt buộc** — không được để trống
-- **Format:** IPv4 hợp lệ (regex `^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`)
-- **Range:** mỗi octet 0–255
-- **Warning:** IP không trong range LAN phổ biến (10.x, 172.16–31.x, 192.168.x) → hiện cảnh báo "IP này có vẻ không thuộc mạng LAN"
-- **Không cho phép:** `0.0.0.0`, `127.x.x.x`, `255.255.255.255`
+- **Format:** IPv4 hoặc IPv6 hợp lệ
+  - IPv4: regex `^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`, mỗi octet 0–255
+  - IPv6: regex chuẩn hoặc dùng URL constructor để validate
+- **Warning:** IP không trong range LAN phổ biến (10.x, 172.16–31.x, 192.168.x, fd00::/7, fe80::/10, ::1) → hiện cảnh báo "IP này có vẻ không thuộc mạng LAN"
+- **Không cho phép:** `0.0.0.0`, `127.x.x.x` (trừ khi dev), `255.255.255.255`, `::`
 - **Warning:** IP trùng với station khác → hiện cảnh báo "IP này đã được dùng ở trạm X"
 
 ### A3. IP Camera Phụ (ip_camera_2)
 - **Tùy chọn** — được phép để trống
-- **Nếu có nhập:** validate như IP Camera Chính
-- **Không cho phép:** trùng với IP Camera Chính
+- **Nếu có nhập:** validate như IP Camera Chính (IPv4 hoặc IPv6)
+- **Được phép trùng IP Camera Chính** — hỗ trợ camera 1 thiết bị nhiều mắt (VD: Imou dual-lens, Tenda CH10)
 - **Chỉ hiện khi:** camera_mode là `dual_file` hoặc `pip` (2 camera vật lý)
 
 ### A4. Safety Code
@@ -54,8 +55,8 @@ Khi user bấm "LƯU TRẠM NÀY", kiểm tra trước khi gửi API:
 
 ### A7. Camera Mode
 - **Bắt buộc** — dropdown, luôn có giá trị (default: single)
-- **Logic:** Nếu chọn `dual_file` hoặc `pip` → ip_camera_2 **bắt buộc** (block save nếu trống)
 - **Nếu chọn `single`** → ẩn field ip_camera_2
+- **Nếu chọn `dual_file` hoặc `pip`** → hiện ip_camera_2 (optional — để trống = dùng cùng IP với camera 1, tức 1 thiết bị 2 mắt)
 - **Nếu chọn `pip_sim` hoặc `dual_file_sim`** → ẩn field ip_camera_2 (dùng 1 camera)
 
 ### A8. Keep Days
@@ -84,8 +85,13 @@ Khi user bấm "LƯU TRẠM NÀY", kiểm tra trước khi gửi API:
 - Không block, chỉ gợi ý
 
 ### B4. Conditional Field Visibility
-- `ip_camera_2` chỉ hiện khi mode cần 2 camera vật lý (`dual_file`, `pip`)
-- Camera mode description ngắn gọn bên dưới dropdown (không cần đọc docs)
+- `ip_camera_2` chỉ hiện khi mode `dual_file` hoặc `pip` (optional — để trống = cùng IP, hỗ trợ 1 thiết bị nhiều mắt)
+- Camera mode description ngắn gọn bên dưới dropdown:
+  - `single`: "Ghi 1 luồng từ 1 camera"
+  - `pip`: "Ghép hình-in-picture từ 2 camera (hoặc 1 camera 2 mắt)"
+  - `pip_sim`: "Ghép PIP thử nghiệm từ 1 camera"
+  - `dual_file`: "Ghi 2 file riêng từ 2 camera (hoặc 1 camera 2 mắt)"
+  - `dual_file_sim`: "Ghi 2 file riêng từ 1 camera"
 - Cloud provider fields chỉ hiện khi chọn provider đó (đã có)
 
 ### B5. Safety Code Toggle Visibility
