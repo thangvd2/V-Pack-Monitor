@@ -4,7 +4,7 @@
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { Settings, Save, AlertCircle, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, Wifi, WifiOff, Loader2 } from 'lucide-react';
 
@@ -43,7 +43,7 @@ const isLANIPv4 = (ip) => {
 
 const isLANIPv6 = (ip) => {
   const l = ip.toLowerCase();
-  return l.startsWith('fd') || l.startsWith('fe80') || l === '::1';
+  return l.startsWith('fd') || l.startsWith('fc') || l.startsWith('fe80') || l === '::1';
 };
 
 const isLANIP = (ip) => isLANIPv4(ip) || isLANIPv6(ip);
@@ -72,6 +72,20 @@ const CAMERA_MODE_DESC = {
 };
 
 const MODES_NEED_IP2 = ['dual_file', 'pip'];
+
+function ErrorHint({ show, msg }) {
+  if (!show) return null;
+  return <p className="mt-1 text-xs text-red-400">{msg}</p>;
+}
+
+function WarningHints({ warnings }) {
+  if (!warnings || warnings.length === 0) return null;
+  return (
+    <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-300 space-y-0.5">
+      {warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
+    </div>
+  );
+}
 
 export default function SetupModal({ isOpen, onSaved, onCancel, currentStation = {}, isNewStation = false, initialSettings = {} }) {
   const [name, setName] = useState(currentStation.name || '');
@@ -103,6 +117,7 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
   const [dirty, setDirty] = useState(false);
   const [warnings, setWarnings] = useState([]);
   const [touched, setTouched] = useState({});
+  const conflictTimerRef = useRef(null);
 
   const markDirty = useCallback(() => setDirty(true), []);
 
@@ -141,18 +156,21 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
     return hasError ? 'border-red-500/60' : 'border-emerald-500/40';
   };
 
-  const checkConflicts = async () => {
-    try {
-      const params = new URLSearchParams();
-      if (ip1) params.set('ip', ip1);
-      if (ip2 && ip2.trim()) params.set('ip2', ip2);
-      if (macAddress) params.set('mac', macAddress);
-      if (name) params.set('name', name);
-      params.set('exclude_id', excludeId);
-      const res = await axios.get(`${API_BASE}/api/stations/check-conflict?${params}`);
-      setWarnings(res.data.warnings || []);
-    } catch { setWarnings([]); }
-  };
+  const checkConflicts = useCallback(() => {
+    if (conflictTimerRef.current) clearTimeout(conflictTimerRef.current);
+    conflictTimerRef.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams();
+        if (ip1) params.set('ip', ip1);
+        if (ip2 && ip2.trim()) params.set('ip2', ip2);
+        if (macAddress) params.set('mac', macAddress);
+        if (name) params.set('name', name);
+        params.set('exclude_id', excludeId);
+        const res = await axios.get(`${API_BASE}/api/stations/check-conflict?${params}`);
+        setWarnings(res.data.warnings || []);
+      } catch { setWarnings([]); }
+    }, 300);
+  }, [ip1, ip2, macAddress, name, excludeId]);
 
   const handleTestIp = async () => {
     if (!ip1 || !isValidIP(ip1)) return;
@@ -179,15 +197,25 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
       return;
     }
 
-    if (warnings.length > 0) {
-      const confirmed = window.confirm('Cảnh báo:\n' + warnings.join('\n') + '\n\nTiếp tục lưu?');
-      if (!confirmed) return;
-    }
-
     setLoading(true);
     setError('');
 
     try {
+      const params = new URLSearchParams();
+      if (ip1) params.set('ip', ip1);
+      if (ip2 && ip2.trim()) params.set('ip2', ip2);
+      if (macAddress) params.set('mac', macAddress);
+      if (name) params.set('name', name);
+      params.set('exclude_id', excludeId);
+      const conflictRes = await axios.get(`${API_BASE}/api/stations/check-conflict?${params}`);
+      const freshWarnings = conflictRes.data.warnings || [];
+      setWarnings(freshWarnings);
+
+      if (freshWarnings.length > 0) {
+        const confirmed = window.confirm('Cảnh báo:\n' + freshWarnings.join('\n') + '\n\nTiếp tục lưu?');
+        if (!confirmed) { setLoading(false); return; }
+      }
+
       await axios.post(`${API_BASE}/api/settings`, {
         RECORD_KEEP_DAYS: parseInt(keepDays),
         CLOUD_PROVIDER: cloudProvider,
@@ -223,7 +251,6 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
         await axios.put(`${API_BASE}/api/stations/${currentStation.id}`, payload);
       }
 
-      setDirty(false);
       onSaved();
     } catch (err) {
       console.error(err);
@@ -260,22 +287,9 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
     return val;
   };
 
-  const ErrorHint = ({ show, msg }) => {
-    if (!show) return null;
-    return <p className="mt-1 text-xs text-red-400">{msg}</p>;
-  };
-
-  const WarningHints = () => {
-    if (warnings.length === 0) return null;
-    return (
-      <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-300 space-y-0.5">
-        {warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
-      </div>
-    );
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) handleCancel(); }}
       onKeyDown={(e) => { if (e.key === 'Escape') handleCancel(); }}
       tabIndex={-1}
     >
@@ -483,7 +497,7 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
             </div>
           </div>
 
-          <WarningHints />
+          <WarningHints warnings={warnings} />
 
           {/* SECTION: Hệ thống chung */}
           <div className="rounded-xl border border-white/10 overflow-hidden">
