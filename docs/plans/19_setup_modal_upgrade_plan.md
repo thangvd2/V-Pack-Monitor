@@ -3,7 +3,7 @@
 **Phiên bản:** v2.3.1
 **Ngày lập:** 2026-04-14
 **Mức ưu tiên:** MEDIUM
-**Trạng thái:** PENDING
+**Trạng thái:** COMPLETED
 
 ---
 

@@ -823,6 +823,7 @@ function App() {
           initialSettings={initialSettings} 
           currentStation={activeStation}
           isNewStation={!activeStation.id}
+          allStations={stations}
           onSaved={() => {
             setShowSetupModal(false);
             window.location.reload(); 

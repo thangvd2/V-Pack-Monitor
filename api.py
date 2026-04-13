@@ -842,6 +842,22 @@ def get_stations_api(current_user: CurrentUser):
     return {"data": stations}
 
 
+@app.get("/api/stations/check-conflict")
+def check_station_conflict(admin: AdminUser, ip: str = "", mac: str = "", name: str = "", exclude_id: int = 0):
+    stations = database.get_stations()
+    warnings = []
+    for s in stations:
+        if s["id"] == exclude_id:
+            continue
+        if ip and (s.get("ip_camera_1") == ip or s.get("ip_camera_2") == ip):
+            warnings.append(f"IP {ip} đã được dùng ở trạm \"{s['name']}\"")
+        if mac and s.get("mac_address", "").upper() == mac.upper():
+            warnings.append(f"MAC {mac} đã được gán cho trạm \"{s['name']}\"")
+        if name and s.get("name", "").lower() == name.lower():
+            warnings.append(f"Tên \"{name}\" đã tồn tại ở trạm khác")
+    return {"warnings": warnings}
+
+
 @app.post("/api/stations")
 def create_station(payload: StationPayload, admin: AdminUser):
     new_id = database.create_station(payload.dict())
