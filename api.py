@@ -843,7 +843,7 @@ def get_stations_api(current_user: CurrentUser):
 
 
 @app.get("/api/stations/check-conflict")
-def check_station_conflict(admin: AdminUser, ip: str = "", mac: str = "", name: str = "", exclude_id: int = 0):
+def check_station_conflict(admin: AdminUser, ip: str = "", ip2: str = "", mac: str = "", name: str = "", exclude_id: int = 0):
     stations = database.get_stations()
     warnings = []
     for s in stations:
@@ -851,6 +851,8 @@ def check_station_conflict(admin: AdminUser, ip: str = "", mac: str = "", name: 
             continue
         if ip and (s.get("ip_camera_1") == ip or s.get("ip_camera_2") == ip):
             warnings.append(f"IP {ip} đã được dùng ở trạm \"{s['name']}\"")
+        if ip2 and (s.get("ip_camera_1") == ip2 or s.get("ip_camera_2") == ip2):
+            warnings.append(f"IP {ip2} đã được dùng ở trạm \"{s['name']}\"")
         if mac and s.get("mac_address", "").upper() == mac.upper():
             warnings.append(f"MAC {mac} đã được gán cho trạm \"{s['name']}\"")
         if name and s.get("name", "").lower() == name.lower():
@@ -1633,6 +1635,29 @@ def get_network_info(admin: AdminUser):
         "local_ip": local_ip,
         "cameras": camera_status,
     }
+
+
+@app.get("/api/ping")
+def ping_ip(ip: str, admin: AdminUser):
+    if not ip:
+        return {"reachable": False}
+    alive = False
+    try:
+        import subprocess
+        if _platform.system() == "Windows":
+            result = subprocess.run(
+                ["ping", "-n", "1", "-w", "2000", ip],
+                capture_output=True, timeout=5,
+            )
+        else:
+            result = subprocess.run(
+                ["ping", "-c", "1", "-W", "2", ip],
+                capture_output=True, timeout=5,
+            )
+        alive = result.returncode == 0
+    except Exception:
+        pass
+    return {"ip": ip, "reachable": alive}
 
 
 # --- AUTO-UPDATE API ---

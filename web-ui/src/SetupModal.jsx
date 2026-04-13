@@ -4,7 +4,7 @@
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import axios from 'axios';
 import { Settings, Save, AlertCircle, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, Wifi, WifiOff, Loader2 } from 'lucide-react';
 
@@ -21,17 +21,16 @@ const isValidIPv4 = (ip) => {
 const isValidIPv6 = (ip) => {
   const s = ip.trim();
   if (!s) return false;
-  try {
-    const parts = s.split(':');
-    if (parts.length < 2 || parts.length > 8) return false;
-    const hasDoubleColon = s.includes('::');
-    if (hasDoubleColon && s.split('::').length - 1 > 1) return false;
-    for (const part of parts) {
-      if (part === '') continue;
-      if (!/^[0-9a-fA-F]{1,4}$/.test(part)) return false;
-    }
-    return true;
-  } catch { return false; }
+  const parts = s.split(':');
+  const hasDoubleColon = s.includes('::');
+  if (hasDoubleColon && s.split('::').length - 1 > 1) return false;
+  const maxParts = hasDoubleColon ? 9 : 8;
+  if (parts.length < 2 || parts.length > maxParts) return false;
+  for (const part of parts) {
+    if (part === '') continue;
+    if (!/^[0-9a-fA-F]{1,4}$/.test(part)) return false;
+  }
+  return true;
 };
 
 const isValidIP = (ip) => isValidIPv4(ip) || isValidIPv6(ip);
@@ -74,7 +73,7 @@ const CAMERA_MODE_DESC = {
 
 const MODES_NEED_IP2 = ['dual_file', 'pip'];
 
-export default function SetupModal({ isOpen, onSaved, onCancel, currentStation = {}, isNewStation = false, initialSettings = {}, allStations = [] }) {
+export default function SetupModal({ isOpen, onSaved, onCancel, currentStation = {}, isNewStation = false, initialSettings = {} }) {
   const [name, setName] = useState(currentStation.name || '');
   const [ip1, setIp1] = useState(currentStation.ip_camera_1 || '');
   const [ip2, setIp2] = useState(currentStation.ip_camera_2 || '');
@@ -146,6 +145,7 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
     try {
       const params = new URLSearchParams();
       if (ip1) params.set('ip', ip1);
+      if (ip2 && ip2.trim()) params.set('ip2', ip2);
       if (macAddress) params.set('mac', macAddress);
       if (name) params.set('name', name);
       params.set('exclude_id', excludeId);
@@ -159,10 +159,9 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
     setTestingIp(true);
     setTestIpResult(null);
     try {
-      const res = await axios.get(`${API_BASE}/api/system/network-info`);
-      const cam = (res.data.cameras || []).find(c => c.ip === ip1);
-      if (cam) {
-        setTestIpResult({ ok: true, msg: `Reachable (${cam.ip})` });
+      const res = await axios.get(`${API_BASE}/api/ping?ip=${encodeURIComponent(ip1)}`);
+      if (res.data.reachable) {
+        setTestIpResult({ ok: true, msg: `Reachable (${ip1})` });
       } else {
         setTestIpResult({ ok: false, msg: 'Unreachable — camera không phản hồi' });
       }
@@ -276,7 +275,10 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onKeyDown={(e) => { if (e.key === 'Escape') handleCancel(); }}
+      tabIndex={-1}
+    >
       <div className="bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg relative overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 bg-blue-500/20 blur-3xl opacity-50 rounded-full pointer-events-none"></div>
 
@@ -336,7 +338,7 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
                   value={ip1}
                   onChange={(e) => { setIp1(e.target.value); markDirty(); setTestIpResult(null); }}
                   onBlur={() => { touch('ip1'); checkConflicts(); }}
-                  className={`flex-1 bg-black/40 border rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 ${fieldBorder('ip1', ip1 && !isValidIP(ip1))}`}
+                  className={`flex-1 bg-black/40 border rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 ${fieldBorder('ip1', !ip1?.trim() || !isValidIP(ip1?.trim()) || isReservedIP(ip1?.trim()))}`}
                 />
                 <button
                   onClick={handleTestIp}
