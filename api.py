@@ -45,6 +45,16 @@ def _read_version():
     except Exception:
         return "unknown"
 
+
+def _parse_semver(version_str):
+    """Parse a version string like 'v2.4.1' or '2.4.1' into (major, minor, patch) tuple."""
+    try:
+        v = version_str.strip().lstrip("vV")
+        parts = v.split(".")
+        return tuple(int(p) for p in parts[:3])
+    except (ValueError, AttributeError):
+        return (0, 0, 0)
+
 # --- Quản lý Trạng thái Ghi hình Đa Trạm ---
 active_recorders = {}
 active_waybills = {}
@@ -1762,6 +1772,9 @@ def check_update(admin: AdminUser):
             )
             remote_head = r4.stdout.strip() if r4.returncode == 0 else ""
             update_available = local_head != remote_head and remote_head != ""
+            # In dev mode, if local is ahead of or equal to remote, show VERSION as latest
+            if not update_available:
+                latest = current
         else:
             import urllib.request as _ur
             req = _ur.Request(
@@ -1774,7 +1787,7 @@ def check_update(admin: AdminUser):
             if tag:
                 latest = tag
                 changelog = release.get("body", "")
-            update_available = latest != current and latest != "unknown"
+            update_available = _parse_semver(latest) > _parse_semver(current) and latest != "unknown"
     except Exception as e:
         print(f"[UPDATE] check failed: {e}")
 
