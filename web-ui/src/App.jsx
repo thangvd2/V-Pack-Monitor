@@ -199,7 +199,12 @@ function App() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [pipCamSwap, setPipCamSwap] = useState(false);
   const [stationStatusList, setStationStatusList] = useState([]);
-  const [showAllRecords, setShowAllRecords] = useState(false);
+  const [recordsPage, setRecordsPage] = useState(1);
+  const [recordsTotal, setRecordsTotal] = useState(0);
+  const [recordsTotalPages, setRecordsTotalPages] = useState(0);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [recordStreamType, setRecordStreamType] = useState('sub');
   const [updateInfo, setUpdateInfo] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -295,7 +300,7 @@ function App() {
                 activeRecordIdRef.current = null;
               }
             }
-            fetchRecords(searchTermRef.current, activeStationId);
+            fetchRecords(searchTermRef.current, activeStationId, recordsPage);
           }
         } else {
           if (data.station_id !== activeStationId) return;
@@ -304,21 +309,21 @@ function App() {
             setPackingStatus('packing');
             setCurrentWaybill(data.waybill || '');
             activeRecordIdRef.current = data.record_id;
-            fetchRecords(searchTermRef.current, activeStationId);
+            fetchRecords(searchTermRef.current, activeStationId, recordsPage);
           } else if (data.status === 'PROCESSING') {
             if (data.record_id === activeRecordIdRef.current) {
               setPackingStatus('idle');
               setCurrentWaybill('');
               activeRecordIdRef.current = null;
             }
-            fetchRecords(searchTermRef.current, activeStationId);
+            fetchRecords(searchTermRef.current, activeStationId, recordsPage);
           } else if (data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
             if (data.record_id === activeRecordIdRef.current) {
               setPackingStatus('idle');
               setCurrentWaybill('');
               activeRecordIdRef.current = null;
             }
-            fetchRecords(searchTermRef.current, activeStationId);
+            fetchRecords(searchTermRef.current, activeStationId, recordsPage);
           }
         }
       } catch {}
@@ -454,15 +459,28 @@ function App() {
   // Fetch records
   useEffect(() => {
     if (activeStationId && currentUser) {
-      fetchRecords(searchTerm, activeStationId);
+      setRecordsPage(1);
+      fetchRecords(searchTerm, activeStationId, 1);
     }
-  }, [searchTerm, activeStationId, currentUser]);
+  }, [searchTerm, activeStationId, currentUser, dateFrom, dateTo, statusFilter]);
 
-  const fetchRecords = async (query = '', sid = activeStationId) => {
+  const fetchRecords = async (query = '', sid = activeStationId, page = 1) => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE}/api/records?search=${query}&station_id=${sid}`);
-      setRecords(res.data.data);
+      const params = new URLSearchParams();
+      if (query) params.set('search', query);
+      if (sid) params.set('station_id', sid);
+      if (page > 1) params.set('page', String(page));
+      if (dateFrom) params.set('date_from', dateFrom);
+      if (dateTo) params.set('date_to', dateTo);
+      if (statusFilter) params.set('status', statusFilter);
+      params.set('limit', '20');
+
+      const res = await axios.get(`${API_BASE}/api/records?${params.toString()}`);
+      setRecords(res.data.records);
+      setRecordsTotal(res.data.total);
+      setRecordsTotalPages(res.data.total_pages);
+      setRecordsPage(res.data.page);
       setLoading(false);
       fetchStorageInfo();
       fetchAnalytics(sid);
@@ -562,11 +580,11 @@ function App() {
         }
         setPackingStatus('idle');
         setCurrentWaybill('');
-        fetchRecords(searchTerm, activeStationId); 
+        fetchRecords(searchTerm, activeStationId, recordsPage); 
       } else if (res.data.status === 'processing') {
         setPackingStatus('idle');
         setCurrentWaybill('');
-        fetchRecords(searchTerm, activeStationId);
+        fetchRecords(searchTerm, activeStationId, recordsPage);
       }
     } catch (err) {
       console.error("Barcode Lỗi", err);
@@ -644,7 +662,7 @@ function App() {
     if (window.confirm(`Bạn có chắc chắn muốn xoá bản ghi "${waybill_code}" không?`)) {
       try {
         await axios.delete(`${API_BASE}/api/records/${id}`);
-        fetchRecords(searchTerm, activeStationId);
+        fetchRecords(searchTerm, activeStationId, recordsPage);
       } catch (err) {
         alert("Có lỗi xảy ra khi xoá.");
       }
@@ -1541,7 +1559,49 @@ function App() {
               Lịch sử ghi hình
             </h2>
             <div className="px-3 py-1 bg-white/10 rounded-full text-xs font-semibold">
-              {records.length} videos
+              {recordsTotal} video
+            </div>
+          </div>
+
+          {/* Filter Bar */}
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2 bg-white/5 border-b border-white/10 rounded-xl">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="bg-white/10 text-white text-xs rounded px-2 py-1 border border-white/20 focus:outline-none focus:border-blue-400"
+              style={{ colorScheme: 'dark' }}
+            />
+            <span className="text-white/50 text-xs">→</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="bg-white/10 text-white text-xs rounded px-2 py-1 border border-white/20 focus:outline-none focus:border-blue-400"
+              style={{ colorScheme: 'dark' }}
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-white/10 text-white text-xs rounded px-2 py-1 border border-white/20 focus:outline-none focus:border-blue-400"
+              style={{ colorScheme: 'dark' }}
+            >
+              <option value="" className="bg-slate-800">Tất cả trạng thái</option>
+              <option value="READY" className="bg-slate-800">✅ READY</option>
+              <option value="RECORDING" className="bg-slate-800">🔴 RECORDING</option>
+              <option value="PROCESSING" className="bg-slate-800">⏳ PROCESSING</option>
+              <option value="FAILED" className="bg-slate-800">❌ FAILED</option>
+            </select>
+            {(dateFrom || dateTo || statusFilter) && (
+              <button
+                onClick={() => { setDateFrom(''); setDateTo(''); setStatusFilter(''); }}
+                className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
+              >
+                ✕ Xóa bộ lọc
+              </button>
+            )}
+            <div className="ml-auto text-xs text-white/50">
+              {recordsTotal} video
             </div>
           </div>
 
@@ -1557,7 +1617,7 @@ function App() {
               </div>
             ) : (
               <>
-                {(showAllRecords ? records : records.slice(0, 3)).map((record) => (
+                {records.map((record) => (
                 <div 
                   key={record.id} 
                   className="group p-3 md:p-5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-400/30 backdrop-blur-md transition-all duration-300 shadow-lg cursor-pointer min-h-[44px]"
@@ -1631,21 +1691,27 @@ function App() {
                   </div>
                 </div>
                 ))}
-                {!showAllRecords && records.length > 3 && (
-                  <button
-                    onClick={() => setShowAllRecords(true)}
-                    className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-400/30 rounded-2xl text-sm text-slate-400 hover:text-blue-300 font-medium transition-all min-h-[44px]"
-                  >
-                    Xem thêm ({records.length - 3} bản ghi khác)
-                  </button>
-                )}
-                {showAllRecords && records.length > 3 && (
-                  <button
-                    onClick={() => setShowAllRecords(false)}
-                    className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs text-slate-500 hover:text-slate-300 transition-all"
-                  >
-                    Thu gọn
-                  </button>
+                {/* Pagination */}
+                {recordsTotalPages > 1 && (
+                  <div className="flex items-center justify-center gap-3 py-3 border-t border-white/10">
+                    <button
+                      onClick={() => fetchRecords(searchTermRef.current, activeStationId, recordsPage - 1)}
+                      disabled={recordsPage <= 1}
+                      className="px-3 py-1 text-xs rounded bg-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/20"
+                    >
+                      ← Trước
+                    </button>
+                    <span className="text-xs text-white/70">
+                      Trang {recordsPage}/{recordsTotalPages}
+                    </span>
+                    <button
+                      onClick={() => fetchRecords(searchTermRef.current, activeStationId, recordsPage + 1)}
+                      disabled={recordsPage >= recordsTotalPages}
+                      className="px-3 py-1 text-xs rounded bg-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/20"
+                    >
+                      Sau →
+                    </button>
+                  </div>
                 )}
               </>
             )}
