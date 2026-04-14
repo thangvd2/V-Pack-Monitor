@@ -87,6 +87,68 @@ class TestFTS5Search:
 
 
 # ---------------------------------------------------------------------------
+# Group 1b: Trigram Substring Search (the key improvement over unicode61)
+# ---------------------------------------------------------------------------
+class TestTrigramSubstringSearch:
+    """Verify that trigram tokenizer supports substring search, not just prefix."""
+
+    def test_substring_middle(self, sample_station_id):
+        """Search '123456' in 'SPXVN123456789' — middle substring."""
+        rid = database.create_record(sample_station_id, "SPXVN123456789", "SINGLE")
+        database.update_record_status(rid, "READY")
+        result = database.get_records_v2(search="123456")
+        assert result["total"] >= 1
+        codes = [r["waybill_code"] for r in result["records"]]
+        assert "SPXVN123456789" in codes
+
+    def test_substring_trailing(self, sample_station_id):
+        """Search '789' in 'SPXVN123456789' — trailing substring."""
+        rid = database.create_record(sample_station_id, "SPXVN123456789", "SINGLE")
+        database.update_record_status(rid, "READY")
+        result = database.get_records_v2(search="789")
+        assert result["total"] >= 1
+        codes = [r["waybill_code"] for r in result["records"]]
+        assert "SPXVN123456789" in codes
+
+    def test_substring_cross_segment(self, sample_station_id):
+        """Search 'VN123' in 'SPXVN123456789' — cross letter-digit boundary."""
+        rid = database.create_record(sample_station_id, "SPXVN123456789", "SINGLE")
+        database.update_record_status(rid, "READY")
+        result = database.get_records_v2(search="VN123")
+        assert result["total"] >= 1
+        codes = [r["waybill_code"] for r in result["records"]]
+        assert "SPXVN123456789" in codes
+
+    def test_substring_multiple_records(self, sample_station_id):
+        """Substring search finds all matching records."""
+        for code in ["SPXVN123456789", "SPXVN987654321", "GHN111222333"]:
+            rid = database.create_record(sample_station_id, code, "SINGLE")
+            database.update_record_status(rid, "READY")
+        result = database.get_records_v2(search="SPXVN")
+        assert result["total"] >= 2
+        codes = [r["waybill_code"] for r in result["records"]]
+        assert "SPXVN123456789" in codes
+        assert "SPXVN987654321" in codes
+
+    def test_short_query_falls_back_to_like(self, sample_station_id):
+        """Queries < 3 chars fall back to LIKE (trigram can't index these)."""
+        rid = database.create_record(sample_station_id, "SPXVN123", "SINGLE")
+        database.update_record_status(rid, "READY")
+        # 2-char search should still work via LIKE fallback
+        result = database.get_records_v2(search="VN")
+        assert result["total"] >= 1
+        codes = [r["waybill_code"] for r in result["records"]]
+        assert "SPXVN123" in codes
+
+    def test_short_query_single_char(self, sample_station_id):
+        """Single char search still works via LIKE fallback."""
+        rid = database.create_record(sample_station_id, "SPXVN123", "SINGLE")
+        database.update_record_status(rid, "READY")
+        result = database.get_records_v2(search="X")
+        assert result["total"] >= 1
+
+
+# ---------------------------------------------------------------------------
 # Group 2: Pagination
 # ---------------------------------------------------------------------------
 class TestPagination:

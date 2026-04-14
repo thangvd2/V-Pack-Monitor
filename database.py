@@ -225,13 +225,29 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_status ON packing_video(status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_station_date ON packing_video(station_id, recorded_at DESC)")
 
-        # --- FTS5 virtual table (external content) ---
+        # --- FTS5 virtual table (external content, trigram for substring search) ---
+        # Migration: drop old unicode61 FTS5 table if it exists (tokenizer cannot be altered)
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
+        if cursor.fetchone():
+            # Check if it's the old unicode61 version — if so, drop and recreate
+            try:
+                cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
+                fts_sql = cursor.fetchone()[0] or ""
+                if "unicode61" in fts_sql:
+                    cursor.execute("DROP TABLE IF EXISTS packing_video_fts")
+                    # Drop triggers too — they'll be recreated below
+                    cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_insert")
+                    cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_update")
+                    cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_delete")
+            except Exception:
+                pass
+
         cursor.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS packing_video_fts USING fts5(
                 waybill_code,
                 content='packing_video',
                 content_rowid='id',
-                tokenize='unicode61'
+                tokenize='trigram'
             )
         """)
 
@@ -449,9 +465,6 @@ def get_records_v2(
         where_clauses = []
 
         if search:
-            # Use FTS5 for search — escape special chars
-            safe_search = search.replace('"', '""')
-            fts_query = f'"{safe_search}"*'
             # Check if FTS5 table exists (graceful degradation)
             try:
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
@@ -459,12 +472,18 @@ def get_records_v2(
             except Exception:
                 has_fts = False
 
-            if has_fts:
+            # Trigram tokenizer requires >= 3 chars for indexed match.
+            # For short queries, fall back to LIKE (which works fine for small result sets).
+            use_fts = has_fts and len(search) >= 3
+
+            if use_fts:
+                # FTS5 trigram: substring match (no prefix * needed)
                 from_clause = "packing_video p JOIN packing_video_fts fts ON fts.rowid = p.id LEFT JOIN stations s ON p.station_id = s.id"
+                safe_search = search.replace('"', '""')
                 where_clauses.append("fts.waybill_code MATCH ?")
-                params.append(fts_query)
+                params.append(f'"{safe_search}"')
             else:
-                # Fallback to LIKE if FTS5 not available
+                # Fallback to LIKE for short queries or if FTS5 not available
                 from_clause = "packing_video p LEFT JOIN stations s ON p.station_id = s.id"
                 where_clauses.append("p.waybill_code LIKE ?")
                 params.append(f"%{search}%")
