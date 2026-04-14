@@ -1312,23 +1312,30 @@ def get_status(station_id: int, current_user: CurrentUser):
 
 
 @app.get("/api/records")
-def get_records(current_user: CurrentUser, station_id: int = None, search: str = ""):
-    records = database.get_records(search, station_id)
-    results = []
-    for r in records:
-        r_id, waybill_code, video_paths, record_mode, recorded_at, s_name, status = r
-        results.append(
-            {
-                "id": r_id,
-                "waybill_code": waybill_code,
-                "video_paths": [p for p in video_paths.split(",") if p] if video_paths else [],
-                "record_mode": record_mode,
-                "recorded_at": recorded_at,
-                "station_name": s_name,
-                "status": status,
-            }
-        )
-    return {"data": results}
+def get_records(
+    current_user: CurrentUser,
+    station_id: int = None,
+    search: str = "",
+    status: str = None,
+    date_from: str = None,
+    date_to: str = None,
+    page: int = 1,
+    limit: int = 20,
+    sort_by: str = "recorded_at",
+    sort_order: str = "desc",
+):
+    result = database.get_records_v2(
+        search=search,
+        station_id=station_id,
+        status=status,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        limit=limit,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+    return result
 
 
 @app.delete("/api/records/{record_id}")

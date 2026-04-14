@@ -219,6 +219,57 @@ def init_db():
 
         conn.commit()
 
+        # --- Indexes for packing_video ---
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_recorded_at ON packing_video(recorded_at DESC)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_station_id ON packing_video(station_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_status ON packing_video(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_station_date ON packing_video(station_id, recorded_at DESC)")
+
+        # --- FTS5 virtual table (external content) ---
+        cursor.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS packing_video_fts USING fts5(
+                waybill_code,
+                content='packing_video',
+                content_rowid='id',
+                tokenize='unicode61'
+            )
+        """)
+
+        # --- Triggers for auto-sync FTS5 ---
+        cursor.execute("""
+            CREATE TRIGGER IF NOT EXISTS packing_video_fts_insert AFTER INSERT ON packing_video BEGIN
+                INSERT INTO packing_video_fts(rowid, waybill_code) VALUES (new.id, new.waybill_code);
+            END
+        """)
+        cursor.execute("""
+            CREATE TRIGGER IF NOT EXISTS packing_video_fts_update AFTER UPDATE ON packing_video BEGIN
+                INSERT INTO packing_video_fts(packing_video_fts, rowid, waybill_code)
+                    VALUES ('delete', old.id, old.waybill_code);
+                INSERT INTO packing_video_fts(rowid, waybill_code) VALUES (new.id, new.waybill_code);
+            END
+        """)
+        cursor.execute("""
+            CREATE TRIGGER IF NOT EXISTS packing_video_fts_delete AFTER DELETE ON packing_video BEGIN
+                INSERT INTO packing_video_fts(packing_video_fts, rowid, waybill_code)
+                    VALUES ('delete', old.id, old.waybill_code);
+            END
+        """)
+
+        # Rebuild FTS5 index from existing data (safe to call multiple times)
+        try:
+            _rebuild_fts_index()
+        except Exception:
+            pass  # FTS5 may not be available on all SQLite builds
+
+        conn.commit()
+
+
+def _rebuild_fts_index():
+    """Populate FTS5 index from existing packing_video records. Safe to call multiple times."""
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.execute("INSERT INTO packing_video_fts(packing_video_fts) VALUES ('rebuild')")
+        conn.commit()
+
 
 def get_setting(key, default=None):
     with sqlite3.connect(DB_FILE) as conn:
@@ -360,6 +411,116 @@ def get_records(search="", station_id=None):
         cursor.execute(query, params)
         records = cursor.fetchall()
     return records
+
+
+_SORT_COLUMNS = {
+    "recorded_at": "p.recorded_at",
+    "waybill_code": "p.waybill_code",
+    "station_name": "s.name",
+    "status": "p.status",
+}
+
+
+def get_records_v2(
+    search: str = "",
+    station_id: int | None = None,
+    status: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    page: int = 1,
+    limit: int = 20,
+    sort_by: str = "recorded_at",
+    sort_order: str = "desc",
+) -> dict:
+    """Paginated record search with FTS5, date range, status filter."""
+    limit = min(max(limit, 1), 100)  # Clamp 1-100
+    page = max(page, 1)
+    offset = (page - 1) * limit
+
+    # Validate sort
+    sort_col = _SORT_COLUMNS.get(sort_by, "p.recorded_at")
+    sort_dir = "DESC" if sort_order.lower() == "desc" else "ASC"
+
+    base_select = "p.id, p.waybill_code, p.video_paths, p.record_mode, p.recorded_at, s.name, p.status"
+
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        params = []
+        where_clauses = []
+
+        if search:
+            # Use FTS5 for search — escape special chars
+            safe_search = search.replace('"', '""')
+            fts_query = f'"{safe_search}"*'
+            # Check if FTS5 table exists (graceful degradation)
+            try:
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
+                has_fts = cursor.fetchone() is not None
+            except Exception:
+                has_fts = False
+
+            if has_fts:
+                from_clause = "packing_video p JOIN packing_video_fts fts ON fts.rowid = p.id LEFT JOIN stations s ON p.station_id = s.id"
+                where_clauses.append("fts.waybill_code MATCH ?")
+                params.append(fts_query)
+            else:
+                # Fallback to LIKE if FTS5 not available
+                from_clause = "packing_video p LEFT JOIN stations s ON p.station_id = s.id"
+                where_clauses.append("p.waybill_code LIKE ?")
+                params.append(f"%{search}%")
+        else:
+            from_clause = "packing_video p LEFT JOIN stations s ON p.station_id = s.id"
+
+        if station_id is not None:
+            where_clauses.append("p.station_id = ?")
+            params.append(station_id)
+
+        if status is not None:
+            where_clauses.append("p.status = ?")
+            params.append(status)
+
+        if date_from is not None:
+            where_clauses.append("date(p.recorded_at, 'localtime') >= ?")
+            params.append(date_from)
+
+        if date_to is not None:
+            where_clauses.append("date(p.recorded_at, 'localtime') <= ?")
+            params.append(date_to)
+
+        where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+        # Count query
+        count_query = f"SELECT COUNT(*) FROM {from_clause} WHERE {where_sql}"
+        cursor.execute(count_query, params)
+        total = cursor.fetchone()[0]
+
+        # Data query
+        data_query = f"SELECT {base_select} FROM {from_clause} WHERE {where_sql} ORDER BY {sort_col} {sort_dir} LIMIT ? OFFSET ?"
+        cursor.execute(data_query, params + [limit, offset])
+        rows = cursor.fetchall()
+
+    records = []
+    for r in rows:
+        records.append({
+            "id": r[0],
+            "waybill_code": r[1],
+            "video_paths": [p for p in r[2].split(",") if p] if r[2] else [],
+            "record_mode": r[3],
+            "recorded_at": r[4],
+            "station_name": r[5],
+            "status": r[6],
+        })
+
+    total_pages = (total + limit - 1) // limit if limit > 0 else 0
+
+    return {
+        "records": records,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": total_pages,
+        "has_more": page < total_pages,
+    }
 
 
 def get_record_by_id(record_id):
