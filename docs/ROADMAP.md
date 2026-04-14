@@ -1,6 +1,8 @@
-# V-Pack Monitor — Roadmap & Backlog (Updated 2026-04-14)
+# V-Pack Monitor — Roadmap & Backlog (Updated 2026-04-15)
 
 ## COMPLETED
+- [x] v2.4.2 — Security & Stability Audit (22 issues fixed: FTS5 crash guard, Zip Slip prevention, SSE stale closure, CORS hardening, error boundary, search debounce)
+- [x] v2.4.1 — Bugfix (semver version comparison for auto-update)
 - [x] v2.4.0 — Video Search v2 (FTS5 full-text search, pagination, date range filter, status filter)
 - [x] v2.3.2 — Unit Test Hardening Phase 1-6 (298 tests, coverage: database, auth, API, network, video worker, cloud sync, telegram)
 - [x] v2.3.1 — Comprehensive Bug Fix (12 bugs: SQL injection, race condition, auth bypass, memory leaks)

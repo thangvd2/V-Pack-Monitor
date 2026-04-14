@@ -274,8 +274,8 @@ def init_db():
         # Rebuild FTS5 index from existing data (safe to call multiple times)
         try:
             _rebuild_fts_index()
-        except Exception:
-            pass  # FTS5 may not be available on all SQLite builds
+        except Exception as e:
+            print(f"[DB] FTS5 rebuild warning: {e}")
 
         conn.commit()
 
@@ -409,9 +409,11 @@ def get_pending_records():
 
 
 def get_records(search="", station_id=None):
+    """Legacy record fetch (no pagination, no FTS5).
+    Prefer get_records_v2() for all new code."""
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
-        query = "SELECT p.id, p.waybill_code, p.video_paths, p.record_mode, p.recorded_at, s.name, p.status FROM packing_video p LEFT JOIN stations s ON p.station_id = s.id WHERE 1=1"
+        query = "SELECT p.id, p.waybill_code, p.video_paths, p.record_mode, datetime(p.recorded_at, 'localtime') AS recorded_at, s.name, p.status FROM packing_video p LEFT JOIN stations s ON p.station_id = s.id WHERE 1=1"
         params = []
 
         if search:
@@ -457,7 +459,7 @@ def get_records_v2(
     sort_col = _SORT_COLUMNS.get(sort_by, "p.recorded_at")
     sort_dir = "DESC" if sort_order.lower() == "desc" else "ASC"
 
-    base_select = "p.id, p.waybill_code, p.video_paths, p.record_mode, p.recorded_at, s.name, p.status"
+    base_select = "p.id, p.waybill_code, p.video_paths, p.record_mode, datetime(p.recorded_at, 'localtime') AS recorded_at, s.name, p.status"
 
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
@@ -466,6 +468,7 @@ def get_records_v2(
 
         if search:
             # Check if FTS5 table exists (graceful degradation)
+            # Intentional per-query check: defensive in case FTS5 table was dropped externally
             try:
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
                 has_fts = cursor.fetchone() is not None
@@ -482,13 +485,20 @@ def get_records_v2(
                 safe_search = search.replace('"', '""')
                 where_clauses.append("fts.waybill_code MATCH ?")
                 params.append(f'"{safe_search}"')
+                # If MATCH query fails at execution time, we'll retry with LIKE
+                try_fts = True
             else:
                 # Fallback to LIKE for short queries or if FTS5 not available
                 from_clause = "packing_video p LEFT JOIN stations s ON p.station_id = s.id"
                 where_clauses.append("p.waybill_code LIKE ?")
                 params.append(f"%{search}%")
+                try_fts = False
         else:
             from_clause = "packing_video p LEFT JOIN stations s ON p.station_id = s.id"
+            try_fts = False
+
+        # Save params before FTS so we can fall back to LIKE on MATCH error
+        params_before_fts = list(params) if search else []
 
         if station_id is not None:
             where_clauses.append("p.station_id = ?")
@@ -508,15 +518,44 @@ def get_records_v2(
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
-        # Count query
-        count_query = f"SELECT COUNT(*) FROM {from_clause} WHERE {where_sql}"
-        cursor.execute(count_query, params)
-        total = cursor.fetchone()[0]
+        try:
+            # Count query
+            count_query = f"SELECT COUNT(*) FROM {from_clause} WHERE {where_sql}"
+            cursor.execute(count_query, params)
+            total = cursor.fetchone()[0]
 
-        # Data query
-        data_query = f"SELECT {base_select} FROM {from_clause} WHERE {where_sql} ORDER BY {sort_col} {sort_dir} LIMIT ? OFFSET ?"
-        cursor.execute(data_query, params + [limit, offset])
-        rows = cursor.fetchall()
+            # Data query
+            data_query = f"SELECT {base_select} FROM {from_clause} WHERE {where_sql} ORDER BY {sort_col} {sort_dir} LIMIT ? OFFSET ?"
+            cursor.execute(data_query, params + [limit, offset])
+            rows = cursor.fetchall()
+        except sqlite3.OperationalError:
+            if search and try_fts:
+                # FTS5 MATCH failed (special chars in query) — fall back to LIKE
+                from_clause = "packing_video p LEFT JOIN stations s ON p.station_id = s.id"
+                non_fts_where = [c for c in where_clauses if "MATCH" not in c]
+                non_fts_where.append("p.waybill_code LIKE ?")
+                like_params = params_before_fts + [f"%{search}%"]
+                if station_id is not None:
+                    non_fts_where.append("p.station_id = ?")
+                    like_params.append(station_id)
+                if status is not None:
+                    non_fts_where.append("p.status = ?")
+                    like_params.append(status)
+                if date_from is not None:
+                    non_fts_where.append("date(p.recorded_at, 'localtime') >= ?")
+                    like_params.append(date_from)
+                if date_to is not None:
+                    non_fts_where.append("date(p.recorded_at, 'localtime') <= ?")
+                    like_params.append(date_to)
+                where_sql_fb = " AND ".join(non_fts_where) if non_fts_where else "1=1"
+                count_fb = f"SELECT COUNT(*) FROM {from_clause} WHERE {where_sql_fb}"
+                cursor.execute(count_fb, like_params)
+                total = cursor.fetchone()[0]
+                data_fb = f"SELECT {base_select} FROM {from_clause} WHERE {where_sql_fb} ORDER BY {sort_col} {sort_dir} LIMIT ? OFFSET ?"
+                cursor.execute(data_fb, like_params + [limit, offset])
+                rows = cursor.fetchall()
+            else:
+                raise
 
     records = []
     for r in rows:

@@ -155,9 +155,32 @@ function StationSelectionScreen({ stations, stationStatusList, fetchStationStatu
   );
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+          <div className="text-center">
+            <p className="text-red-400 text-lg font-bold mb-2">Something went wrong</p>
+            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Reload Page</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   const [stations, setStations] = useState([]);
-  const [activeStationId, setActiveStationId] = useState(1);
+  const [activeStationId, setActiveStationId] = useState(null);
   const [records, setRecords] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -213,6 +236,14 @@ function App() {
   const activeRecordIdRef = useRef(null);
   const searchTermRef = useRef(searchTerm);
   useEffect(() => { searchTermRef.current = searchTerm; }, [searchTerm]);
+  const recordsPageRef = useRef(recordsPage);
+  const dateFromRef = useRef(dateFrom);
+  const dateToRef = useRef(dateTo);
+  const statusFilterRef = useRef(statusFilter);
+  useEffect(() => { recordsPageRef.current = recordsPage; }, [recordsPage]);
+  useEffect(() => { dateFromRef.current = dateFrom; }, [dateFrom]);
+  useEffect(() => { dateToRef.current = dateTo; }, [dateTo]);
+  useEffect(() => { statusFilterRef.current = statusFilter; }, [statusFilter]);
 
   useEffect(() => {
     const token = localStorage.getItem('vpack_token');
@@ -234,6 +265,7 @@ function App() {
       }
     }
     setAuthLoading(false);
+    axios.defaults.timeout = 15000;
   }, []);
 
   useEffect(() => {
@@ -272,7 +304,7 @@ function App() {
   useEffect(() => {
     const stationIds = viewMode === 'grid'
       ? stations.map(s => s.id).join(',')
-      : String(activeStationId);
+      : String(activeStationId || '');
     const sseToken = localStorage.getItem('vpack_token');
     const es = new EventSource(`${API_BASE}/api/events?stations=${stationIds}${sseToken ? '&token=' + encodeURIComponent(sseToken) : ''}`);
     
@@ -300,7 +332,7 @@ function App() {
                 activeRecordIdRef.current = null;
               }
             }
-            fetchRecords(searchTermRef.current, activeStationId, recordsPage);
+            fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
           }
         } else {
           if (data.station_id !== activeStationId) return;
@@ -309,21 +341,21 @@ function App() {
             setPackingStatus('packing');
             setCurrentWaybill(data.waybill || '');
             activeRecordIdRef.current = data.record_id;
-            fetchRecords(searchTermRef.current, activeStationId, recordsPage);
+            fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
           } else if (data.status === 'PROCESSING') {
             if (data.record_id === activeRecordIdRef.current) {
               setPackingStatus('idle');
               setCurrentWaybill('');
               activeRecordIdRef.current = null;
             }
-            fetchRecords(searchTermRef.current, activeStationId, recordsPage);
+            fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
           } else if (data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
             if (data.record_id === activeRecordIdRef.current) {
               setPackingStatus('idle');
               setCurrentWaybill('');
               activeRecordIdRef.current = null;
             }
-            fetchRecords(searchTermRef.current, activeStationId, recordsPage);
+            fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
           }
         }
       } catch {}
@@ -418,8 +450,7 @@ function App() {
       if (res.data.data) {
          setAnalytics(res.data.data);
       }
-    } catch (error) {
-      console.log('Analytics not ready');
+     } catch {
     }
   };
 
@@ -434,8 +465,7 @@ function App() {
         setPackingStatus('idle');
         setCurrentWaybill('');
       }
-    } catch (error) {
-      console.log('Status not ready', error);
+    } catch {
     }
   };
 
@@ -460,7 +490,10 @@ function App() {
   useEffect(() => {
     if (activeStationId && currentUser) {
       setRecordsPage(1);
-      fetchRecords(searchTerm, activeStationId, 1);
+      const debounce = setTimeout(() => {
+        fetchRecords(searchTerm, activeStationId, 1);
+      }, 300);
+      return () => clearTimeout(debounce);
     }
   }, [searchTerm, activeStationId, currentUser, dateFrom, dateTo, statusFilter]);
 
@@ -539,8 +572,7 @@ function App() {
     try {
       const response = await axios.get(`${API_BASE}/api/settings`);
       setInitialSettings(response.data.data || {});
-    } catch (error) {
-      console.log('API not reachable yet', error);
+    } catch {
     }
   };
 
@@ -573,6 +605,8 @@ function App() {
       });
       if (res.data.status === 'recording') {
         activeRecordIdRef.current = res.data.record_id || null;
+        setPackingStatus('packing');
+        setCurrentWaybill(finalBarcode);
       } else if (res.data.status === 'error') {
         if (res.data.message) {
           setToast(res.data.message);
@@ -580,11 +614,11 @@ function App() {
         }
         setPackingStatus('idle');
         setCurrentWaybill('');
-        fetchRecords(searchTerm, activeStationId, recordsPage); 
+        fetchRecords(searchTerm, activeStationId, recordsPageRef.current); 
       } else if (res.data.status === 'processing') {
         setPackingStatus('idle');
         setCurrentWaybill('');
-        fetchRecords(searchTerm, activeStationId, recordsPage);
+        fetchRecords(searchTerm, activeStationId, recordsPageRef.current);
       }
     } catch (err) {
       console.error("Barcode Lỗi", err);
@@ -1725,4 +1759,9 @@ function App() {
   );
 }
 
-export default App;
+const AppWithErrorBoundary = () => (
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
+export default AppWithErrorBoundary;

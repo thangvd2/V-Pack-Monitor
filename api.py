@@ -47,9 +47,11 @@ def _read_version():
 
 
 def _parse_semver(version_str):
-    """Parse a version string like 'v2.4.1' or '2.4.1' into (major, minor, patch) tuple."""
+    """Parse a version string like 'v2.4.1' or 'v2.4.1-beta' into (major, minor, patch) tuple."""
     try:
         v = version_str.strip().lstrip("vV")
+        # Strip pre-release suffix (e.g. '-beta', '-rc1')
+        v = v.split("-")[0]
         parts = v.split(".")
         return tuple(int(p) for p in parts[:3])
     except (ValueError, AttributeError):
@@ -66,7 +68,7 @@ stream_managers = {}
 
 reconnect_status = {}
 
-MTX_API = "http://127.0.0.1:9997"
+MTX_API = os.environ.get("MTX_API", "http://127.0.0.1:9997")
 
 _sse_clients = []
 _sse_lock = threading.Lock()
@@ -492,8 +494,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_get_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 if not os.path.exists("recordings"):
@@ -503,7 +505,7 @@ if not os.path.exists("recordings"):
 try:
     keep_days = int(database.get_setting("RECORD_KEEP_DAYS", 7))
     database.cleanup_old_records(keep_days)
-except BaseException:
+except Exception:
     pass
 
 
@@ -686,7 +688,7 @@ _LOGIN_WINDOW = 300
 def login(payload: LoginPayload, request: Request):
     ip = request.client.host if request.client else "unknown"
     now = time.time()
-    if len(_login_attempts) > 1000:
+    if len(_login_attempts) > 100:
         expired_ips = [k for k, v in _login_attempts.items() if not v or now - v[-1] > _LOGIN_WINDOW]
         for k in expired_ips:
             del _login_attempts[k]
@@ -1513,7 +1515,7 @@ async def sse_events(request: Request, stations: str = ""):
         raise HTTPException(status_code=401, detail="Invalid token")
     import queue
 
-    q = queue.Queue()
+    q = queue.Queue(maxsize=100)
     with _sse_lock:
         _sse_clients.append(q)
 
@@ -1939,8 +1941,24 @@ def _update_production():
                 f.write(chunk)
 
         _notify_update_progress("extracting", "Đang giải nén...", 40)
+        # Verify zip integrity before extraction
+        try:
+            with zipfile.ZipFile(zip_path, "r") as test_zf:
+                bad_file = test_zf.testzip()
+                if bad_file:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    return {"status": "error", "message": f"Zip file corrupted at entry: {bad_file}"}
+        except zipfile.BadZipFile:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return {"status": "error", "message": "Downloaded file is not a valid zip archive."}
         with zipfile.ZipFile(zip_path, "r") as zf:
-            zf.extractall(tmp_dir)
+            for member in zf.infolist():
+                # Prevent Zip Slip (path traversal)
+                member_path = os.path.realpath(os.path.join(tmp_dir, member.filename))
+                if not member_path.startswith(os.path.realpath(tmp_dir) + os.sep) and member_path != os.path.realpath(tmp_dir):
+                    print(f"[UPDATE] Zip Slip detected: skipping {member.filename}")
+                    continue
+                zf.extract(member, tmp_dir)
         tag_ver = tag[1:] if tag.startswith("v") else tag
         src_dir = os.path.join(tmp_dir, f"V-Pack-Monitor-{tag_ver}")
         if not os.path.isdir(src_dir):
