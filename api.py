@@ -1373,13 +1373,13 @@ def get_analytics_today(station_id: int, current_user: CurrentUser):
 
         # Đếm tổng đơn toàn hệ thống kho hôm nay (SQLite local time)
         cursor.execute(
-            "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at) = date('now', 'localtime')"
+            "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at, 'localtime') = date('now', 'localtime')"
         )
         total_today = cursor.fetchone()[0]
 
         # Đếm số đơn riêng của trạm đang chọn
         cursor.execute(
-            "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at) = date('now', 'localtime') AND station_id = ?",
+            "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at, 'localtime') = date('now', 'localtime') AND station_id = ?",
             (station_id,),
         )
         station_today = cursor.fetchone()[0]

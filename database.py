@@ -9,7 +9,7 @@ import os
 import time as _time
 import hashlib
 import base64
-from datetime import datetime
+from datetime import datetime, timezone
 
 _ENCRYPT_PREFIX = "enc:v1:"
 
@@ -284,7 +284,7 @@ def save_record(station_id, waybill_code, video_paths, record_mode):
             INSERT INTO packing_video (station_id, waybill_code, video_paths, record_mode, recorded_at)
             VALUES (?, ?, ?, ?, ?)
         """,
-            (station_id, waybill_code, paths_str, record_mode, datetime.now()),
+            (station_id, waybill_code, paths_str, record_mode, datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")),
         )
         conn.commit()
 
@@ -296,7 +296,7 @@ def create_record(station_id, waybill_code, record_mode, video_paths=""):
         cursor.execute(
             """INSERT INTO packing_video (station_id, waybill_code, video_paths, record_mode, recorded_at, status)
             VALUES (?, ?, ?, ?, ?, 'RECORDING')""",
-            (station_id, waybill_code, paths_str, record_mode, datetime.now()),
+            (station_id, waybill_code, paths_str, record_mode, datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")),
         )
         conn.commit()
         return cursor.lastrowid
@@ -388,7 +388,7 @@ def cleanup_old_records(days=7):
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, video_paths FROM packing_video WHERE recorded_at <= datetime('now', 'localtime', '-' || ? || ' days')",
+            "SELECT id, video_paths FROM packing_video WHERE recorded_at <= datetime('now', '-' || ? || ' days')",
             (days,)
         )
         old_records = cursor.fetchall()
@@ -851,7 +851,7 @@ def get_hourly_stats(
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         query = (
-            "SELECT CAST(strftime('%H', recorded_at) AS INTEGER) as hour, COUNT(*) as count "
+            "SELECT CAST(strftime('%H', recorded_at, 'localtime') AS INTEGER) as hour, COUNT(*) as count "
             "FROM packing_video WHERE status = 'READY' AND date(recorded_at, 'localtime') = ?"
         )
         params: list[str | int] = [target_date]

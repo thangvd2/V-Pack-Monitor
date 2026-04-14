@@ -31,7 +31,7 @@ def _run_bot(bot_token, authorized_chat_id):
                 with sqlite3.connect(database.DB_FILE) as conn:
                     cursor = conn.cursor()
                     cursor.execute(
-                        "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at) = date('now', 'localtime')"
+                        "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at, 'localtime') = date('now', 'localtime')"
                     )
                     total_today = cursor.fetchone()[0]
 
