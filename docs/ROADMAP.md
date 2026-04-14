@@ -1,6 +1,8 @@
 # V-Pack Monitor — Roadmap & Backlog (Updated 2026-04-14)
 
 ## COMPLETED
+- [x] v2.4.0 — Video Search v2 (FTS5 full-text search, pagination, date range filter, status filter)
+- [x] v2.3.2 — Unit Test Hardening Phase 1-6 (298 tests, coverage: database, auth, API, network, video worker, cloud sync, telegram)
 - [x] v2.3.1 — Comprehensive Bug Fix (12 bugs: SQL injection, race condition, auth bypass, memory leaks)
 - [x] v2.3.0 — Auto-Update System (1-click update, version badge, progress UI)
 - [x] v2.2.4 — Security Hardening (26 vulnerabilities fixed)
@@ -18,10 +20,11 @@
 
 ## BACKLOG (Theo mức ưu tiên)
 
-### 1. Unit Test Suite — Phase 3+4 (API Routes + Helpers)
-- **DONE (Phase 1+2):** 84 tests, 94% coverage on `database.py` + `auth.py`
-- Phase 3: API endpoint tests (login, stations, records, scan, sessions, SSE)
-- Phase 4: Helper tests (RTSP URLs, conflict check)
+### 1. ~~Unit Test Suite~~ ✅ DONE (298 tests)
+- Phase 1+2: 84 tests (database.py + auth.py)
+- Phase 3+4: 77 tests (API routes + helpers)
+- Phase 5-10: 108 tests (security regression, network, video worker, API hardening, DB edge cases, cloud sync, telegram)
+- Phase 11: 28 tests (video search FTS5 + pagination)
 - GitHub Actions CI: auto-run pytest on push
 
 ### 2. Smart Storage — 3-tier Video Management
@@ -49,12 +52,12 @@
 - Camera latency/quality metrics trong SystemHealth
 - Camera uptime percentage per day/week
 
-### 6. Video Search & Filter nâng cao
-- Filter theo date range (from → to), station, status
-- Pagination (hiện LIMIT 100 cứng)
-- Batch export CSV nhiều ngày
-- Full-text search waybill code (SQLite FTS5)
-- Sort by date, station, status
+### 6. ~~Video Search & Filter nâng cao~~ ✅ DONE (v2.4.0)
+- FTS5 full-text search (replacing LIKE)
+- Pagination (replacing LIMIT 100 cứng)
+- Date range filter (from → to)
+- Status filter (READY, RECORDING, PROCESSING, FAILED)
+- Sort by recorded_at, waybill_code, station_name, status
 
 ### 7. UI/UX Polish
 - [PLAN] Setup Modal upgrade — frontend validation + UX (#19)
@@ -62,7 +65,7 @@
 - Notifications panel (camera down, storage full, new user login)
 - Keyboard shortcuts reference panel
 - Responsive table cho mobile (history cards)
-- `showAllRecords` chỉ limit trên mobile, full trên desktop
+- ~~`showAllRecords` chỉ limit trên mobile, full trên desktop~~ → replaced by server-side pagination (v2.4.0)
 
 ### 8. Infrastructure
 - Docker Compose production config (MediaMTX + V-Pack + SQLite volume)
