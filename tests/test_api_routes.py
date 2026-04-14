@@ -149,13 +149,13 @@ class TestRecords:
     def test_get_records_empty(self, client, admin_headers):
         r = client.get("/api/records", headers=admin_headers)
         assert r.status_code == 200
-        assert r.json()["data"] == []
+        assert r.json()["records"] == []
 
     def test_get_records_with_data(self, client, admin_headers, sample_station_id):
         rid = database.create_record(sample_station_id, "WB001", "SINGLE")
         database.update_record_status(rid, "READY", video_paths="/a.mp4,/b.mp4")
         r = client.get("/api/records", headers=admin_headers)
-        data = r.json()["data"]
+        data = r.json()["records"]
         assert len(data) >= 1
         rec = data[0]
         assert rec["video_paths"] == ["/a.mp4", "/b.mp4"]
@@ -164,13 +164,13 @@ class TestRecords:
         rid = database.create_record(sample_station_id, "WB-EMPTY", "SINGLE")
         database.update_record_status(rid, "RECORDING")
         r = client.get("/api/records", headers=admin_headers)
-        rec = [d for d in r.json()["data"] if d["waybill_code"] == "WB-EMPTY"][0]
+        rec = [d for d in r.json()["records"] if d["waybill_code"] == "WB-EMPTY"][0]
         assert rec["video_paths"] == []
 
     def test_get_records_search(self, client, admin_headers, sample_station_id):
         database.create_record(sample_station_id, "FINDME-001", "SINGLE")
         r = client.get("/api/records", headers=admin_headers, params={"search": "FINDME"})
-        assert len(r.json()["data"]) >= 1
+        assert len(r.json()["records"]) >= 1
 
     def test_delete_record(self, client, admin_headers, sample_station_id):
         rid = database.create_record(sample_station_id, "DEL-WB", "SINGLE")
