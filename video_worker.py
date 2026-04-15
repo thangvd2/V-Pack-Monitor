@@ -6,6 +6,7 @@
 
 import threading
 import os
+import time
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 import database
@@ -158,15 +159,15 @@ def _send_failed_alert(record_id, waybill, reason):
 def submit_stop_and_save(record_id, rec, waybill, station_id, save=True):
     global _executor, _pending_count
 
-    # Check pending count before submitting (bounded queue - H21)
     with _pending_lock:
         if _pending_count >= _MAX_PENDING:
-            print(f"[WORKER] WARNING: Too many pending tasks ({_pending_count}), dropping record {record_id}")
+            print(
+                f"[WORKER] WARNING: Too many pending tasks ({_pending_count}), dropping record {record_id}"
+            )
             _decrement_processing(station_id)
-            return
+            return False
         _pending_count += 1
 
-    # Hold _lock during both check and submit to prevent race (M25)
     with _lock:
         if _executor is None:
             _executor = ThreadPoolExecutor(max_workers=1)
@@ -180,11 +181,33 @@ def submit_stop_and_save(record_id, rec, waybill, station_id, save=True):
                     _pending_count -= 1
 
         _executor.submit(_wrapped)
+    return True
+
+
+_SHUTDOWN_TIMEOUT = 60  # seconds to wait for in-flight tasks
 
 
 def shutdown():
     global _executor
     with _lock:
         if _executor:
-            _executor.shutdown(wait=True)
+            _executor.shutdown(wait=False)
+            import concurrent.futures
+
+            deadline = time.time() + _SHUTDOWN_TIMEOUT
+            while time.time() < deadline:
+                try:
+                    if _executor._threads:
+                        remaining = deadline - time.time()
+                        if remaining > 0:
+                            time.sleep(min(1.0, remaining))
+                        else:
+                            print(
+                                "[WORKER] WARNING: Shutdown timed out after 60s — forcing exit"
+                            )
+                            break
+                    else:
+                        break
+                except Exception:
+                    break
             _executor = None

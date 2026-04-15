@@ -6,24 +6,28 @@ LABEL org.opencontainers.image.title="V-Pack Monitor"
 LABEL org.opencontainers.image.authors="VDT - Vu Duc Thang"
 LABEL org.opencontainers.image.source="https://github.com/thangvd2/V-Pack-Monitor"
 
-# Thiết lập thư mục làm việc
+ARG MTX_VERSION=1.17.1
+
 WORKDIR /app
 
-# Cài đặt FFmpeg và các thư viện hỗ trợ OpenCV
-RUN apt-get update && apt-get install -y ffmpeg libsm6 libxext6 libgl1 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ffmpeg libsm6 libxext6 libgl1 curl tar && rm -rf /var/lib/apt/lists/*
 
-# Copy thư mục cài đặt requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy toàn bộ mã nguồn V-Pack Monitor (Cả Backend và Frontend Build)
+RUN mkdir -p bin/mediamtx && \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then MTX_ARCH="linux_arm64"; \
+    elif [ "$ARCH" = "x86_64" ]; then MTX_ARCH="linux_amd64"; \
+    else MTX_ARCH="linux_amd64"; fi && \
+    curl -L "https://github.com/bluenviron/mediamtx/releases/download/v${MTX_VERSION}/mediamtx_v${MTX_VERSION}_${MTX_ARCH}.tar.gz" \
+    | tar xz -C bin/mediamtx mediamtx mediamtx.yml LICENSE && \
+    chmod +x bin/mediamtx/mediamtx
+
 COPY . .
 
-# Tạo thư mục recordings nếu chưa có
 RUN mkdir -p recordings
 
-# Expose port chia sẻ mạng LAN
-EXPOSE 8001
+EXPOSE 8001 8889 9997
 
-# Lệnh khởi động
-CMD ["python", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["sh", "-c", "bin/mediamtx/mediamtx bin/mediamtx/mediamtx.yml & python -m uvicorn api:app --host 0.0.0.0 --port 8001"]
