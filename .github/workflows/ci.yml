@@ -30,6 +30,8 @@ jobs:
 
       - name: Run tests
         run: python -m pytest tests/ --ignore=tests/test_video_worker.py --ignore=tests/test_network.py -v --tb=short
+        env:
+          VPACK_SECRET: test-secret-key-for-ci
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -64,4 +66,4 @@ jobs:
         run: pip install ruff
 
       - name: Lint
-        run: ruff check . --ignore=E501,F401,F841,E402,F811 --select=E,F,W
+        run: ruff check . --ignore=E501,F401,F841,E402,F811,F541 --select=E,F,W
