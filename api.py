@@ -11,23 +11,19 @@ import shutil
 import threading
 import json
 import asyncio
-import re as _re
 import socket
 import subprocess
 import logging
 import urllib.request
 import urllib.error
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import database
 import recorder
-from recorder import CameraRecorder
 import network
 import video_worker
-import auth
-from auth import CurrentUser, AdminUser, oauth2_scheme
 
 _SERVER_START_TIME = time.time()
 
@@ -65,9 +61,7 @@ stream_managers = {}
 reconnect_status = {}
 
 # Per-concern locks for shared mutable state
-_recorders_lock = (
-    threading.Lock()
-)  # guards active_recorders, active_waybills, active_record_ids
+_recorders_lock = threading.Lock()  # guards active_recorders, active_waybills, active_record_ids
 _streams_lock = threading.Lock()  # guards stream_managers, reconnect_status
 _station_locks_lock = threading.Lock()  # guards _station_locks dict itself
 _cache_lock = threading.Lock()  # guards _update_check_cache
@@ -289,7 +283,6 @@ def get_rtsp_sub_url(ip, safety_code, channel=1, brand="imou"):
         return f"rtsp://admin:{safety_code}@{ip}:554/cam/realmonitor?channel={channel}&subtype=1"
 
 
-import telebot
 import telegram_bot
 
 
@@ -413,8 +406,6 @@ def _recover_pending_records():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    import asyncio
-
     loop = asyncio.get_event_loop()
     orig_handler = loop.get_exception_handler()
 

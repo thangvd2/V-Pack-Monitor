@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.1.0
+# V-Pack Monitor - CamDongHang v3.0.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -36,16 +36,10 @@ def register_routes(app):
         now = time.time()
         with api._login_attempts_lock:
             if len(_login_attempts) > 100:
-                expired_ips = [
-                    k
-                    for k, v in _login_attempts.items()
-                    if not v or now - v[-1] > _LOGIN_WINDOW
-                ]
+                expired_ips = [k for k, v in _login_attempts.items() if not v or now - v[-1] > _LOGIN_WINDOW]
                 for k in expired_ips:
                     del _login_attempts[k]
-            attempts = [
-                t for t in _login_attempts.get(ip, []) if now - t < _LOGIN_WINDOW
-            ]
+            attempts = [t for t in _login_attempts.get(ip, []) if now - t < _LOGIN_WINDOW]
             _login_attempts[ip] = attempts
             if len(attempts) >= _LOGIN_MAX:
                 return JSONResponse(
@@ -56,9 +50,7 @@ def register_routes(app):
                     },
                 )
         user = database.get_user_by_username(payload.username)
-        if not user or not auth.verify_password(
-            payload.password, user["password_hash"]
-        ):
+        if not user or not auth.verify_password(payload.password, user["password_hash"]):
             with api._login_attempts_lock:
                 _login_attempts.setdefault(ip, []).append(now)
             database.log_audit(
@@ -100,11 +92,7 @@ def register_routes(app):
     @app.post("/api/auth/logout")
     def logout(current_user: CurrentUser, request: Request):
         auth_header = request.headers.get("Authorization", "")
-        token = (
-            auth_header.replace("Bearer ", "")
-            if auth_header.startswith("Bearer ")
-            else ""
-        )
+        token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else ""
         if token:
             auth.revoke_token(token)
         database.log_audit(current_user["id"], "LOGOUT")
@@ -133,9 +121,7 @@ def register_routes(app):
                 content={"status": "error", "message": "Người dùng không tồn tại."},
             )
         full_user = database.get_user_by_username(user["username"])
-        if not full_user or not auth.verify_password(
-            payload.old_password, full_user["password_hash"]
-        ):
+        if not full_user or not auth.verify_password(payload.old_password, full_user["password_hash"]):
             return JSONResponse(
                 status_code=401,
                 content={"status": "error", "message": "Mật khẩu cũ không đúng."},
@@ -167,9 +153,7 @@ def register_routes(app):
                     "message": "Role phải là ADMIN hoặc OPERATOR.",
                 },
             )
-        new_id = database.create_user(
-            payload.username, payload.password, payload.role, payload.full_name
-        )
+        new_id = database.create_user(payload.username, payload.password, payload.role, payload.full_name)
         if new_id is None:
             return JSONResponse(
                 status_code=422,

@@ -1,10 +1,7 @@
 import os
 import sys
-import pytest
 import time
 import threading
-import json
-from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -158,9 +155,7 @@ class TestStationConflict:
         warnings = r.json()["warnings"]
         assert len(warnings) > 0
 
-    def test_conflict_name_case_insensitive(
-        self, client, admin_headers, sample_station_id
-    ):
+    def test_conflict_name_case_insensitive(self, client, admin_headers, sample_station_id):
         """Name conflict detection is case-insensitive."""
         r = client.get(
             "/api/stations/check-conflict",
@@ -170,9 +165,7 @@ class TestStationConflict:
         warnings = r.json()["warnings"]
         assert len(warnings) > 0
 
-    def test_conflict_multiple_warnings_combined(
-        self, client, admin_headers, sample_station_id
-    ):
+    def test_conflict_multiple_warnings_combined(self, client, admin_headers, sample_station_id):
         """Requesting IP + MAC + name together yields >= 3 warnings."""
         r = client.get(
             "/api/stations/check-conflict",
@@ -297,9 +290,7 @@ class TestAutoUpdate:
         assert r1.json() == r2.json()
         assert r2.json()["current_version"] == "1.0.0"
 
-    def test_update_concurrent_rejected_by_lock(
-        self, client, admin_headers, monkeypatch
-    ):
+    def test_update_concurrent_rejected_by_lock(self, client, admin_headers, monkeypatch):
         """Second update attempt is rejected when ``_update_lock`` is held."""
         import routes_system
 
@@ -338,9 +329,7 @@ class TestRBACEdgeCases:
         # Confirm the admin still exists
         assert database.get_user_by_id(admin_user_id) is not None
 
-    def test_release_session_other_user_noop(
-        self, client, operator_headers, sample_station_id
-    ):
+    def test_release_session_other_user_noop(self, client, operator_headers, sample_station_id):
         """Releasing another operator's session silently succeeds without
         actually ending the session (api.py line 1060-1065)."""
         # Operator 1 acquires the station

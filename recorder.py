@@ -120,9 +120,7 @@ def _is_hevc(filepath):
 
 
 class CameraRecorder:
-    def __init__(
-        self, rtsp_url_1, rtsp_url_2=None, output_dir="recordings", record_mode="SINGLE"
-    ):
+    def __init__(self, rtsp_url_1, rtsp_url_2=None, output_dir="recordings", record_mode="SINGLE"):
         self.rtsp_url_1 = rtsp_url_1
         self.rtsp_url_2 = rtsp_url_2 if rtsp_url_2 else rtsp_url_1
 
@@ -139,7 +137,8 @@ class CameraRecorder:
     def start_recording(self, waybill_code):
         # Sanitize waybill_code to prevent path traversal
         import re
-        safe_code = re.sub(r'[^\w\-.]', '_', waybill_code)
+
+        safe_code = re.sub(r"[^\w\-.]", "_", waybill_code)
         if not safe_code:
             safe_code = "unknown"
         waybill_code = safe_code
@@ -179,9 +178,7 @@ class CameraRecorder:
             self.current_files.append(filepath)
 
         elif self.record_mode == "DUAL_FILE":
-            file1 = os.path.join(
-                self.output_dir, f"{waybill_code}_{timestamp}_Cam1.mp4"
-            )
+            file1 = os.path.join(self.output_dir, f"{waybill_code}_{timestamp}_Cam1.mp4")
             tmp1 = file1 + ".tmp.ts"
             self._launch_ffmpeg(
                 [
@@ -203,9 +200,7 @@ class CameraRecorder:
             )
             self.current_files.append(file1)
 
-            file2 = os.path.join(
-                self.output_dir, f"{waybill_code}_{timestamp}_Cam2.mp4"
-            )
+            file2 = os.path.join(self.output_dir, f"{waybill_code}_{timestamp}_Cam2.mp4")
             tmp2 = file2 + ".tmp.ts"
             self._launch_ffmpeg(
                 [

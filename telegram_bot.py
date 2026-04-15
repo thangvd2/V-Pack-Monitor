@@ -113,9 +113,7 @@ def start_polling():
         return False, "Chưa đủ cấu hình Telegram"
 
     _stop_event.clear()
-    _bot_thread = threading.Thread(
-        target=_run_bot, args=(bot_token, chat_id), daemon=True
-    )
+    _bot_thread = threading.Thread(target=_run_bot, args=(bot_token, chat_id), daemon=True)
     _bot_thread.start()
     return True, "Đã khởi động Bot"
 

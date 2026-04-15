@@ -8,13 +8,11 @@ import os
 import zipfile
 import datetime
 import sqlite3
-import json
 import threading
 from database import DB_FILE, get_setting
 import telegram_bot
 
 # Google API
-from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
@@ -49,9 +47,8 @@ def _get_gdrive_creds():
         if _gdrive_creds and mtime == _gdrive_creds_mtime:
             return _gdrive_creds
         from google.oauth2 import service_account
-        _gdrive_creds = service_account.Credentials.from_service_account_file(
-            creds_path, scopes=SCOPES
-        )
+
+        _gdrive_creds = service_account.Credentials.from_service_account_file(creds_path, scopes=SCOPES)
         _gdrive_creds_mtime = mtime
         return _gdrive_creds
     except Exception:
@@ -179,9 +176,7 @@ def _process_cloud_sync_inner():
     provider = get_setting("CLOUD_PROVIDER", "NONE")
 
     if provider == "NONE":
-        raise Exception(
-            "Bạn chưa cấu hình Lát Cắt Đám Mây (Google Drive / S3) trong mục Cài Đặt!"
-        )
+        raise Exception("Bạn chưa cấu hình Lát Cắt Đám Mây (Google Drive / S3) trong mục Cài Đặt!")
 
     zip_path, synced_ids = create_backup_zip()
 
@@ -209,19 +204,13 @@ def _process_cloud_sync_inner():
         if os.path.exists(zip_path):
             os.remove(zip_path)
 
-        success_msg = (
-            f"Đã sao lưu {len(synced_ids)} video đơn hàng lên {provider} thành công!"
-        )
-        telegram_bot.send_telegram_message(
-            f"✅ <b>Cloud Sync Hoàn Tất</b>\n{success_msg}"
-        )
+        success_msg = f"Đã sao lưu {len(synced_ids)} video đơn hàng lên {provider} thành công!"
+        telegram_bot.send_telegram_message(f"✅ <b>Cloud Sync Hoàn Tất</b>\n{success_msg}")
         return success_msg
     except Exception as e:
         # Nếu thất bại, xóa zip và văng lỗi ra UI
         if os.path.exists(zip_path):
             os.remove(zip_path)
         err_msg = str(e)
-        telegram_bot.send_telegram_message(
-            f"❌ <b>Cloud Sync Thất Bại</b>\nLỗi: {err_msg}"
-        )
+        telegram_bot.send_telegram_message(f"❌ <b>Cloud Sync Thất Bại</b>\nLỗi: {err_msg}")
         raise e

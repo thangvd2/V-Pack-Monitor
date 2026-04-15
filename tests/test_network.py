@@ -1,6 +1,5 @@
 import os
 import sys
-import pytest
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,6 +11,7 @@ import database
 # ---------------------------------------------------------------------------
 # validate_mac
 # ---------------------------------------------------------------------------
+
 
 class TestValidateMac:
     """Tests for network.validate_mac()."""
@@ -50,6 +50,7 @@ class TestValidateMac:
 # normalize_mac
 # ---------------------------------------------------------------------------
 
+
 class TestNormalizeMac:
     """Tests for network.normalize_mac()."""
 
@@ -76,6 +77,7 @@ class TestNormalizeMac:
 # ---------------------------------------------------------------------------
 # get_local_subnet
 # ---------------------------------------------------------------------------
+
 
 class TestGetLocalSubnet:
     """Tests for network.get_local_subnet()."""
@@ -112,6 +114,7 @@ class TestGetLocalSubnet:
 # ---------------------------------------------------------------------------
 # scan_lan_for_mac / scan_lan_all
 # ---------------------------------------------------------------------------
+
 
 class TestScanLan:
     """Tests for network.scan_lan_for_mac() and scan_lan_all()."""
@@ -168,6 +171,7 @@ class TestScanLan:
 # API endpoints for camera discovery
 # ---------------------------------------------------------------------------
 
+
 class TestDiscoverAPI:
     """Tests for /api/discover-mac and /api/discover/{station_id}."""
 
@@ -178,15 +182,21 @@ class TestDiscoverAPI:
 
     @patch("network.scan_lan_for_mac", return_value="192.168.1.77")
     def test_discover_mac_found(self, mock_scan, client, admin_headers):
-        r = client.get("/api/discover-mac", headers=admin_headers,
-                       params={"mac": "AA:BB:CC:DD:EE:FF"})
+        r = client.get(
+            "/api/discover-mac",
+            headers=admin_headers,
+            params={"mac": "AA:BB:CC:DD:EE:FF"},
+        )
         assert r.json()["status"] == "found"
         assert r.json()["ip"] == "192.168.1.77"
 
     @patch("network.scan_lan_for_mac", return_value=None)
     def test_discover_mac_not_found(self, mock_scan, client, admin_headers):
-        r = client.get("/api/discover-mac", headers=admin_headers,
-                       params={"mac": "AA:BB:CC:DD:EE:FF"})
+        r = client.get(
+            "/api/discover-mac",
+            headers=admin_headers,
+            params={"mac": "AA:BB:CC:DD:EE:FF"},
+        )
         assert r.json()["status"] == "not_found"
 
     def test_discover_station_not_exist(self, client, admin_headers):
@@ -194,14 +204,12 @@ class TestDiscoverAPI:
         assert r.json()["status"] == "error"
 
     @patch("network.scan_lan_for_mac", return_value=None)
-    def test_discover_station_not_found(self, mock_scan, client, admin_headers,
-                                        sample_station_id):
+    def test_discover_station_not_found(self, mock_scan, client, admin_headers, sample_station_id):
         r = client.get(f"/api/discover/{sample_station_id}", headers=admin_headers)
         assert r.json()["status"] == "not_found"
 
     @patch("network.scan_lan_for_mac", return_value="192.168.1.18")
-    def test_discover_station_same_ip(self, mock_scan, client, admin_headers,
-                                      sample_station_id):
+    def test_discover_station_same_ip(self, mock_scan, client, admin_headers, sample_station_id):
         # Station was created with ip_camera_1="192.168.5.18", mock returns different
         # so let's update station IP to match what mock returns
         database.update_station_ip(sample_station_id, "ip_camera_1", "192.168.1.18")
@@ -209,22 +217,23 @@ class TestDiscoverAPI:
         assert r.json()["status"] == "same_ip"
 
     @patch("network.scan_lan_for_mac", return_value="192.168.1.200")
-    def test_discover_station_new_ip(self, mock_scan, client, admin_headers,
-                                     sample_station_id):
+    def test_discover_station_new_ip(self, mock_scan, client, admin_headers, sample_station_id):
         r = client.get(f"/api/discover/{sample_station_id}", headers=admin_headers)
         assert r.json()["status"] == "found"
         assert r.json()["new_ip"] == "192.168.1.200"
         assert r.json()["old_ip"] == "192.168.5.18"
 
     def test_discover_station_no_mac(self, client, admin_headers):
-        sid = database.add_station({
-            "name": "No MAC",
-            "ip_camera_1": "10.0.0.1",
-            "ip_camera_2": "",
-            "safety_code": "",
-            "camera_mode": "SINGLE",
-            "mac_address": "",
-        })
+        sid = database.add_station(
+            {
+                "name": "No MAC",
+                "ip_camera_1": "10.0.0.1",
+                "ip_camera_2": "",
+                "safety_code": "",
+                "camera_mode": "SINGLE",
+                "mac_address": "",
+            }
+        )
         r = client.get(f"/api/discover/{sid}", headers=admin_headers)
         assert r.json()["status"] == "error"
         assert "MAC" in r.json()["message"]

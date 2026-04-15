@@ -61,6 +61,7 @@ class TestJWT:
 
     def test_expired_token_raises(self):
         import jwt as _jwt
+
         expired = _jwt.encode(
             {"sub": "1", "exp": time.time() - 3600, "jti": "old"},
             auth.SECRET_KEY,
@@ -75,6 +76,7 @@ class TestJWT:
 
     def test_wrong_secret_raises(self):
         import jwt as _jwt
+
         token = _jwt.encode(
             {"sub": "1", "exp": time.time() + 3600},
             "wrong_secret_key",
@@ -99,6 +101,7 @@ class TestTokenRevocation:
 
     def test_revoke_expired_token_no_error(self):
         import jwt as _jwt
+
         expired = _jwt.encode(
             {"sub": "1", "exp": time.time() - 3600, "jti": "expired_jti"},
             auth.SECRET_KEY,
@@ -109,7 +112,6 @@ class TestTokenRevocation:
 
 class TestGetCurrentUser:
     def test_valid_token_active_user(self, isolate_db, admin_user_id):
-        from unittest.mock import MagicMock
         token = auth.create_access_token({"sub": str(admin_user_id), "role": "ADMIN"})
         user = auth.get_current_user(token=token)
         assert user["id"] == admin_user_id
@@ -117,6 +119,7 @@ class TestGetCurrentUser:
 
     def test_revoked_token_raises_401(self, isolate_db, admin_user_id):
         from fastapi import HTTPException
+
         token = auth.create_access_token({"sub": str(admin_user_id), "role": "ADMIN"})
         auth.revoke_token(token)
         with pytest.raises(HTTPException) as exc_info:
@@ -125,6 +128,7 @@ class TestGetCurrentUser:
 
     def test_inactive_user_raises_401(self, isolate_db, admin_user_id):
         from fastapi import HTTPException
+
         database.update_user(admin_user_id, is_active=0)
         token = auth.create_access_token({"sub": str(admin_user_id), "role": "ADMIN"})
         with pytest.raises(HTTPException) as exc_info:
@@ -133,6 +137,7 @@ class TestGetCurrentUser:
 
     def test_deleted_user_raises_401(self, isolate_db, admin_user_id):
         from fastapi import HTTPException
+
         token = auth.create_access_token({"sub": str(admin_user_id), "role": "ADMIN"})
         database.delete_user(admin_user_id)
         with pytest.raises(HTTPException) as exc_info:
@@ -141,6 +146,7 @@ class TestGetCurrentUser:
 
     def test_invalid_token_raises_401(self, isolate_db):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             auth.get_current_user(token="invalid_token")
         assert exc_info.value.status_code == 401
@@ -154,6 +160,7 @@ class TestRequireAdmin:
 
     def test_operator_raises_403(self, isolate_db, operator_user_id):
         from fastapi import HTTPException
+
         user = database.get_user_by_id(operator_user_id)
         with pytest.raises(HTTPException) as exc_info:
             auth.require_admin(current_user=user)

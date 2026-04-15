@@ -1,12 +1,11 @@
 import os
 import sys
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import cloud_sync
-import database
 
 
 class TestS3Upload:
@@ -33,9 +32,7 @@ class TestS3Upload:
             aws_access_key_id="AKIA_TEST",
             aws_secret_access_key="SECRET_TEST",
         )
-        mock_s3.upload_file.assert_called_once_with(
-            "/recordings/backup.zip", "vpack-backup", "backup.zip"
-        )
+        mock_s3.upload_file.assert_called_once_with("/recordings/backup.zip", "vpack-backup", "backup.zip")
 
     @patch("cloud_sync.boto3.client")
     def test_s3_upload_invalid_credentials(self, mock_boto_client):
@@ -94,9 +91,7 @@ class TestGDriveUpload:
         mock_media_instance = MagicMock()
         mock_media.return_value = mock_media_instance
 
-        result = cloud_sync.upload_to_gdrive(
-            "/recordings/backup.zip", folder_id="folder_xyz"
-        )
+        result = cloud_sync.upload_to_gdrive("/recordings/backup.zip", folder_id="folder_xyz")
 
         assert result is True
         mock_get_creds.assert_called_once()
@@ -142,9 +137,7 @@ class TestProcessCloudSync:
         with patch("os.path.exists", return_value=False):
             cloud_sync.process_cloud_sync()
 
-        mock_upload_s3.assert_called_once_with(
-            tmp_path, "https://s3.example.com", "AK_TEST", "SK_TEST", "bucket1"
-        )
+        mock_upload_s3.assert_called_once_with(tmp_path, "https://s3.example.com", "AK_TEST", "SK_TEST", "bucket1")
         mock_tg.assert_called_once()
         tg_msg = mock_tg.call_args[0][0]
         assert "Cloud Sync Hoàn Tất" in tg_msg

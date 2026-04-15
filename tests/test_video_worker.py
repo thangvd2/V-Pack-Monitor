@@ -1,9 +1,8 @@
 import os
 import sys
 import pytest
-import time
 import threading
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -19,14 +18,19 @@ import database
 def _reset_worker():
     """Ensure executor is cleaned up between tests."""
     yield
-    video_worker.shutdown()
+    # Use short timeout to avoid hanging test suite on shutdown poll
+    original = video_worker._SHUTDOWN_TIMEOUT
+    video_worker._SHUTDOWN_TIMEOUT = 2
+    try:
+        video_worker.shutdown()
+    finally:
+        video_worker._SHUTDOWN_TIMEOUT = original
 
 
 # =============================================================================
 # TestVideoWorker — executor lifecycle, submit, shutdown, task processing
 # =============================================================================
 class TestVideoWorker:
-
     # --- lazy init ---
 
     def test_submit_lazy_init_creates_executor(self):
@@ -34,8 +38,9 @@ class TestVideoWorker:
         assert video_worker._executor is None
         mock_rec = MagicMock()
         mock_rec.stop_recording.return_value = []
-        video_worker.submit_stop_and_save(1, mock_rec, "WB001", 1, save=False)
-        assert video_worker._executor is not None
+        with patch("video_worker._process_stop_and_save"):
+            video_worker.submit_stop_and_save(1, mock_rec, "WB001", 1, save=False)
+            assert video_worker._executor is not None
 
     # --- submit delegation ---
 
@@ -55,23 +60,25 @@ class TestVideoWorker:
 
     # --- shutdown behaviour ---
 
-    def test_shutdown_calls_wait_true(self):
-        """shutdown() calls executor.shutdown(wait=True) — Bug #6 guard."""
+    def test_shutdown_calls_wait_false_then_poll(self):
+        """shutdown() calls executor.shutdown(wait=False) then polls — timeout guard."""
         mock_executor = MagicMock()
+        mock_executor._threads = []  # No active threads — exit immediately
         with video_worker._lock:
             video_worker._executor = mock_executor
 
         video_worker.shutdown()
 
-        mock_executor.shutdown.assert_called_once_with(wait=True)
+        mock_executor.shutdown.assert_called_once_with(wait=False)
         assert video_worker._executor is None
 
     def test_shutdown_resets_executor_to_none(self):
         """After shutdown, module-level _executor is reset to None."""
         mock_rec = MagicMock()
         mock_rec.stop_recording.return_value = []
-        video_worker.submit_stop_and_save(1, mock_rec, "WB001", 1, save=False)
-        assert video_worker._executor is not None
+        with patch("video_worker._process_stop_and_save"):
+            video_worker.submit_stop_and_save(1, mock_rec, "WB001", 1, save=False)
+            assert video_worker._executor is not None
         video_worker.shutdown()
         assert video_worker._executor is None
 
@@ -79,8 +86,9 @@ class TestVideoWorker:
         """Calling shutdown() twice does not raise — second call is a no-op."""
         mock_rec = MagicMock()
         mock_rec.stop_recording.return_value = []
-        video_worker.submit_stop_and_save(1, mock_rec, "WB001", 1, save=False)
-        video_worker.shutdown()
+        with patch("video_worker._process_stop_and_save"):
+            video_worker.submit_stop_and_save(1, mock_rec, "WB001", 1, save=False)
+            video_worker.shutdown()
         # Second call — must not raise
         video_worker.shutdown()
         assert video_worker._executor is None
@@ -91,19 +99,26 @@ class TestVideoWorker:
         """Concurrent submit + shutdown must not deadlock."""
         mock_rec = MagicMock()
         mock_rec.stop_recording.return_value = []
-        # Pre-create executor with a real task
-        video_worker.submit_stop_and_save(1, mock_rec, "WB001", 1, save=False)
+        # Pre-create executor with a real task (mock processing to avoid DB side effects)
+        with patch("video_worker._process_stop_and_save"):
+            video_worker.submit_stop_and_save(1, mock_rec, "WB001", 1, save=False)
 
         done = threading.Event()
 
         def do_shutdown():
-            video_worker.shutdown()
+            # Use shorter timeout in test to avoid long waits
+            original_timeout = video_worker._SHUTDOWN_TIMEOUT
+            video_worker._SHUTDOWN_TIMEOUT = 3
+            try:
+                video_worker.shutdown()
+            finally:
+                video_worker._SHUTDOWN_TIMEOUT = original_timeout
             done.set()
 
         t = threading.Thread(target=do_shutdown)
         t.start()
-        assert done.wait(timeout=3), "shutdown() hung — possible deadlock"
-        t.join(timeout=1)
+        assert done.wait(timeout=10), "shutdown() hung — possible deadlock"
+        t.join(timeout=3)
 
     # --- task success callback ---
 
@@ -113,11 +128,17 @@ class TestVideoWorker:
         mock_rec = MagicMock()
         mock_rec.stop_recording.return_value = ["/fake/video.mp4"]
 
-        with patch("video_worker._verify_video", return_value=True), \
-             patch("video_worker._decrement_processing"), \
-             patch("video_worker._notify_sse_safe"):
+        with (
+            patch("video_worker._verify_video", return_value=True),
+            patch("video_worker._decrement_processing"),
+            patch("video_worker._notify_sse_safe"),
+        ):
             video_worker._process_stop_and_save(
-                rid, mock_rec, "WB_OK", sample_station_id, save=True,
+                rid,
+                mock_rec,
+                "WB_OK",
+                sample_station_id,
+                save=True,
             )
 
         assert database.get_record_by_id(rid)["status"] == "READY"
@@ -130,11 +151,17 @@ class TestVideoWorker:
         mock_rec = MagicMock()
         mock_rec.stop_recording.return_value = []
 
-        with patch("video_worker._send_failed_alert"), \
-             patch("video_worker._decrement_processing"), \
-             patch("video_worker._notify_sse_safe"):
+        with (
+            patch("video_worker._send_failed_alert"),
+            patch("video_worker._decrement_processing"),
+            patch("video_worker._notify_sse_safe"),
+        ):
             video_worker._process_stop_and_save(
-                rid, mock_rec, "WB_FAIL", sample_station_id, save=True,
+                rid,
+                mock_rec,
+                "WB_FAIL",
+                sample_station_id,
+                save=True,
             )
 
         assert database.get_record_by_id(rid)["status"] == "FAILED"
@@ -147,10 +174,16 @@ class TestVideoWorker:
         mock_rec = MagicMock()
         mock_rec.stop_recording.return_value = ["/fake/video.mp4"]
 
-        with patch("video_worker._decrement_processing"), \
-             patch("video_worker._notify_sse_safe"):
+        with (
+            patch("video_worker._decrement_processing"),
+            patch("video_worker._notify_sse_safe"),
+        ):
             video_worker._process_stop_and_save(
-                rid, mock_rec, "WB_DEL", sample_station_id, save=False,
+                rid,
+                mock_rec,
+                "WB_DEL",
+                sample_station_id,
+                save=False,
             )
 
         assert database.get_record_by_id(rid) is None
@@ -163,11 +196,17 @@ class TestVideoWorker:
         mock_rec = MagicMock()
         mock_rec.stop_recording.side_effect = RuntimeError("FFmpeg crashed")
 
-        with patch("video_worker._send_failed_alert"), \
-             patch("video_worker._decrement_processing"), \
-             patch("video_worker._notify_sse_safe"):
+        with (
+            patch("video_worker._send_failed_alert"),
+            patch("video_worker._decrement_processing"),
+            patch("video_worker._notify_sse_safe"),
+        ):
             video_worker._process_stop_and_save(
-                rid, mock_rec, "WB_ERR", sample_station_id, save=True,
+                rid,
+                mock_rec,
+                "WB_ERR",
+                sample_station_id,
+                save=True,
             )
 
         assert database.get_record_by_id(rid)["status"] == "FAILED"
@@ -177,7 +216,6 @@ class TestVideoWorker:
 # TestCrashRecovery — _recover_pending_records (defined in api.py)
 # =============================================================================
 class TestCrashRecovery:
-
     def test_recover_recording_records(self, sample_station_id):
         """RECORDING records with no recoverable files are marked FAILED."""
         import api
@@ -185,8 +223,10 @@ class TestCrashRecovery:
         rid = database.create_record(sample_station_id, "REC_WB", "SINGLE")
         assert database.get_record_by_id(rid)["status"] == "RECORDING"
 
-        with patch("os.path.exists", return_value=False), \
-             patch("api._verify_video_external", return_value=False):
+        with (
+            patch("os.path.exists", return_value=False),
+            patch("api._verify_video_external", return_value=False),
+        ):
             api._recover_pending_records()
 
         assert database.get_record_by_id(rid)["status"] == "FAILED"
@@ -202,8 +242,10 @@ class TestCrashRecovery:
             # .tmp.ts does not exist, but final .mp4 does
             return p == "/fake/video.mp4"
 
-        with patch("os.path.exists", side_effect=mock_exists), \
-             patch("api._verify_video_external", return_value=True):
+        with (
+            patch("os.path.exists", side_effect=mock_exists),
+            patch("api._verify_video_external", return_value=True),
+        ):
             api._recover_pending_records()
 
         assert database.get_record_by_id(rid)["status"] == "READY"

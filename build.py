@@ -7,7 +7,6 @@
 import os
 import sys
 import subprocess
-import shutil
 
 print("=== V-Pack Monitor Builder ===")
 

@@ -19,7 +19,6 @@ Vi du:
 
 import os
 import sys
-import time
 import socket
 
 os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
@@ -80,7 +79,7 @@ def main():
         sys.exit(1)
 
     print(f"{'=' * 50}")
-    print(f" RTSP Camera Connection Tester")
+    print(" RTSP Camera Connection Tester")
     print(f"{'=' * 50}")
     print(f"IP: {ip}")
     print(f"Safety Code: {code}")
@@ -88,16 +87,16 @@ def main():
         print(f"Brand filter: {brand_filter}")
     print()
 
-    print(f"[1/2] Kiem tra TCP port 554...")
+    print("[1/2] Kiem tra TCP port 554...")
     if check_tcp(ip, 554):
-        print(f"      Port 554 MO - Thiet bi phan hoi")
+        print("      Port 554 MO - Thiet bi phan hoi")
     else:
-        print(f"      Port 554 DONG - Khong the ket noi!")
-        print(f"      Kiem tra lai IP va dam bao camera dang bat.")
+        print("      Port 554 DONG - Khong the ket noi!")
+        print("      Kiem tra lai IP va dam bao camera dang bat.")
         sys.exit(1)
 
     print()
-    print(f"[2/2] Thu ket noi RTSP...")
+    print("[2/2] Thu ket noi RTSP...")
     print()
 
     urls = generate_rtsp_urls(ip, code)
@@ -105,9 +104,7 @@ def main():
     for label, url in urls.items():
         if brand_filter:
             brand_name = label.split(" ")[0].lower()
-            if brand_filter not in brand_name and not (
-                brand_filter == "dahua" and "imou" in brand_name
-            ):
+            if brand_filter not in brand_name and not (brand_filter == "dahua" and "imou" in brand_name):
                 continue
 
         print(f"  Thu: {label}")
@@ -116,7 +113,7 @@ def main():
         if ok:
             print(f"  => THANH CONG! ({info})")
         else:
-            print(f"  => That bai")
+            print("  => That bai")
         print()
 
     print(f"{'=' * 50}")
