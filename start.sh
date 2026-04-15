@@ -21,6 +21,14 @@ if [ -d "bin/ffmpeg/bin" ]; then
     export PATH="$(pwd)/bin/ffmpeg/bin:$PATH"
 fi
 
+if [ ! -f "venv/bin/activate" ]; then
+    echo ""
+    echo "LOI: Khong tim thay moi truong ao venv!"
+    echo "Vui long chay install_macos.sh truoc."
+    echo ""
+    exit 1
+fi
+
 source venv/bin/activate
 python3 -m uvicorn api:app --host 0.0.0.0 --port 8001 &
 SERVER_PID=$!

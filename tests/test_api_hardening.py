@@ -33,57 +33,77 @@ class TestStationValidation:
     def test_create_station_empty_name(self, client, admin_headers):
         """Empty name is currently accepted — needs backend validation."""
         # Empty name now rejected with 422 (Pydantic min_length=1)
-        r = client.post("/api/stations", headers=admin_headers, json={
-            "name": "",
-            "ip_camera_1": "10.0.0.1",
-            "safety_code": "ABCD",
-            "camera_mode": "SINGLE",
-        })
+        r = client.post(
+            "/api/stations",
+            headers=admin_headers,
+            json={
+                "name": "",
+                "ip_camera_1": "10.0.0.1",
+                "safety_code": "ABCD",
+                "camera_mode": "SINGLE",
+            },
+        )
         assert r.status_code == 422
 
     def test_create_station_very_long_name(self, client, admin_headers):
         """Names exceeding 50 characters are currently accepted."""
         # TODO(Plan #19): Backend should reject name > 50 characters
-        r = client.post("/api/stations", headers=admin_headers, json={
-            "name": "X" * 100,
-            "ip_camera_1": "10.0.0.1",
-            "safety_code": "ABCD",
-            "camera_mode": "SINGLE",
-        })
+        r = client.post(
+            "/api/stations",
+            headers=admin_headers,
+            json={
+                "name": "X" * 100,
+                "ip_camera_1": "10.0.0.1",
+                "safety_code": "ABCD",
+                "camera_mode": "SINGLE",
+            },
+        )
         assert r.status_code == 200
         assert r.json()["status"] == "success"
 
     def test_create_station_empty_ip_camera(self, client, admin_headers):
         """Empty ip_camera_1 is currently accepted."""
         # Empty ip_camera_1 now rejected with 422 (Pydantic min_length=7)
-        r = client.post("/api/stations", headers=admin_headers, json={
-            "name": "NoIP Station",
-            "ip_camera_1": "",
-            "safety_code": "ABCD",
-            "camera_mode": "SINGLE",
-        })
+        r = client.post(
+            "/api/stations",
+            headers=admin_headers,
+            json={
+                "name": "NoIP Station",
+                "ip_camera_1": "",
+                "safety_code": "ABCD",
+                "camera_mode": "SINGLE",
+            },
+        )
         assert r.status_code == 422
 
     def test_create_station_empty_safety_code(self, client, admin_headers):
         """Empty safety_code is currently accepted."""
         # Empty safety_code now rejected with 422 (Pydantic min_length=1)
-        r = client.post("/api/stations", headers=admin_headers, json={
-            "name": "NoCode Station",
-            "ip_camera_1": "10.0.0.1",
-            "safety_code": "",
-            "camera_mode": "SINGLE",
-        })
+        r = client.post(
+            "/api/stations",
+            headers=admin_headers,
+            json={
+                "name": "NoCode Station",
+                "ip_camera_1": "10.0.0.1",
+                "safety_code": "",
+                "camera_mode": "SINGLE",
+            },
+        )
         assert r.status_code == 422
 
     def test_create_station_invalid_ip_format(self, client, admin_headers):
         """Invalid IP format is currently accepted — no server-side regex check."""
         # TODO(Plan #19): Backend should validate IP address format
-        r = client.post("/api/stations", headers=admin_headers, json={
-            "name": "BadIP Station",
-            "ip_camera_1": "not-an-ip-address",
-            "safety_code": "ABCD",
-            "camera_mode": "SINGLE",
-        })
+        r = client.post(
+            "/api/stations",
+            headers=admin_headers,
+            json={
+                "name": "BadIP Station",
+                "ip_camera_1": "not-an-ip-address",
+                "safety_code": "ABCD",
+                "camera_mode": "SINGLE",
+            },
+        )
         assert r.status_code == 200
         assert r.json()["status"] == "success"
 
@@ -108,15 +128,17 @@ class TestStationConflict:
 
     def test_conflict_ip_matches_camera_2(self, client, admin_headers):
         """Queried IP should match a station's ip_camera_2 field."""
-        database.add_station({
-            "name": "Dual Station",
-            "ip_camera_1": "10.0.0.1",
-            "ip_camera_2": "10.0.0.2",
-            "safety_code": "CODE1",
-            "camera_mode": "DUAL",
-            "camera_brand": "imou",
-            "mac_address": "",
-        })
+        database.add_station(
+            {
+                "name": "Dual Station",
+                "ip_camera_1": "10.0.0.1",
+                "ip_camera_2": "10.0.0.2",
+                "safety_code": "CODE1",
+                "camera_mode": "DUAL",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
         r = client.get(
             "/api/stations/check-conflict",
             headers=admin_headers,
@@ -136,7 +158,9 @@ class TestStationConflict:
         warnings = r.json()["warnings"]
         assert len(warnings) > 0
 
-    def test_conflict_name_case_insensitive(self, client, admin_headers, sample_station_id):
+    def test_conflict_name_case_insensitive(
+        self, client, admin_headers, sample_station_id
+    ):
         """Name conflict detection is case-insensitive."""
         r = client.get(
             "/api/stations/check-conflict",
@@ -146,7 +170,9 @@ class TestStationConflict:
         warnings = r.json()["warnings"]
         assert len(warnings) > 0
 
-    def test_conflict_multiple_warnings_combined(self, client, admin_headers, sample_station_id):
+    def test_conflict_multiple_warnings_combined(
+        self, client, admin_headers, sample_station_id
+    ):
         """Requesting IP + MAC + name together yields >= 3 warnings."""
         r = client.get(
             "/api/stations/check-conflict",
@@ -169,32 +195,44 @@ class TestSettingsValidation:
     """
 
     def test_settings_stream_type_main(self, client, admin_headers):
-        r = client.post("/api/settings", headers=admin_headers, json={
-            "RECORD_KEEP_DAYS": 7,
-            "RECORD_STREAM_TYPE": "main",
-            "CLOUD_PROVIDER": "NONE",
-        })
+        r = client.post(
+            "/api/settings",
+            headers=admin_headers,
+            json={
+                "RECORD_KEEP_DAYS": 7,
+                "RECORD_STREAM_TYPE": "main",
+                "CLOUD_PROVIDER": "NONE",
+            },
+        )
         assert r.json()["status"] == "success"
         assert database.get_setting("RECORD_STREAM_TYPE") == "main"
 
     def test_settings_stream_type_sub(self, client, admin_headers):
         database.set_setting("RECORD_STREAM_TYPE", "main")
-        r = client.post("/api/settings", headers=admin_headers, json={
-            "RECORD_KEEP_DAYS": 7,
-            "RECORD_STREAM_TYPE": "sub",
-            "CLOUD_PROVIDER": "NONE",
-        })
+        r = client.post(
+            "/api/settings",
+            headers=admin_headers,
+            json={
+                "RECORD_KEEP_DAYS": 7,
+                "RECORD_STREAM_TYPE": "sub",
+                "CLOUD_PROVIDER": "NONE",
+            },
+        )
         assert r.json()["status"] == "success"
         assert database.get_setting("RECORD_STREAM_TYPE") == "sub"
 
     def test_settings_invalid_stream_type_accepted(self, client, admin_headers):
         """Invalid stream type is persisted without validation."""
         # TODO(Plan #16): Backend should validate RECORD_STREAM_TYPE ∈ {main, sub}
-        r = client.post("/api/settings", headers=admin_headers, json={
-            "RECORD_KEEP_DAYS": 7,
-            "RECORD_STREAM_TYPE": "INVALID_TYPE",
-            "CLOUD_PROVIDER": "NONE",
-        })
+        r = client.post(
+            "/api/settings",
+            headers=admin_headers,
+            json={
+                "RECORD_KEEP_DAYS": 7,
+                "RECORD_STREAM_TYPE": "INVALID_TYPE",
+                "CLOUD_PROVIDER": "NONE",
+            },
+        )
         assert r.json()["status"] == "success"
         assert database.get_setting("RECORD_STREAM_TYPE") == "INVALID_TYPE"
 
@@ -209,7 +247,7 @@ class TestAutoUpdate:
 
     def test_update_check_returns_structure(self, client, admin_headers, monkeypatch):
         """Pre-populated cache is returned with the expected keys."""
-        import api
+        import routes_system
 
         cached = {
             "current_version": "2.0.0",
@@ -218,10 +256,14 @@ class TestAutoUpdate:
             "mode": "production",
             "changelog": "Bug fixes",
         }
-        monkeypatch.setattr(api, "_update_check_cache", {
-            "result": cached,
-            "timestamp": time.time(),
-        })
+        monkeypatch.setattr(
+            routes_system,
+            "_update_check_cache",
+            {
+                "result": cached,
+                "timestamp": time.time(),
+            },
+        )
 
         r = client.get("/api/system/update-check", headers=admin_headers)
         data = r.json()
@@ -232,7 +274,7 @@ class TestAutoUpdate:
 
     def test_update_check_caches_result(self, client, admin_headers, monkeypatch):
         """Two consecutive calls return the identical cached payload."""
-        import api
+        import routes_system
 
         cached = {
             "current_version": "1.0.0",
@@ -241,23 +283,29 @@ class TestAutoUpdate:
             "mode": "dev",
             "changelog": "",
         }
-        monkeypatch.setattr(api, "_update_check_cache", {
-            "result": cached,
-            "timestamp": time.time(),
-        })
+        monkeypatch.setattr(
+            routes_system,
+            "_update_check_cache",
+            {
+                "result": cached,
+                "timestamp": time.time(),
+            },
+        )
 
         r1 = client.get("/api/system/update-check", headers=admin_headers)
         r2 = client.get("/api/system/update-check", headers=admin_headers)
         assert r1.json() == r2.json()
         assert r2.json()["current_version"] == "1.0.0"
 
-    def test_update_concurrent_rejected_by_lock(self, client, admin_headers, monkeypatch):
+    def test_update_concurrent_rejected_by_lock(
+        self, client, admin_headers, monkeypatch
+    ):
         """Second update attempt is rejected when ``_update_lock`` is held."""
-        import api
+        import routes_system
 
         new_lock = threading.Lock()
-        monkeypatch.setattr(api, "_update_lock", new_lock)
-        monkeypatch.setattr(api, "_is_updating", False)
+        monkeypatch.setattr(routes_system, "_update_lock", new_lock)
+        monkeypatch.setattr(routes_system, "_is_updating", False)
 
         # Simulate an ongoing update by pre-acquiring the lock
         new_lock.acquire()
@@ -270,10 +318,10 @@ class TestAutoUpdate:
 
     def test_update_rejected_when_flag_set(self, client, admin_headers, monkeypatch):
         """``_is_updating`` flag blocks even when lock is free."""
-        import api
+        import routes_system
 
-        monkeypatch.setattr(api, "_update_lock", threading.Lock())
-        monkeypatch.setattr(api, "_is_updating", True)
+        monkeypatch.setattr(routes_system, "_update_lock", threading.Lock())
+        monkeypatch.setattr(routes_system, "_is_updating", True)
 
         r = client.post("/api/system/update", headers=admin_headers)
         data = r.json()
@@ -334,10 +382,14 @@ class TestRBACEdgeCases:
 
     def test_operator_cannot_create_station(self, client, operator_headers):
         """Station creation requires ADMIN role."""
-        r = client.post("/api/stations", headers=operator_headers, json={
-            "name": "Op Station",
-            "ip_camera_1": "10.0.0.1",
-            "safety_code": "CODE1",
-            "camera_mode": "SINGLE",
-        })
+        r = client.post(
+            "/api/stations",
+            headers=operator_headers,
+            json={
+                "name": "Op Station",
+                "ip_camera_1": "10.0.0.1",
+                "safety_code": "CODE1",
+                "camera_mode": "SINGLE",
+            },
+        )
         assert r.status_code == 403
