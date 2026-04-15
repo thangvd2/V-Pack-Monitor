@@ -28,8 +28,10 @@ def _load_or_create_secret():
     return new_secret
 
 
+# Loaded once at module import. To rotate, restart the server.
 SECRET_KEY = _load_or_create_secret()
 ALGORITHM = "HS256"
+# Token expires in 8 hours. Adjust ACCESS_TOKEN_EXPIRE_HOURS for shorter/longer sessions.
 ACCESS_TOKEN_EXPIRE_HOURS = 8
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -42,8 +44,8 @@ def revoke_token(token: str):
         exp = payload.get("exp", 0)
         if jti and exp:
             database.revoke_jti(jti, exp)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[AUTH] Token revocation failed: {e}")
 
 
 def is_token_revoked(jti: str) -> bool:
@@ -89,7 +91,12 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     except jwt.InvalidTokenError:
         raise credentials_exception
 
-    user = database.get_user_by_id(int(user_id))
+    try:
+        user_id_int = int(user_id)
+    except (ValueError, TypeError):
+        raise credentials_exception
+
+    user = database.get_user_by_id(user_id_int)
     if user is None or not user.get("is_active"):
         raise credentials_exception
     return user

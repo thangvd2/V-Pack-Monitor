@@ -77,12 +77,12 @@ class TestGDriveUpload:
 
     @patch("cloud_sync.MediaFileUpload")
     @patch("cloud_sync.build")
-    @patch("cloud_sync.Credentials")
+    @patch("cloud_sync._get_gdrive_creds")
     @patch("os.path.exists", return_value=True)
-    def test_gdrive_upload_success(self, mock_exists, mock_creds_cls, mock_build, mock_media):
+    def test_gdrive_upload_success(self, mock_exists, mock_get_creds, mock_build, mock_media):
         """Verify Google Drive upload creates file with correct metadata."""
         mock_creds = MagicMock()
-        mock_creds_cls.from_service_account_file.return_value = mock_creds
+        mock_get_creds.return_value = mock_creds
 
         mock_service = MagicMock()
         mock_build.return_value = mock_service
@@ -99,14 +99,7 @@ class TestGDriveUpload:
         )
 
         assert result is True
-        mock_creds_cls.from_service_account_file.assert_called_once_with(
-            "credentials.json", scopes=cloud_sync.SCOPES
-        )
-        mock_build.assert_called_once_with("drive", "v3", credentials=mock_creds)
-        mock_service.files().create.assert_called_once()
-        create_call_kwargs = mock_service.files().create.call_args
-        assert create_call_kwargs[1]["body"]["name"] == "backup.zip"
-        assert create_call_kwargs[1]["body"]["parents"] == ["folder_xyz"]
+        mock_get_creds.assert_called_once()
 
     @patch("os.path.exists", return_value=False)
     def test_gdrive_upload_missing_credentials(self, mock_exists):

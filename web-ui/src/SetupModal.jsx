@@ -1,5 +1,5 @@
 /**
- * V-Pack Monitor - CamDongHang v2.3.1
+ * V-Pack Monitor - CamDongHang v2.4.2
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
@@ -7,10 +7,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Settings, Save, AlertCircle, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, Wifi, WifiOff, Loader2 } from 'lucide-react';
-
-const API_BASE = window.location.hostname === 'localhost' && ['3000', '3001', '5173'].includes(window.location.port)
-  ? 'http://localhost:8001'
-  : window.location.origin;
+import API_BASE from './config';
 
 const isValidIPv4 = (ip) => {
   const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
@@ -118,6 +115,7 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
   const [warnings, setWarnings] = useState([]);
   const [touched, setTouched] = useState({});
   const conflictTimerRef = useRef(null);
+  const [confirmDialog, setConfirmDialog] = useState({ show: false, message: '', onConfirm: null });
 
   useEffect(() => {
     if (!isOpen) {
@@ -200,32 +198,8 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
     }
   };
 
-  const handleSave = async () => {
-    setTouched({ name: true, ip1: true, ip2: true, safety: true, mac: true });
-    if (hasErrors) {
-      setError('Vui lòng sửa các lỗi trước khi lưu.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
+  const doSaveStation = async () => {
     try {
-      const params = new URLSearchParams();
-      if (ip1) params.set('ip', ip1);
-      if (ip2 && ip2.trim()) params.set('ip2', ip2);
-      if (macAddress) params.set('mac', macAddress);
-      if (name) params.set('name', name);
-      params.set('exclude_id', excludeId);
-      const conflictRes = await axios.get(`${API_BASE}/api/stations/check-conflict?${params}`);
-      const freshWarnings = conflictRes.data.warnings || [];
-      setWarnings(freshWarnings);
-
-      if (freshWarnings.length > 0) {
-        const confirmed = window.confirm('Cảnh báo:\n' + freshWarnings.join('\n') + '\n\nTiếp tục lưu?');
-        if (!confirmed) { setLoading(false); return; }
-      }
-
       await axios.post(`${API_BASE}/api/settings`, {
         RECORD_KEEP_DAYS: parseInt(keepDays),
         CLOUD_PROVIDER: cloudProvider,
@@ -262,33 +236,78 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
       }
 
       onSaved();
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError('Lỗi kết nối tới Server. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (window.confirm("Xóa trạm này khỏi hệ thống? Các video cũ vẫn sẽ được giữ lại theo mã vận đơn.")) {
-      try {
-        setLoading(true);
-        await axios.delete(`${API_BASE}/api/stations/${currentStation.id}`);
-        onSaved();
-      } catch {
-        setLoading(false);
-        setError("Không thể xóa trạm lúc này!");
-      }
+  const handleSave = async () => {
+    setTouched({ name: true, ip1: true, ip2: true, safety: true, mac: true });
+    if (hasErrors) {
+      setError('Vui lòng sửa các lỗi trước khi lưu.');
+      return;
     }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const params = new URLSearchParams();
+      if (ip1) params.set('ip', ip1);
+      if (ip2 && ip2.trim()) params.set('ip2', ip2);
+      if (macAddress) params.set('mac', macAddress);
+      if (name) params.set('name', name);
+      params.set('exclude_id', excludeId);
+      const conflictRes = await axios.get(`${API_BASE}/api/stations/check-conflict?${params}`);
+      const freshWarnings = conflictRes.data.warnings || [];
+      setWarnings(freshWarnings);
+
+      if (freshWarnings.length > 0) {
+        setLoading(false);
+        setConfirmDialog({
+          show: true,
+          message: 'Cảnh báo:\n' + freshWarnings.join('\n') + '\n\nTiếp tục lưu?',
+          onConfirm: () => { setLoading(true); doSaveStation(); }
+        });
+        return;
+      }
+
+      await doSaveStation();
+    } catch {
+      setError('Lỗi kiểm tra xung đột. Vui lòng thử lại.');
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setConfirmDialog({
+      show: true,
+      message: "Xóa trạm này khỏi hệ thống? Các video cũ vẫn sẽ được giữ lại theo mã vận đơn.",
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await axios.delete(`${API_BASE}/api/stations/${currentStation.id}`);
+          onSaved();
+        } catch {
+          setLoading(false);
+          setError("Không thể xóa trạm lúc này!");
+        }
+      }
+    });
   };
 
   const handleCancel = () => {
     if (dirty) {
-      const confirmed = window.confirm('Bạn có thay đổi chưa lưu. Thoát?');
-      if (!confirmed) return;
+      setConfirmDialog({
+        show: true,
+        message: 'Bạn có thay đổi chưa lưu. Thoát?',
+        onConfirm: () => onCancel()
+      });
+    } else {
+      onCancel();
     }
-    onCancel();
   };
 
   const formatMac = (val) => {
@@ -651,6 +670,19 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
           </button>
         </div>
       </div>
+
+      {/* Confirm Dialog */}
+      {confirmDialog.show && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
+          <div className="bg-zinc-800 rounded-lg p-6 max-w-sm">
+            <p className="text-white mb-4 whitespace-pre-line">{confirmDialog.message}</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setConfirmDialog({ show: false })} className="px-4 py-2 text-zinc-400 hover:text-white">Huỷ</button>
+              <button onClick={() => { confirmDialog.onConfirm?.(); setConfirmDialog({ show: false }); }} className="px-4 py-2 bg-red-600 text-white rounded-lg">Xác nhận</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

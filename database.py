@@ -9,9 +9,11 @@ import os
 import time as _time
 import hashlib
 import base64
+import threading
 from datetime import datetime, timezone
 
-_ENCRYPT_PREFIX = "enc:v1:"
+_ENCRYPT_PREFIX = "enc:v2:"
+_V1_PREFIX = "enc:v1:"
 
 
 _DB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recordings")
@@ -19,276 +21,390 @@ os.makedirs(_DB_DIR, exist_ok=True)
 
 
 def _get_enc_key():
+    """Get key material for encryption."""
     try:
         from auth import SECRET_KEY
-        if SECRET_KEY:
-            return hashlib.sha256(SECRET_KEY.encode()).digest()
+        key_material = SECRET_KEY.encode("utf-8") if isinstance(SECRET_KEY, str) else SECRET_KEY
+        if key_material:
+            return key_material
     except (ImportError, AttributeError):
         pass
-    fallback = os.environ.get("VPACK_SECRET", "vpack-default-encryption-key")
-    return hashlib.sha256(fallback.encode()).digest()
+    fallback = os.environ.get("VPACK_SECRET", "")
+    if fallback:
+        return fallback.encode("utf-8")
+    # No hardcoded fallback — generate random key and warn
+    import secrets
+    key_material = secrets.token_bytes(32)
+    print("[DB] WARNING: No encryption key configured. Using random key. Set VPACK_SECRET env var or auth.SECRET_KEY.")
+    return key_material
+
+
+def _get_fernet():
+    """Get Fernet instance derived from key material."""
+    from cryptography.fernet import Fernet
+    key_material = _get_enc_key()
+    fernet_key = base64.urlsafe_b64encode(hashlib.sha256(key_material).digest())
+    return Fernet(fernet_key)
+
+
+def _xor_decrypt_raw(data, key):
+    """Legacy XOR decryption for v1 migration."""
+    return bytes(a ^ b for a, b in zip(data, (key * ((len(data) // len(key)) + 1))[:len(data)]))
 
 
 def _encrypt_value(plaintext: str) -> str:
-    key = _get_enc_key()
-    raw = plaintext.encode("utf-8")
-    encrypted = bytes(a ^ b for a, b in zip(raw, (key * (len(raw) // len(key) + 1))[:len(raw)]))
-    return _ENCRYPT_PREFIX + base64.b64encode(encrypted).decode()
+    if not plaintext:
+        return plaintext
+    f = _get_fernet()
+    encrypted = f.encrypt(plaintext.encode("utf-8"))
+    return _ENCRYPT_PREFIX + encrypted.decode("utf-8")
 
 
 def _decrypt_value(ciphertext: str) -> str:
-    if not ciphertext.startswith(_ENCRYPT_PREFIX):
+    if not ciphertext:
         return ciphertext
-    key = _get_enc_key()
-    encrypted = base64.b64decode(ciphertext[len(_ENCRYPT_PREFIX):])
-    decrypted = bytes(a ^ b for a, b in zip(encrypted, (key * (len(encrypted) // len(key) + 1))[:len(encrypted)]))
+    if ciphertext.startswith(_ENCRYPT_PREFIX):
+        # v2: Fernet decryption
+        try:
+            f = _get_fernet()
+            decrypted = f.decrypt(ciphertext[len(_ENCRYPT_PREFIX):].encode("utf-8"))
+            return decrypted.decode("utf-8")
+        except Exception:
+            return ciphertext  # Return as-is if decryption fails
+    elif ciphertext.startswith(_V1_PREFIX):
+        # v1: Legacy XOR decryption (for migration compatibility)
+        try:
+            from auth import SECRET_KEY
+            key_material = SECRET_KEY.encode("utf-8") if isinstance(SECRET_KEY, str) else SECRET_KEY
+            fallback = os.environ.get("VPACK_SECRET", "vpack-default-encryption-key")
+            if not key_material:
+                key_material = fallback.encode("utf-8")
+            key = hashlib.sha256(key_material).digest()
+            data = base64.b64decode(ciphertext[len(_V1_PREFIX):])
+            return _xor_decrypt_raw(data, key).decode("utf-8")
+        except Exception:
+            return ciphertext
+    return ciphertext
+
+
+def _migrate_v1_to_v2():
+    """Migrate encrypted values from XOR (v1) to Fernet (v2)."""
     try:
-        return decrypted.decode("utf-8")
-    except UnicodeDecodeError:
-        return ciphertext
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            for key_name in _SENSITIVE_KEYS:
+                cursor.execute("SELECT config_value FROM system_settings WHERE config_key = ?", (key_name,))
+                row = cursor.fetchone()
+                if row and row[0] and row[0].startswith(_V1_PREFIX):
+                    # Decrypt with old XOR
+                    plaintext = _decrypt_value(row[0])  # _decrypt_value handles v1
+                    # Re-encrypt with Fernet
+                    new_value = _encrypt_value(plaintext)
+                    cursor.execute("UPDATE system_settings SET config_value = ? WHERE config_key = ?", (new_value, key_name))
+            conn.commit()
+            print("[DB] Encryption migration v1→v2 complete.")
+    except Exception as e:
+        print(f"[DB] Encryption migration warning: {e}")
 
 
 _SENSITIVE_KEYS = {"S3_SECRET_KEY", "S3_ACCESS_KEY", "TELEGRAM_BOT_TOKEN"}
 
-DB_FILE = "recordings/packing_records.db"
+# L4: Use absolute path for DB_FILE to avoid CWD-dependent behavior
+DB_FILE = os.path.join(_DB_DIR, "packing_records.db")
+
+_init_lock = threading.Lock()
+_init_done = False
+_init_db_path = None
+
+
+def get_connection():
+    """Get a SQLite connection with proper settings."""
+    conn = sqlite3.connect(DB_FILE)
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 def init_db():
-    if not os.path.exists("recordings"):
-        os.makedirs("recordings")
+    global _init_done, _init_db_path
+    with _init_lock:
+        # Re-init if DB_FILE path changed (e.g. in tests with monkeypatch)
+        if _init_done and _init_db_path == DB_FILE:
+            return
+        if not os.path.exists("recordings"):
+            os.makedirs("recordings")
 
-    with sqlite3.connect(DB_FILE) as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS packing_video (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                station_id INTEGER DEFAULT 1,
-                waybill_code TEXT NOT NULL,
-                video_paths TEXT NOT NULL,
-                record_mode TEXT NOT NULL,
-                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+        with sqlite3.connect(DB_FILE) as conn:
+            # M2: Enable WAL journal mode for better concurrent performance
+            conn.execute("PRAGMA journal_mode=WAL")
+            # D3: Enable foreign key enforcement
+            conn.execute("PRAGMA foreign_keys = ON")
 
-        # Check and add columns if not exists (for migration)
-        cursor.execute("PRAGMA table_info(packing_video);")
-        columns = [col[1] for col in cursor.fetchall()]
-        if "station_id" not in columns:
+            cursor = conn.cursor()
+            # Note: SQLite ignores DATETIME vs TIMESTAMP distinction — both stored as TEXT
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS packing_video (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    station_id INTEGER DEFAULT 1,
+                    waybill_code TEXT NOT NULL,
+                    video_paths TEXT NOT NULL,
+                    record_mode TEXT NOT NULL,
+                    recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT DEFAULT 'READY' CHECK(status IN ('READY', 'RECORDING', 'PROCESSING', 'FAILED', 'SYNCED')),
+                    is_synced INTEGER DEFAULT 0
+                )
+            """)
+
+            # Check and add columns if not exists (for migration)
+            cursor.execute("PRAGMA table_info(packing_video);")
+            columns = [col[1] for col in cursor.fetchall()]
+            if "station_id" not in columns:
+                cursor.execute(
+                    "ALTER TABLE packing_video ADD COLUMN station_id INTEGER DEFAULT 1;"
+                )
+            if "is_synced" not in columns:
+                # L7: is_synced column reserved for future cloud-sync tracking
+                cursor.execute(
+                    "ALTER TABLE packing_video ADD COLUMN is_synced INTEGER DEFAULT 0;"
+                )
+            if "status" not in columns:
+                cursor.execute(
+                    "ALTER TABLE packing_video ADD COLUMN status TEXT DEFAULT 'READY';"
+                )
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS system_settings (
+                    config_key TEXT PRIMARY KEY,
+                    config_value TEXT
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS stations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    ip_camera_1 TEXT,
+                    ip_camera_2 TEXT,
+                    safety_code TEXT,
+                    camera_mode TEXT DEFAULT 'SINGLE',
+                    camera_brand TEXT DEFAULT 'imou'
+                )
+            """)
+
+            cursor.execute("PRAGMA table_info(stations);")
+            st_cols = [col[1] for col in cursor.fetchall()]
+            if "camera_brand" not in st_cols:
+                cursor.execute(
+                    "ALTER TABLE stations ADD COLUMN camera_brand TEXT DEFAULT 'imou';"
+                )
+            if "mac_address" not in st_cols:
+                cursor.execute(
+                    "ALTER TABLE stations ADD COLUMN mac_address TEXT DEFAULT '';"
+                )
+
+            # Migrate old settings to station 1 if stations table is empty
+            cursor.execute("SELECT COUNT(*) FROM stations")
+            if cursor.fetchone()[0] == 0:
+                cursor.execute(
+                    "SELECT config_value FROM system_settings WHERE config_key = 'IP_CAMERA'"
+                )
+                ip_row = cursor.fetchone()
+                ip1 = ip_row[0] if ip_row else ""
+
+                cursor.execute(
+                    "SELECT config_value FROM system_settings WHERE config_key = 'SAFETY_CODE'"
+                )
+                code_row = cursor.fetchone()
+                code = code_row[0] if code_row else ""
+
+                cursor.execute(
+                    "SELECT config_value FROM system_settings WHERE config_key = 'RECORD_MODE'"
+                )
+                mode_row = cursor.fetchone()
+                mode = mode_row[0] if mode_row else "SINGLE"
+
+                cursor.execute(
+                    """
+                    INSERT INTO stations (name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand)
+                    VALUES ('Bàn Chốt Đơn 1', ?, '', ?, ?, 'imou')
+                """,
+                    (ip1, code, mode),
+                )
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'OPERATOR' CHECK(role IN ('ADMIN', 'OPERATOR')),
+                    full_name TEXT NOT NULL DEFAULT '',
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    must_change_password INTEGER DEFAULT 0
+                )
+            """)
+            cursor.execute("PRAGMA table_info(users);")
+            user_cols = [col[1] for col in cursor.fetchall()]
+            if "must_change_password" not in user_cols:
+                cursor.execute(
+                    "ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0;"
+                )
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    station_id INTEGER NOT NULL,
+                    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_heartbeat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'EXPIRED')),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (station_id) REFERENCES stations(id) ON DELETE CASCADE
+                )
+            """)
+
+            cursor.execute("SELECT COUNT(*) FROM users")
+            if cursor.fetchone()[0] == 0:
+                # Lazy import to avoid startup overhead when bcrypt not yet needed
+                import bcrypt as _bcrypt
+
+                hashed = _bcrypt.hashpw(
+                    "08012011".encode("utf-8"), _bcrypt.gensalt()
+                ).decode("utf-8")
+                cursor.execute(
+                    "INSERT INTO users (username, password_hash, role, full_name, must_change_password) VALUES (?, ?, 'ADMIN', 'Administrator', 1)",
+                    ("admin", hashed),
+                )
+                # H6: Warn about default password
+                print("[DB] WARNING: Default admin password is '08012011'. Change it immediately after first login.")
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS audit_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    action TEXT NOT NULL,
+                    details TEXT,
+                    station_id INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+                )
+            """)
+
+            # Clean up audit logs older than 90 days
             cursor.execute(
-                "ALTER TABLE packing_video ADD COLUMN station_id INTEGER DEFAULT 1;"
-            )
-        if "is_synced" not in columns:
-            cursor.execute(
-                "ALTER TABLE packing_video ADD COLUMN is_synced INTEGER DEFAULT 0;"
-            )
-        if "status" not in columns:
-            cursor.execute(
-                "ALTER TABLE packing_video ADD COLUMN status TEXT DEFAULT 'READY';"
+                "DELETE FROM audit_log WHERE created_at < datetime('now', '-90 days')"
             )
 
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS system_settings (
-                config_key TEXT PRIMARY KEY,
-                config_value TEXT
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS stations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                ip_camera_1 TEXT,
-                ip_camera_2 TEXT,
-                safety_code TEXT,
-                camera_mode TEXT DEFAULT 'SINGLE',
-                camera_brand TEXT DEFAULT 'imou'
-            )
-        """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS revoked_tokens (
+                    jti TEXT PRIMARY KEY,
+                    expires_at REAL NOT NULL
+                )
+            """)
+            cursor.execute("DELETE FROM revoked_tokens WHERE expires_at < ?", (_time.time(),))
 
-        cursor.execute("PRAGMA table_info(stations);")
-        st_cols = [col[1] for col in cursor.fetchall()]
-        if "camera_brand" not in st_cols:
-            cursor.execute(
-                "ALTER TABLE stations ADD COLUMN camera_brand TEXT DEFAULT 'imou';"
-            )
-        if "mac_address" not in st_cols:
-            cursor.execute(
-                "ALTER TABLE stations ADD COLUMN mac_address TEXT DEFAULT '';"
-            )
+            # Expire all stale sessions on startup
+            cursor.execute("UPDATE sessions SET status = 'EXPIRED' WHERE status = 'ACTIVE'")
 
-        # Migrate old settings to station 1 if stations table is empty
-        cursor.execute("SELECT COUNT(*) FROM stations")
-        if cursor.fetchone()[0] == 0:
-            cursor.execute(
-                "SELECT config_value FROM system_settings WHERE config_key = 'IP_CAMERA'"
-            )
-            ip_row = cursor.fetchone()
-            ip1 = ip_row[0] if ip_row else ""
-
-            cursor.execute(
-                "SELECT config_value FROM system_settings WHERE config_key = 'SAFETY_CODE'"
-            )
-            code_row = cursor.fetchone()
-            code = code_row[0] if code_row else ""
-
-            cursor.execute(
-                "SELECT config_value FROM system_settings WHERE config_key = 'RECORD_MODE'"
-            )
-            mode_row = cursor.fetchone()
-            mode = mode_row[0] if mode_row else "SINGLE"
-
-            cursor.execute(
-                """
-                INSERT INTO stations (name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand)
-                VALUES ('Bàn Chốt Đơn 1', ?, '', ?, ?, 'imou')
-            """,
-                (ip1, code, mode),
-            )
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'OPERATOR',
-                full_name TEXT NOT NULL DEFAULT '',
-                is_active INTEGER DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                must_change_password INTEGER DEFAULT 0
-            )
-        """)
-        cursor.execute("PRAGMA table_info(users);")
-        user_cols = [col[1] for col in cursor.fetchall()]
-        if "must_change_password" not in user_cols:
-            cursor.execute(
-                "ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0;"
-            )
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                station_id INTEGER NOT NULL,
-                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_heartbeat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                status TEXT DEFAULT 'ACTIVE',
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                FOREIGN KEY (station_id) REFERENCES stations(id)
-            )
-        """)
-
-        cursor.execute("SELECT COUNT(*) FROM users")
-        if cursor.fetchone()[0] == 0:
-            import bcrypt as _bcrypt
-
-            hashed = _bcrypt.hashpw(
-                "08012011".encode("utf-8"), _bcrypt.gensalt()
-            ).decode("utf-8")
-            cursor.execute(
-                "INSERT INTO users (username, password_hash, role, full_name, must_change_password) VALUES (?, ?, 'ADMIN', 'Administrator', 1)",
-                ("admin", hashed),
-            )
-            print("Default admin created. Please login and change password.")
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS audit_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                action TEXT NOT NULL,
-                details TEXT,
-                station_id INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        """)
-
-        # Clean up audit logs older than 90 days
-        cursor.execute(
-            "DELETE FROM audit_log WHERE created_at < datetime('now', '-90 days')"
-        )
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS revoked_tokens (
-                jti TEXT PRIMARY KEY,
-                expires_at REAL NOT NULL
-            )
-        """)
-        cursor.execute("DELETE FROM revoked_tokens WHERE expires_at < ?", (_time.time(),))
-
-        # Expire all stale sessions on startup
-        cursor.execute("UPDATE sessions SET status = 'EXPIRED' WHERE status = 'ACTIVE'")
-
-        conn.commit()
-
-        # --- Indexes for packing_video ---
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_recorded_at ON packing_video(recorded_at DESC)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_station_id ON packing_video(station_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_status ON packing_video(status)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_station_date ON packing_video(station_id, recorded_at DESC)")
-
-        # --- FTS5 virtual table (external content, trigram for substring search) ---
-        # Migration: drop old unicode61 FTS5 table if it exists (tokenizer cannot be altered)
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
-        if cursor.fetchone():
-            # Check if it's the old unicode61 version — if so, drop and recreate
+            # D3: Clean orphaned records before enabling FK
             try:
-                cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
-                fts_sql = cursor.fetchone()[0] or ""
-                if "unicode61" in fts_sql:
-                    cursor.execute("DROP TABLE IF EXISTS packing_video_fts")
-                    # Drop triggers too — they'll be recreated below
-                    cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_insert")
-                    cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_update")
-                    cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_delete")
-            except Exception:
-                pass
+                cursor.execute("DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)")
+                cursor.execute("DELETE FROM sessions WHERE station_id NOT IN (SELECT id FROM stations)")
+                cursor.execute("UPDATE packing_video SET station_id = NULL WHERE station_id IS NOT NULL AND station_id NOT IN (SELECT id FROM stations)")
+                orphan_count = cursor.rowcount
+                if orphan_count:
+                    print(f"[DB] Cleaned {orphan_count} orphaned records.")
+            except Exception as e:
+                print(f"[DB] Orphan cleanup warning: {e}")
 
-        cursor.execute("""
-            CREATE VIRTUAL TABLE IF NOT EXISTS packing_video_fts USING fts5(
-                waybill_code,
-                content='packing_video',
-                content_rowid='id',
-                tokenize='trigram'
-            )
-        """)
+            conn.commit()
 
-        # --- Triggers for auto-sync FTS5 ---
-        cursor.execute("""
-            CREATE TRIGGER IF NOT EXISTS packing_video_fts_insert AFTER INSERT ON packing_video BEGIN
-                INSERT INTO packing_video_fts(rowid, waybill_code) VALUES (new.id, new.waybill_code);
-            END
-        """)
-        cursor.execute("""
-            CREATE TRIGGER IF NOT EXISTS packing_video_fts_update AFTER UPDATE ON packing_video BEGIN
-                INSERT INTO packing_video_fts(packing_video_fts, rowid, waybill_code)
-                    VALUES ('delete', old.id, old.waybill_code);
-                INSERT INTO packing_video_fts(rowid, waybill_code) VALUES (new.id, new.waybill_code);
-            END
-        """)
-        cursor.execute("""
-            CREATE TRIGGER IF NOT EXISTS packing_video_fts_delete AFTER DELETE ON packing_video BEGIN
-                INSERT INTO packing_video_fts(packing_video_fts, rowid, waybill_code)
-                    VALUES ('delete', old.id, old.waybill_code);
-            END
-        """)
+            # --- Indexes for packing_video ---
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_recorded_at ON packing_video(recorded_at DESC)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_station_id ON packing_video(station_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_status ON packing_video(status)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_station_date ON packing_video(station_id, recorded_at DESC)")
 
-        # Rebuild FTS5 index from existing data (safe to call multiple times)
-        try:
-            _rebuild_fts_index()
-        except Exception as e:
-            print(f"[DB] FTS5 rebuild warning: {e}")
+            # H1: Additional indexes for common queries
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_station_status ON sessions(station_id, status)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_packing_video_waybill_code ON packing_video(waybill_code)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)")
 
-        conn.commit()
+            # --- FTS5 virtual table (external content, trigram for substring search) ---
+            # Migration: drop old unicode61 FTS5 table if it exists (tokenizer cannot be altered)
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
+            if cursor.fetchone():
+                # Check if it's the old unicode61 version — if so, drop and recreate
+                try:
+                    cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
+                    fts_sql = cursor.fetchone()[0] or ""
+                    if "unicode61" in fts_sql:
+                        cursor.execute("DROP TABLE IF EXISTS packing_video_fts")
+                        # Drop triggers too — they'll be recreated below
+                        cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_insert")
+                        cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_update")
+                        cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_delete")
+                except Exception:
+                    pass
+
+            cursor.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS packing_video_fts USING fts5(
+                    waybill_code,
+                    content='packing_video',
+                    content_rowid='id',
+                    tokenize='trigram'
+                )
+            """)
+
+            # --- Triggers for auto-sync FTS5 ---
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS packing_video_fts_insert AFTER INSERT ON packing_video BEGIN
+                    INSERT INTO packing_video_fts(rowid, waybill_code) VALUES (new.id, new.waybill_code);
+                END
+            """)
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS packing_video_fts_update AFTER UPDATE ON packing_video BEGIN
+                    INSERT INTO packing_video_fts(packing_video_fts, rowid, waybill_code)
+                        VALUES ('delete', old.id, old.waybill_code);
+                    INSERT INTO packing_video_fts(rowid, waybill_code) VALUES (new.id, new.waybill_code);
+                END
+            """)
+            cursor.execute("""
+                CREATE TRIGGER IF NOT EXISTS packing_video_fts_delete AFTER DELETE ON packing_video BEGIN
+                    INSERT INTO packing_video_fts(packing_video_fts, rowid, waybill_code)
+                        VALUES ('delete', old.id, old.waybill_code);
+                END
+            """)
+
+            # Rebuild FTS5 index from existing data using existing connection (H4: avoid nested connections)
+            _rebuild_fts_index(conn)
+
+            # D1: Migrate encrypted values from v1 (XOR) to v2 (Fernet)
+            _migrate_v1_to_v2()
+
+            conn.commit()
+
+        _init_done = True
+        _init_db_path = DB_FILE
 
 
-def _rebuild_fts_index():
+def _rebuild_fts_index(conn=None):
     """Populate FTS5 index from existing packing_video records. Safe to call multiple times."""
-    with sqlite3.connect(DB_FILE) as conn:
-        conn.execute("INSERT INTO packing_video_fts(packing_video_fts) VALUES ('rebuild')")
-        conn.commit()
+    try:
+        if conn:
+            conn.execute("INSERT INTO packing_video_fts(packing_video_fts) VALUES ('rebuild')")
+        else:
+            with get_connection() as c:
+                c.execute("INSERT INTO packing_video_fts(packing_video_fts) VALUES ('rebuild')")
+    except Exception as e:
+        print(f"[DB] FTS5 rebuild warning: {e}")
 
 
 def get_setting(key, default=None):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT config_value FROM system_settings WHERE config_key = ?", (key,)
@@ -300,10 +416,15 @@ def get_setting(key, default=None):
 
 
 def set_setting(key, value):
+    # M6: Input length validation
+    if len(key) > 50:
+        raise ValueError(f"Setting key too long (max 50 chars): {key[:20]}...")
     str_val = str(value)
+    if len(str_val) > 10000:
+        raise ValueError(f"Setting value too long (max 10000 chars)")
     if key in _SENSITIVE_KEYS and str_val:
         str_val = _encrypt_value(str_val)
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -317,7 +438,7 @@ def set_setting(key, value):
 
 
 def get_all_settings():
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT config_key, config_value FROM system_settings")
         rows = cursor.fetchall()
@@ -325,8 +446,9 @@ def get_all_settings():
 
 
 def set_settings(settings_dict):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
+        # Settings dict is small (typically <10 entries), individual INSERTs are fine
         for k, v in settings_dict.items():
             str_val = str(v)
             if k in _SENSITIVE_KEYS and str_val:
@@ -343,8 +465,15 @@ def set_settings(settings_dict):
 
 
 def save_record(station_id, waybill_code, video_paths, record_mode):
-    paths_str = ",".join(video_paths)
-    with sqlite3.connect(DB_FILE) as conn:
+    """Legacy record save. Prefer create_record() for new code."""
+    # H5: Handle non-iterable video_paths (str, list, tuple, etc.)
+    if isinstance(video_paths, str):
+        paths_str = video_paths
+    elif isinstance(video_paths, (list, tuple)):
+        paths_str = ",".join(video_paths)
+    else:
+        paths_str = str(video_paths) if video_paths else ""
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -356,9 +485,16 @@ def save_record(station_id, waybill_code, video_paths, record_mode):
         conn.commit()
 
 
+# H2: Valid status values for packing_video
+_VALID_RECORD_STATUSES = {"READY", "RECORDING", "PROCESSING", "FAILED", "SYNCED"}
+
+
 def create_record(station_id, waybill_code, record_mode, video_paths=""):
+    # M6: Input length validation
+    if len(waybill_code) > 100:
+        raise ValueError(f"Waybill code too long (max 100 chars): {waybill_code[:20]}...")
     paths_str = ",".join(video_paths) if isinstance(video_paths, list) else video_paths
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """INSERT INTO packing_video (station_id, waybill_code, video_paths, record_mode, recorded_at, status)
@@ -370,7 +506,10 @@ def create_record(station_id, waybill_code, record_mode, video_paths=""):
 
 
 def update_record_status(record_id, status, video_paths=None):
-    with sqlite3.connect(DB_FILE) as conn:
+    # H2: Validate status before update
+    if status not in _VALID_RECORD_STATUSES:
+        raise ValueError(f"Invalid record status: {status}. Must be one of {_VALID_RECORD_STATUSES}")
+    with get_connection() as conn:
         cursor = conn.cursor()
         if video_paths is not None:
             paths_str = (
@@ -389,7 +528,7 @@ def update_record_status(record_id, status, video_paths=None):
 
 
 def get_pending_records():
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, station_id, waybill_code, video_paths, record_mode, status FROM packing_video WHERE status IN ('RECORDING', 'PROCESSING')"
@@ -411,7 +550,8 @@ def get_pending_records():
 def get_records(search="", station_id=None):
     """Legacy record fetch (no pagination, no FTS5).
     Prefer get_records_v2() for all new code."""
-    with sqlite3.connect(DB_FILE) as conn:
+    # L3: Intentional 2-query pattern (search overrides station filter) for clarity
+    with get_connection() as conn:
         cursor = conn.cursor()
         query = "SELECT p.id, p.waybill_code, p.video_paths, p.record_mode, datetime(p.recorded_at, 'localtime') AS recorded_at, s.name, p.status FROM packing_video p LEFT JOIN stations s ON p.station_id = s.id WHERE 1=1"
         params = []
@@ -461,7 +601,7 @@ def get_records_v2(
 
     base_select = "p.id, p.waybill_code, p.video_paths, p.record_mode, datetime(p.recorded_at, 'localtime') AS recorded_at, s.name, p.status"
 
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         params = []
         where_clauses = []
@@ -509,6 +649,8 @@ def get_records_v2(
             params.append(status)
 
         if date_from is not None:
+            # M12: Records near midnight UTC may appear on different date in local timezone
+            # This is expected behavior — storage is UTC, display is local
             where_clauses.append("date(p.recorded_at, 'localtime') >= ?")
             params.append(date_from)
 
@@ -519,7 +661,7 @@ def get_records_v2(
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
         try:
-            # Count query
+            # Count query — L1: from_clause is internally controlled, not user input
             count_query = f"SELECT COUNT(*) FROM {from_clause} WHERE {where_sql}"
             cursor.execute(count_query, params)
             total = cursor.fetchone()[0]
@@ -559,10 +701,13 @@ def get_records_v2(
 
     records = []
     for r in rows:
+        # L2: || concatenation in SQL is safe (built-in operator, not string concatenation)
+        # M5: Filter empty path segments from comma-split
+        paths = [p.strip() for p in r[2].split(",") if p.strip()] if r[2] else []
         records.append({
             "id": r[0],
             "waybill_code": r[1],
-            "video_paths": [p for p in r[2].split(",") if p] if r[2] else [],
+            "video_paths": paths,
             "record_mode": r[3],
             "recorded_at": r[4],
             "station_name": r[5],
@@ -582,7 +727,7 @@ def get_records_v2(
 
 
 def get_record_by_id(record_id):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, waybill_code, video_paths, record_mode, recorded_at, station_id, status FROM packing_video WHERE id = ?",
@@ -604,7 +749,7 @@ def get_record_by_id(record_id):
 
 def cleanup_old_records(days=7):
     """Xóa các video và bản ghi cũ hơn X ngày để giải phóng dung lượng ổ cứng."""
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, video_paths FROM packing_video WHERE recorded_at <= datetime('now', '-' || ? || ' days')",
@@ -613,11 +758,15 @@ def cleanup_old_records(days=7):
         old_records = cursor.fetchall()
 
         for r_id, video_paths in old_records:
+            # M5: Filter empty path segments from comma-split
             for path in video_paths.split(","):
+                path = path.strip()
+                if not path:
+                    continue
                 if os.path.exists(path):
                     try:
                         os.remove(path)
-                        print(f"🗑️ Đã dọn dẹp file cũ: {path}")
+                        print(f"[DB] Cleaned old file: {path}")
                     except Exception as e:
                         print(f"Error removing {path}: {e}")
             cursor.execute("DELETE FROM packing_video WHERE id = ?", (r_id,))
@@ -626,14 +775,18 @@ def cleanup_old_records(days=7):
 
 def delete_record(record_id):
     """Xoá một bản ghi cụ thể và file cứng đi kèm"""
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT video_paths FROM packing_video WHERE id = ?", (record_id,)
         )
         row = cursor.fetchone()
         if row:
+            # M5: Filter empty path segments from comma-split
             for path in row[0].split(","):
+                path = path.strip()
+                if not path:
+                    continue
                 if os.path.exists(path):
                     try:
                         os.remove(path)
@@ -647,7 +800,7 @@ def delete_record(record_id):
 
 
 def get_stations():
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand, mac_address FROM stations ORDER BY id ASC"
@@ -669,7 +822,7 @@ def get_stations():
 
 
 def get_station(station_id):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand, mac_address FROM stations WHERE id = ?",
@@ -691,7 +844,7 @@ def get_station(station_id):
 
 
 def update_station(station_id, data):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -717,8 +870,9 @@ def update_station_ip(station_id, field, new_ip):
     allowed_fields = {"ip_camera_1", "ip_camera_2"}
     if field not in allowed_fields:
         return
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
+        # Column name is whitelist-validated above — safe from injection
         cursor.execute(
             f"UPDATE stations SET {field} = ? WHERE id = ?",
             (new_ip, station_id),
@@ -727,7 +881,7 @@ def update_station_ip(station_id, field, new_ip):
 
 
 def add_station(data):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -749,14 +903,21 @@ def add_station(data):
 
 
 def delete_station(station_id):
-    with sqlite3.connect(DB_FILE) as conn:
+    # H8/H9: Clean up related records before deleting station
+    with get_connection() as conn:
         cursor = conn.cursor()
+        # End active sessions for this station
+        cursor.execute("DELETE FROM sessions WHERE station_id = ? AND status = 'ACTIVE'", (station_id,))
+        # Set packing_video.station_id to NULL (preserve evidence)
+        cursor.execute("UPDATE packing_video SET station_id = NULL WHERE station_id = ?", (station_id,))
         cursor.execute("DELETE FROM stations WHERE id = ?", (station_id,))
         conn.commit()
 
 
 def get_user_by_username(username):
-    with sqlite3.connect(DB_FILE) as conn:
+    # H7: password_hash is kept here because auth.py needs it for verification.
+    # API layer should strip password_hash before sending to clients.
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, username, password_hash, role, full_name, is_active, must_change_password FROM users WHERE username = ?",
@@ -777,7 +938,7 @@ def get_user_by_username(username):
 
 
 def clear_must_change_password(user_id):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE users SET must_change_password = 0 WHERE id = ?",
@@ -787,7 +948,7 @@ def clear_must_change_password(user_id):
 
 
 def get_user_by_id(user_id):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, username, role, full_name, is_active FROM users WHERE id = ?",
@@ -806,7 +967,7 @@ def get_user_by_id(user_id):
 
 
 def get_all_users():
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, username, role, full_name, is_active, created_at FROM users ORDER BY id ASC"
@@ -825,11 +986,22 @@ def get_all_users():
         ]
 
 
+# H2: Valid role values
+_VALID_ROLES = {"ADMIN", "OPERATOR"}
+
+
 def create_user(username, password, role="OPERATOR", full_name=""):
+    # M6: Input length validation
+    if len(username) > 50:
+        raise ValueError(f"Username too long (max 50 chars): {username[:20]}...")
+    # H2: Validate role before insert
+    if role not in _VALID_ROLES:
+        raise ValueError(f"Invalid role: {role}. Must be one of {_VALID_ROLES}")
+    # Lazy import to avoid startup overhead when bcrypt not yet needed
     import bcrypt as _bcrypt
 
     hashed = _bcrypt.hashpw(password.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         try:
             cursor.execute(
@@ -853,19 +1025,21 @@ def update_user(user_id, **kwargs):
     if not sets:
         return
     vals.append(user_id)
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
+        # Column name is whitelist-validated above — safe from injection
         cursor.execute(f"UPDATE users SET {', '.join(sets)} WHERE id = ?", vals)
         conn.commit()
 
 
 def update_user_password(user_id, new_password):
+    # Lazy import to avoid startup overhead when bcrypt not yet needed
     import bcrypt as _bcrypt
 
     hashed = _bcrypt.hashpw(new_password.encode("utf-8"), _bcrypt.gensalt()).decode(
         "utf-8"
     )
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE users SET password_hash = ? WHERE id = ?",
@@ -875,14 +1049,23 @@ def update_user_password(user_id, new_password):
 
 
 def delete_user(user_id):
-    with sqlite3.connect(DB_FILE) as conn:
+    # H8/H10: Clean up related records before deleting user
+    with get_connection() as conn:
         cursor = conn.cursor()
+        # End active sessions for this user
+        cursor.execute("DELETE FROM sessions WHERE user_id = ? AND status = 'ACTIVE'", (user_id,))
+        # Set audit_log.user_id to NULL (preserve trail)
+        cursor.execute("UPDATE audit_log SET user_id = NULL WHERE user_id = ?", (user_id,))
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
 
 
+# H2: Valid session statuses
+_VALID_SESSION_STATUSES = {"ACTIVE", "EXPIRED"}
+
+
 def create_session(user_id, station_id):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO sessions (user_id, station_id, status) VALUES (?, ?, 'ACTIVE')",
@@ -893,7 +1076,7 @@ def create_session(user_id, station_id):
 
 
 def get_active_session(station_id):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT s.id, s.user_id, s.station_id, s.last_heartbeat, u.username, u.full_name FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.station_id = ? AND s.status = 'ACTIVE'",
@@ -913,7 +1096,7 @@ def get_active_session(station_id):
 
 
 def update_session_heartbeat(session_id):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE sessions SET last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?",
@@ -923,7 +1106,7 @@ def update_session_heartbeat(session_id):
 
 
 def end_session(session_id):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE sessions SET status = 'EXPIRED' WHERE id = ?", (session_id,)
@@ -931,8 +1114,14 @@ def end_session(session_id):
         conn.commit()
 
 
+# M7: end_session_by_id is kept as alias for backward compatibility
+def end_session_by_id(session_id):
+    """Deprecated: Use end_session() instead."""
+    end_session(session_id)
+
+
 def expire_stale_sessions(timeout_seconds=90):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE sessions SET status = 'EXPIRED' WHERE status = 'ACTIVE' AND strftime('%s', 'now') - strftime('%s', last_heartbeat) > ?",
@@ -945,7 +1134,11 @@ def expire_stale_sessions(timeout_seconds=90):
 def log_audit(
     user_id: int, action: str, details: str | None = None, station_id: int | None = None
 ):
-    with sqlite3.connect(DB_FILE) as conn:
+    # Sanitize user_id: FK enforcement means user_id must reference a real user or be NULL
+    # API passes user_id=0 for anonymous/failed logins — convert to NULL
+    if not user_id:
+        user_id = None
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO audit_log (user_id, action, details, station_id) VALUES (?, ?, ?, ?)",
@@ -955,7 +1148,7 @@ def log_audit(
 
 
 def cleanup_audit_log(days: int = 90):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "DELETE FROM audit_log WHERE created_at < datetime('now', ?)",
@@ -970,7 +1163,7 @@ def get_audit_logs(
     limit: int = 200,
     offset: int = 0,
 ) -> list[dict]:
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         query = (
             "SELECT audit_log.id, audit_log.user_id, audit_log.action, "
@@ -1004,7 +1197,7 @@ def get_audit_logs(
 
 
 def get_active_sessions() -> list[dict]:
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT s.id, s.user_id, s.station_id, s.started_at, s.last_heartbeat, "
@@ -1031,7 +1224,7 @@ def get_active_sessions() -> list[dict]:
 
 
 def get_session_by_id(session_id: int):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, user_id, station_id, status FROM sessions WHERE id = ?",
@@ -1048,15 +1241,6 @@ def get_session_by_id(session_id: int):
         return None
 
 
-def end_session_by_id(session_id: int):
-    with sqlite3.connect(DB_FILE) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE sessions SET status = 'EXPIRED' WHERE id = ?", (session_id,)
-        )
-        conn.commit()
-
-
 # --- ANALYTICS FUNCTIONS ---
 
 
@@ -1066,8 +1250,9 @@ def get_hourly_stats(
     """Get record counts grouped by hour for a given date.
     Returns list of {hour, count} for hours 0-23.
     date format: YYYY-MM-DD, defaults to today."""
+    # M10/L5: datetime.now() returns local time — matches 'localtime' conversion in query
     target_date = date or datetime.now().strftime("%Y-%m-%d")
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         query = (
             "SELECT CAST(strftime('%H', recorded_at, 'localtime') AS INTEGER) as hour, COUNT(*) as count "
@@ -1090,7 +1275,7 @@ def get_hourly_stats(
 def get_daily_trend(days: int = 7) -> list[dict]:
     """Get daily record counts for last N days.
     Returns list of {date, count}."""
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT date(recorded_at, 'localtime') as d, COUNT(*) as count "
@@ -1114,7 +1299,7 @@ def get_daily_trend(days: int = 7) -> list[dict]:
 def get_stations_comparison() -> list[dict]:
     """Get today's record count per station.
     Returns list of {station_id, station_name, count}."""
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT s.id, s.name, COUNT(p.id) as count "
@@ -1131,7 +1316,7 @@ def get_records_for_export(
 ) -> list[dict]:
     """Get records for CSV export.
     Returns list of {waybill_code, station_name, recorded_at, status, video_paths}."""
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         query = (
             "SELECT p.waybill_code, s.name, p.recorded_at, p.status, p.video_paths "
@@ -1160,7 +1345,7 @@ def get_records_for_export(
 
 
 def revoke_jti(jti: str, expires_at: float):
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "INSERT OR IGNORE INTO revoked_tokens (jti, expires_at) VALUES (?, ?)",
@@ -1170,7 +1355,7 @@ def revoke_jti(jti: str, expires_at: float):
 
 
 def is_jti_revoked(jti: str) -> bool:
-    with sqlite3.connect(DB_FILE) as conn:
+    with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT 1 FROM revoked_tokens WHERE jti = ?", (jti,)

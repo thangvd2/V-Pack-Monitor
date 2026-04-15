@@ -32,15 +32,14 @@ class TestStationValidation:
 
     def test_create_station_empty_name(self, client, admin_headers):
         """Empty name is currently accepted — needs backend validation."""
-        # TODO(Plan #19): Backend should reject name < 2 characters
+        # Empty name now rejected with 422 (Pydantic min_length=1)
         r = client.post("/api/stations", headers=admin_headers, json={
             "name": "",
             "ip_camera_1": "10.0.0.1",
             "safety_code": "ABCD",
             "camera_mode": "SINGLE",
         })
-        assert r.status_code == 200
-        assert r.json()["status"] == "success"
+        assert r.status_code == 422
 
     def test_create_station_very_long_name(self, client, admin_headers):
         """Names exceeding 50 characters are currently accepted."""
@@ -56,27 +55,25 @@ class TestStationValidation:
 
     def test_create_station_empty_ip_camera(self, client, admin_headers):
         """Empty ip_camera_1 is currently accepted."""
-        # TODO(Plan #19): Backend should reject empty ip_camera_1
+        # Empty ip_camera_1 now rejected with 422 (Pydantic min_length=7)
         r = client.post("/api/stations", headers=admin_headers, json={
             "name": "NoIP Station",
             "ip_camera_1": "",
             "safety_code": "ABCD",
             "camera_mode": "SINGLE",
         })
-        assert r.status_code == 200
-        assert r.json()["status"] == "success"
+        assert r.status_code == 422
 
     def test_create_station_empty_safety_code(self, client, admin_headers):
         """Empty safety_code is currently accepted."""
-        # TODO(Plan #19): Backend should reject safety_code < 4 characters
+        # Empty safety_code now rejected with 422 (Pydantic min_length=1)
         r = client.post("/api/stations", headers=admin_headers, json={
             "name": "NoCode Station",
             "ip_camera_1": "10.0.0.1",
             "safety_code": "",
             "camera_mode": "SINGLE",
         })
-        assert r.status_code == 200
-        assert r.json()["status"] == "success"
+        assert r.status_code == 422
 
     def test_create_station_invalid_ip_format(self, client, admin_headers):
         """Invalid IP format is currently accepted — no server-side regex check."""

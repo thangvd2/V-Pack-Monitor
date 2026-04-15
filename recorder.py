@@ -137,6 +137,16 @@ class CameraRecorder:
             os.makedirs(self.output_dir)
 
     def start_recording(self, waybill_code):
+        # Sanitize waybill_code to prevent path traversal
+        import re
+        safe_code = re.sub(r'[^\w\-.]', '_', waybill_code)
+        if not safe_code:
+            safe_code = "unknown"
+        waybill_code = safe_code
+
+        with self._stop_lock:
+            self._stopped = False  # Reset for reuse after stop
+
         if self.processes:
             self.stop_recording()
 
@@ -368,10 +378,12 @@ class CameraRecorder:
                     timeout=120,
                 )
                 transcode_ok = True
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[RECORDER] Transcode failed for {final_path}: {e}")
+                # Fall through to rename as .FAILED.ts
 
             if transcode_ok:
+                # 3 retries with 1s sleep is intentional for Windows file locking
                 for _ in range(3):
                     try:
                         if os.path.exists(ts_path):

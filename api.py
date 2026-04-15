@@ -12,6 +12,13 @@ import threading
 import sqlite3
 import json
 import asyncio
+import re as _re
+import socket
+import subprocess
+import tempfile
+import ipaddress
+import logging
+import queue
 import urllib.request
 import urllib.error
 import io
@@ -22,7 +29,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 import database
 import recorder
@@ -67,6 +74,18 @@ _station_locks = {}  # {station_id: threading.Lock} — prevents double-scan per
 stream_managers = {}
 
 reconnect_status = {}
+
+# Per-concern locks for shared mutable state
+_recorders_lock = threading.Lock()  # guards active_recorders, active_waybills, active_record_ids
+_streams_lock = threading.Lock()    # guards stream_managers, reconnect_status
+_station_locks_lock = threading.Lock()  # guards _station_locks dict itself
+_cache_lock = threading.Lock()      # guards _update_check_cache
+_login_attempts_lock = threading.Lock()  # guards _login_attempts
+
+_logger = logging.getLogger("vpack")
+
+MAX_SSE_CLIENTS = 50
+MAX_UPLOAD_SIZE = 1 * 1024 * 1024  # 1MB max for credentials JSON
 
 MTX_API = os.environ.get("MTX_API", "http://127.0.0.1:9997")
 
@@ -194,14 +213,16 @@ class CameraStreamManager:
             new_url = url_fn(new_ip, code, channel=1, brand=brand)
             self.url = new_url
             self._mtx_register()
-            reconnect_status[self.station_id] = {
-                "status": "found",
-                "new_ip": new_ip,
-                "old_ip": station["ip_camera_1"],
-            }
+            with _streams_lock:
+                reconnect_status[self.station_id] = {
+                    "status": "found",
+                    "new_ip": new_ip,
+                    "old_ip": station["ip_camera_1"],
+                }
             return new_ip
         if new_ip:
-            reconnect_status[self.station_id] = {"status": "same_ip", "ip": new_ip}
+            with _streams_lock:
+                reconnect_status[self.station_id] = {"status": "same_ip", "ip": new_ip}
         return None
 
     def _monitor_loop(self):
@@ -282,11 +303,12 @@ import telegram_bot
 
 
 def _preflight_checks(station_id):
-    if station_id in active_recorders:
-        return (
-            False,
-            "Trạm đang ghi hình. Quét STOP trước.",
-        )
+    with _recorders_lock:
+        if station_id in active_recorders:
+            return (
+                False,
+                "Trạm đang ghi hình. Quét STOP trước.",
+            )
     _, _, free = shutil.disk_usage("recordings")
     if free < 500 * 1024 * 1024:
         return (
@@ -294,25 +316,20 @@ def _preflight_checks(station_id):
             f"\u1ed4 c\u1ee9ng qu\u00e1 \u0111\u1ea7y! Ch\u1ec9 c\u00f2n {free // (1024 * 1024)} MB tr\u1ed1ng. C\u1ea7n \u00edt nh\u1ea5t 500 MB.",
         )
     ffmpeg_path = recorder._ffmpeg_bin("ffmpeg")
-    if os.path.exists(ffmpeg_path):
-        pass
-    elif ffmpeg_path == "ffmpeg":
-        if not shutil.which("ffmpeg"):
-            return (
-                False,
-                "Kh\u00f4ng t\u00ecm th\u1ea5y FFmpeg. Vui l\u00f2ng c\u00e0i \u0111\u1eb7t.",
-            )
-    else:
+    if not os.path.exists(ffmpeg_path) and ffmpeg_path != "ffmpeg":
         return (
             False,
             "Kh\u00f4ng t\u00ecm th\u1ea5y FFmpeg. Vui l\u00f2ng ch\u1ea1y l\u1ea1i installer.",
+        )
+    if ffmpeg_path == "ffmpeg" and not shutil.which("ffmpeg"):
+        return (
+            False,
+            "Kh\u00f4ng t\u00ecm th\u1ea5y FFmpeg. Vui l\u00f2ng c\u00e0i \u0111\u1eb7t.",
         )
     return True, ""
 
 
 def _verify_video_external(filepath):
-    import subprocess
-
     if not filepath or not os.path.exists(filepath):
         return False
     if os.path.getsize(filepath) == 0:
@@ -351,8 +368,6 @@ def _recover_pending_records():
                 if os.path.exists(ts_path):
                     is_hevc = recorder._is_hevc(ts_path)
                     try:
-                        import subprocess
-
                         if is_hevc:
                             cmd = recorder._build_transcode_cmd(ts_path, path)
                         else:
@@ -415,6 +430,7 @@ async def lifespan(app: FastAPI):
     def _suppress_conn_reset(loop, ctx):
         exc = ctx.get("exception")
         if isinstance(exc, (ConnectionResetError, ConnectionAbortedError)):
+            _logger.debug("Suppressed connection reset error")
             return
         if orig_handler:
             orig_handler(loop, ctx)
@@ -424,7 +440,8 @@ async def lifespan(app: FastAPI):
     loop.set_exception_handler(_suppress_conn_reset)
 
     database.init_db()
-    _recover_pending_records()
+    recovery_thread = threading.Thread(target=_recover_pending_records, daemon=True)
+    recovery_thread.start()
     stations = database.get_stations()
     live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
     for st in stations:
@@ -448,7 +465,8 @@ async def lifespan(app: FastAPI):
         manager = CameraStreamManager(
             live_url, station_id=st["id"], cam2_url=cam2_url
         )
-        stream_managers[st["id"]] = manager
+        with _streams_lock:
+            stream_managers[st["id"]] = manager
         manager.start()
 
     # Kích hoạt Telegram Bot 2 chiều (Lắng nghe)
@@ -463,9 +481,13 @@ async def lifespan(app: FastAPI):
 
     yield
     cleanup_task.cancel()
-    for manager in stream_managers.values():
+    with _streams_lock:
+        managers = list(stream_managers.values())
+    for manager in managers:
         manager.stop()
-    for rec in active_recorders.values():
+    with _recorders_lock:
+        recorders = list(active_recorders.values())
+    for rec in recorders:
         rec.stop_recording()
     video_worker.shutdown()
     telegram_bot.stop_polling()
@@ -479,7 +501,6 @@ def _get_cors_origins():
         "http://127.0.0.1:8001",
     ]
     try:
-        import socket
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         local_ip = s.getsockname()[0]
@@ -541,9 +562,14 @@ def download_record_file(request: Request, record_id: int, file_index: int):
     if file_index < 0 or file_index >= len(paths):
         raise HTTPException(status_code=404, detail="File not found")
     filepath = paths[file_index]
-    if not os.path.exists(filepath):
+    # Prevent path traversal — only serve files from recordings directory
+    filepath_abs = os.path.abspath(filepath)
+    recordings_dir = os.path.abspath("recordings")
+    if not filepath_abs.startswith(recordings_dir + os.sep) and filepath_abs != recordings_dir:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not os.path.exists(filepath_abs):
         raise HTTPException(status_code=404, detail="File deleted")
-    return _FR(filepath, media_type="video/mp4", filename=os.path.basename(filepath))
+    return _FR(filepath_abs, media_type="video/mp4", filename=os.path.basename(filepath_abs))
 
 
 # --- SYSTEM HEALTH API ---
@@ -615,7 +641,9 @@ def set_live_stream_quality(payload: dict, admin: AdminUser):
     if quality not in ("main", "sub"):
         quality = "sub"
     database.set_setting("LIVE_VIEW_STREAM", quality)
-    for sid, sm in stream_managers.items():
+    with _streams_lock:
+        sm_items = list(stream_managers.items())
+    for sid, sm in sm_items:
         station = database.get_station(sid)
         if not station:
             continue
@@ -649,7 +677,9 @@ def get_live_stream_quality(current_user: CurrentUser):
 
 @app.post("/api/credentials")
 async def upload_credentials(admin: AdminUser, file: UploadFile = File(...)):
-    contents = await file.read()
+    contents = await file.read(MAX_UPLOAD_SIZE + 1)
+    if len(contents) > MAX_UPLOAD_SIZE:
+        return JSONResponse(status_code=413, content={"status": "error", "message": "File quá lớn (tối đa 1MB)."})
     try:
         data = json.loads(contents)
         if not isinstance(data, dict) or "type" not in data:
@@ -668,7 +698,7 @@ def trigger_cloud_sync(admin: AdminUser):
         return {"status": "success", "message": msg}
     except Exception as e:
         print(f"[CLOUD] sync failed: {e}")
-        return {"status": "error", "message": f"Lỗi đồng bộ cloud: {e}"}
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Lỗi đồng bộ cloud."})
 
 
 # --- AUTH API ---
@@ -688,20 +718,23 @@ _LOGIN_WINDOW = 300
 def login(payload: LoginPayload, request: Request):
     ip = request.client.host if request.client else "unknown"
     now = time.time()
-    if len(_login_attempts) > 100:
-        expired_ips = [k for k, v in _login_attempts.items() if not v or now - v[-1] > _LOGIN_WINDOW]
-        for k in expired_ips:
-            del _login_attempts[k]
-    attempts = [t for t in _login_attempts.get(ip, []) if now - t < _LOGIN_WINDOW]
-    _login_attempts[ip] = attempts
-    if len(attempts) >= _LOGIN_MAX:
-        return {"status": "error", "message": "Quá nhiều lần đăng nhập sai. Thử lại sau 5 phút."}
+    with _login_attempts_lock:
+        if len(_login_attempts) > 100:
+            expired_ips = [k for k, v in _login_attempts.items() if not v or now - v[-1] > _LOGIN_WINDOW]
+            for k in expired_ips:
+                del _login_attempts[k]
+        attempts = [t for t in _login_attempts.get(ip, []) if now - t < _LOGIN_WINDOW]
+        _login_attempts[ip] = attempts
+        if len(attempts) >= _LOGIN_MAX:
+            return JSONResponse(status_code=429, content={"status": "error", "message": "Quá nhiều lần đăng nhập sai. Thử lại sau 5 phút."})
     user = database.get_user_by_username(payload.username)
     if not user or not auth.verify_password(payload.password, user["password_hash"]):
-        _login_attempts.setdefault(ip, []).append(now)
-        return {"status": "error", "message": "Sai tên đăng nhập hoặc mật khẩu."}
+        with _login_attempts_lock:
+            _login_attempts.setdefault(ip, []).append(now)
+        database.log_audit(user["id"] if user else 0, "LOGIN_FAILED", f"username={payload.username}, ip={ip}")
+        return JSONResponse(status_code=401, content={"status": "error", "message": "Sai tên đăng nhập hoặc mật khẩu."})
     if not user.get("is_active"):
-        return {"status": "error", "message": "Tài khoản đã bị khóa."}
+        return JSONResponse(status_code=403, content={"status": "error", "message": "Tài khoản đã bị khóa."})
     token = auth.create_access_token({"sub": str(user["id"]), "role": user["role"]})
     database.log_audit(user["id"], "LOGIN")
     return {
@@ -752,12 +785,12 @@ class ChangePasswordPayload(BaseModel):
 def change_password(payload: ChangePasswordPayload, current_user: CurrentUser):
     user = database.get_user_by_id(current_user["id"])
     if not user:
-        return {"status": "error", "message": "Người dùng không tồn tại."}
+        return JSONResponse(status_code=404, content={"status": "error", "message": "Người dùng không tồn tại."})
     full_user = database.get_user_by_username(user["username"])
     if not full_user or not auth.verify_password(
         payload.old_password, full_user["password_hash"]
     ):
-        return {"status": "error", "message": "Mật khẩu cũ không đúng."}
+        return JSONResponse(status_code=401, content={"status": "error", "message": "Mật khẩu cũ không đúng."})
     database.update_user_password(user["id"], payload.new_password)
     database.clear_must_change_password(user["id"])
     database.log_audit(user["id"], "CHANGE_PASSWORD")
@@ -773,8 +806,8 @@ def list_users(admin: AdminUser):
 
 
 class UserCreatePayload(BaseModel):
-    username: str
-    password: str
+    username: str = Field(..., min_length=2, max_length=50)
+    password: str = Field(..., min_length=6)
     role: str = "OPERATOR"
     full_name: str = ""
 
@@ -782,12 +815,12 @@ class UserCreatePayload(BaseModel):
 @app.post("/api/users")
 def create_user(payload: UserCreatePayload, admin: AdminUser):
     if payload.role not in ("ADMIN", "OPERATOR"):
-        return {"status": "error", "message": "Role phải là ADMIN hoặc OPERATOR."}
+        return JSONResponse(status_code=422, content={"status": "error", "message": "Role phải là ADMIN hoặc OPERATOR."})
     new_id = database.create_user(
         payload.username, payload.password, payload.role, payload.full_name
     )
     if new_id is None:
-        return {"status": "error", "message": "Username đã tồn tại."}
+        return JSONResponse(status_code=422, content={"status": "error", "message": "Username đã tồn tại."})
     database.log_audit(admin["id"], "CREATE_USER", f"username={payload.username}")
     return {"status": "success", "id": new_id}
 
@@ -802,7 +835,10 @@ class UserUpdatePayload(BaseModel):
 def update_user_api(user_id: int, payload: UserUpdatePayload, admin: AdminUser):
     kwargs = {k: v for k, v in payload.dict().items() if v is not None}
     if not kwargs:
-        return {"status": "error", "message": "Không có dữ liệu cập nhật."}
+        return JSONResponse(status_code=422, content={"status": "error", "message": "Không có dữ liệu cập nhật."})
+    # Prevent admin from locking themselves out
+    if payload.is_active == 0 and user_id == admin["id"]:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Không thể khoá tài khoản của chính mình."})
     if payload.is_active is not None:
         old_user = database.get_user_by_id(user_id)
         if old_user and old_user["is_active"] != payload.is_active:
@@ -832,7 +868,7 @@ def reset_password(user_id: int, payload: ResetPasswordPayload, admin: AdminUser
 @app.delete("/api/users/{user_id}")
 def delete_user_api(user_id: int, admin: AdminUser):
     if user_id == admin["id"]:
-        return {"status": "error", "message": "Không thể xoá chính mình."}
+        return JSONResponse(status_code=403, content={"status": "error", "message": "Không thể xoá chính mình."})
     database.delete_user(user_id)
     database.log_audit(admin["id"], "DELETE_USER", f"user_id={user_id}")
     return {"status": "success"}
@@ -842,11 +878,11 @@ def delete_user_api(user_id: int, admin: AdminUser):
 
 
 class StationPayload(BaseModel):
-    name: str
-    ip_camera_1: str
+    name: str = Field(..., min_length=1, max_length=100)
+    ip_camera_1: str = Field(..., min_length=7, max_length=45)
     ip_camera_2: str = ""
-    safety_code: str
-    camera_mode: str
+    safety_code: str = Field(..., min_length=1, max_length=50)
+    camera_mode: str = Field(default="single")
     camera_brand: str = "imou"
     mac_address: str = ""
 
@@ -902,7 +938,8 @@ def create_station(payload: StationPayload, admin: AdminUser):
             brand=payload.camera_brand,
         )
     sm = CameraStreamManager(url, station_id=new_id, cam2_url=cam2_url)
-    stream_managers[new_id] = sm
+    with _streams_lock:
+        stream_managers[new_id] = sm
     sm.start()
     return {"status": "success", "id": new_id}
 
@@ -911,7 +948,9 @@ def create_station(payload: StationPayload, admin: AdminUser):
 def update_station(station_id: int, payload: StationPayload, admin: AdminUser):
     database.update_station(station_id, payload.dict())
     database.log_audit(admin["id"], "STATION_UPDATE", f"station_id={station_id}")
-    if station_id in stream_managers:
+    with _streams_lock:
+        sm = stream_managers.get(station_id)
+    if sm:
         live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
         url_fn = get_rtsp_url if live_quality == "main" else get_rtsp_sub_url
         url = url_fn(
@@ -920,7 +959,7 @@ def update_station(station_id: int, payload: StationPayload, admin: AdminUser):
             channel=1,
             brand=payload.camera_brand,
         )
-        stream_managers[station_id].update_url(url)
+        sm.update_url(url)
         cam2_url = None
         if payload.ip_camera_2:
             cam2_url = url_fn(
@@ -929,7 +968,7 @@ def update_station(station_id: int, payload: StationPayload, admin: AdminUser):
                 channel=2,
                 brand=payload.camera_brand,
             )
-        stream_managers[station_id].update_cam2_url(cam2_url)
+        sm.update_cam2_url(cam2_url)
     return {"status": "success"}
 
 
@@ -937,20 +976,21 @@ def update_station(station_id: int, payload: StationPayload, admin: AdminUser):
 def delete_station(station_id: int, admin: AdminUser):
     database.delete_station(station_id)
     database.log_audit(admin["id"], "STATION_DELETE", f"station_id={station_id}")
-    if station_id in stream_managers:
-        stream_managers[station_id].stop()
-        stream_managers.pop(station_id, None)
-    if station_id in active_recorders:
-        active_recorders[station_id].stop_recording()
-        active_recorders.pop(station_id, None)
+    with _streams_lock:
+        sm = stream_managers.pop(station_id, None)
+        reconnect_status.pop(station_id, None)
+    if sm:
+        sm.stop()
+    with _recorders_lock:
+        rec = active_recorders.pop(station_id, None)
         active_waybills.pop(station_id, None)
         active_record_ids.pop(station_id, None)
+    if rec:
+        rec.stop_recording()
     with _processing_lock:
         _processing_count.pop(station_id, None)
-    if station_id in _station_locks:
-        del _station_locks[station_id]
-    if station_id in reconnect_status:
-        del reconnect_status[station_id]
+    with _station_locks_lock:
+        _station_locks.pop(station_id, None)
     return {"status": "success"}
 
 
@@ -1012,8 +1052,10 @@ def discover_camera(station_id: int, current_user: AdminUser):
     live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
     url_fn = get_rtsp_url if live_quality == "main" else get_rtsp_sub_url
     new_url = url_fn(new_ip, code, channel=1, brand=brand)
-    if station_id in stream_managers:
-        stream_managers[station_id].update_url(new_url)
+    with _streams_lock:
+        sm = stream_managers.get(station_id)
+    if sm:
+        sm.update_url(new_url)
 
     return {
         "status": "found",
@@ -1025,9 +1067,10 @@ def discover_camera(station_id: int, current_user: AdminUser):
 
 @app.get("/api/reconnect-status")
 def get_reconnect_status(current_user: CurrentUser, station_id: int | None = None):
-    if station_id:
-        return {"data": reconnect_status.get(station_id, None)}
-    return {"data": reconnect_status}
+    with _streams_lock:
+        if station_id:
+            return {"data": reconnect_status.get(station_id, None)}
+        return {"data": dict(reconnect_status)}
 
 
 # --- SESSION LOCKING API ---
@@ -1123,6 +1166,8 @@ def get_audit_logs_api(
     limit: int = 200,
     offset: int = 0,
 ):
+    limit = min(max(limit, 1), 500)
+    offset = max(offset, 0)
     logs = database.get_audit_logs(
         user_id=user_id, action=action, limit=limit, offset=offset
     )
@@ -1146,7 +1191,8 @@ def handle_scan(payload: ScanPayload, current_user: CurrentUser):
         }
 
     sid = payload.station_id
-    lock = _station_locks.setdefault(sid, threading.Lock())
+    with _station_locks_lock:
+        lock = _station_locks.setdefault(sid, threading.Lock())
     with lock:
         return _handle_scan_locked(payload, sid, current_user)
 
@@ -1169,9 +1215,10 @@ def _handle_scan_locked(payload, sid, current_user):
     if not station:
         return {"status": "error", "message": "Tr\u1ea1m kh\u00f4ng t\u1ed3n t\u1ea1i"}
 
-    current_recorder = active_recorders.get(sid)
-    current_waybill = active_waybills.get(sid)
-    current_record_id = active_record_ids.get(sid)
+    with _recorders_lock:
+        current_recorder = active_recorders.get(sid)
+        current_waybill = active_waybills.get(sid)
+        current_record_id = active_record_ids.get(sid)
 
     if barcode == "EXIT":
         if current_recorder:
@@ -1186,7 +1233,8 @@ def _handle_scan_locked(payload, sid, current_user):
             )
             with _processing_lock:
                 _processing_count[sid] = _processing_count.get(sid, 0) + 1
-            active_recorders.pop(sid, None)
+            with _recorders_lock:
+                active_recorders.pop(sid, None)
             video_worker.submit_stop_and_save(
                 current_record_id, current_recorder, current_waybill, sid, save=False
             )
@@ -1209,7 +1257,8 @@ def _handle_scan_locked(payload, sid, current_user):
             )
             with _processing_lock:
                 _processing_count[sid] = _processing_count.get(sid, 0) + 1
-            active_recorders.pop(sid, None)
+            with _recorders_lock:
+                active_recorders.pop(sid, None)
             database.log_audit(
                 current_user["id"],
                 "STOP_RECORD",
@@ -1235,7 +1284,8 @@ def _handle_scan_locked(payload, sid, current_user):
     if not ok:
         return {"status": "error", "message": err_msg}
 
-    active_waybills[sid] = barcode
+    with _recorders_lock:
+        active_waybills[sid] = barcode
 
     ip1 = station["ip_camera_1"]
     ip2 = station["ip_camera_2"]
@@ -1257,11 +1307,13 @@ def _handle_scan_locked(payload, sid, current_user):
             database.update_station_ip(sid, "ip_camera_1", ip1)
             brand = station.get("camera_brand", "imou")
             code = station.get("safety_code", "")
-            if sid in stream_managers:
+            with _streams_lock:
+                sm = stream_managers.get(sid)
+            if sm:
                 live_quality = database.get_setting("LIVE_VIEW_STREAM") or "sub"
                 url_fn = get_rtsp_url if live_quality == "main" else get_rtsp_sub_url
                 live_url = url_fn(ip1, code, channel=1, brand=brand)
-                stream_managers[sid].update_url(live_url)
+                sm.update_url(live_url)
 
     url1 = get_rtsp_url(ip1, code, channel=1, brand=brand)
     if c_mode in ["dual_file", "pip"]:
@@ -1279,10 +1331,11 @@ def _handle_scan_locked(payload, sid, current_user):
         r_mode = "SINGLE"
 
     record_id = database.create_record(sid, barcode, r_mode)
-    active_record_ids[sid] = record_id
 
     new_recorder = CameraRecorder(url1, rtsp_url_2=url2, record_mode=r_mode)
-    active_recorders[sid] = new_recorder
+    with _recorders_lock:
+        active_record_ids[sid] = record_id
+        active_recorders[sid] = new_recorder
     new_recorder.start_recording(barcode)
 
     database.log_audit(
@@ -1313,10 +1366,15 @@ def _handle_scan_locked(payload, sid, current_user):
 def get_status(station_id: int, current_user: CurrentUser):
     with _processing_lock:
         if station_id in _processing_count:
-            return {"status": "processing", "waybill": active_waybills.get(station_id, "")}
+            with _recorders_lock:
+                waybill = active_waybills.get(station_id, "")
+            return {"status": "processing", "waybill": waybill}
+    with _recorders_lock:
+        is_recording = station_id in active_recorders
+        waybill = active_waybills.get(station_id, "")
     return {
-        "status": "recording" if station_id in active_recorders else "idle",
-        "waybill": active_waybills.get(station_id, ""),
+        "status": "recording" if is_recording else "idle",
+        "waybill": waybill,
     }
 
 
@@ -1357,7 +1415,7 @@ def delete_record(record_id: int, admin: AdminUser):
         return {"status": "success"}
     except Exception as e:
         print(f"[DB] delete record {record_id} failed: {e}")
-        return {"status": "error", "message": f"Không thể xoá bản ghi: {e}"}
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Không thể xoá bản ghi."})
 
 
 @app.get("/api/storage/info")
@@ -1387,7 +1445,11 @@ def get_storage_info(current_user: CurrentUser):
 
 @app.get("/api/analytics/today")
 def get_analytics_today(station_id: int, current_user: CurrentUser):
-    with sqlite3.connect(database.DB_FILE) as conn:
+    try:
+        conn = database.get_connection()
+    except AttributeError:
+        conn = sqlite3.connect(database.DB_FILE)
+    with conn:
         cursor = conn.cursor()
 
         # Đếm tổng đơn toàn hệ thống kho hôm nay (SQLite local time)
@@ -1419,7 +1481,8 @@ def get_hourly_stats_api(
 
 @app.get("/api/analytics/trend")
 def get_daily_trend_api(current_user: CurrentUser, days: int = 7):
-    data = database.get_daily_trend(days=min(days, 30))
+    days = max(min(days, 30), 1)
+    data = database.get_daily_trend(days=days)
     return {"data": data}
 
 
@@ -1468,19 +1531,22 @@ def export_csv(
 
 @app.get("/api/live")
 def live_preview(station_id: int, current_user: CurrentUser):
+    mtx_host = os.environ.get("MTX_HOST", "127.0.0.1")
     return {
         "status": "ok",
-        "webrtc_url": f"http://localhost:8889/station_{station_id}",
+        "webrtc_url": f"http://{mtx_host}:8889/station_{station_id}",
     }
 
 
 @app.get("/api/live-cam2")
 def live_preview_cam2(station_id: int, current_user: CurrentUser):
+    mtx_host = os.environ.get("MTX_HOST", "127.0.0.1")
+    with _streams_lock:
+        has_cam2 = station_id in stream_managers and stream_managers[station_id].cam2_url is not None
     return {
         "status": "ok",
-        "webrtc_url": f"http://localhost:8889/station_{station_id}_cam2",
-        "has_cam2": station_id in stream_managers
-        and stream_managers[station_id].cam2_url is not None,
+        "webrtc_url": f"http://{mtx_host}:8889/station_{station_id}_cam2",
+        "has_cam2": has_cam2,
     }
 
 
@@ -1513,10 +1579,11 @@ async def sse_events(request: Request, stations: str = ""):
         raise
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
-    import queue
 
     q = queue.Queue(maxsize=100)
     with _sse_lock:
+        if len(_sse_clients) >= MAX_SSE_CLIENTS:
+            raise HTTPException(status_code=503, detail="Too many SSE connections")
         _sse_clients.append(q)
 
     async def event_stream():
@@ -1599,7 +1666,6 @@ def get_system_processes(admin: AdminUser):
             if "ffmpeg" in name.lower():
                 cmdline = proc.info.get("cmdline") or []
                 cmdline_str = " ".join(cmdline)[:120] if cmdline else ""
-                import re as _re
                 cmdline_str = _re.sub(r'://[^@]+@', '://***@', cmdline_str)
                 ffmpeg_procs.append(
                     {
@@ -1623,8 +1689,6 @@ def get_system_processes(admin: AdminUser):
 
 @app.get("/api/system/network-info")
 def get_network_info(admin: AdminUser):
-    import socket
-
     hostname = socket.gethostname()
     local_ip = "unknown"
     try:
@@ -1642,8 +1706,6 @@ def get_network_info(admin: AdminUser):
         alive = False
         if ip:
             try:
-                import subprocess
-
                 if _platform.system() == "Windows":
                     result = subprocess.run(
                         ["ping", "-n", "1", "-w", "1000", ip],
@@ -1675,13 +1737,25 @@ def get_network_info(admin: AdminUser):
     }
 
 
+def _validate_ping_ip(ip_str):
+    """Validate that IP is a valid IPv4 address."""
+    try:
+        addr = ipaddress.ip_address(ip_str)
+        if not isinstance(addr, ipaddress.IPv4Address):
+            return False
+        return True
+    except ValueError:
+        return False
+
+
 @app.get("/api/ping")
 def ping_ip(ip: str, admin: AdminUser):
     if not ip:
         return {"reachable": False}
+    if not _validate_ping_ip(ip):
+        return JSONResponse(status_code=400, content={"status": "error", "message": "IP không hợp lệ."})
     alive = False
     try:
-        import subprocess
         if _platform.system() == "Windows":
             result = subprocess.run(
                 ["ping", "-n", "1", "-w", "2000", ip],
@@ -1732,8 +1806,9 @@ def _get_git_branch():
 @app.get("/api/system/update-check")
 def check_update(admin: AdminUser):
     now = time.time()
-    if _update_check_cache["result"] and (now - _update_check_cache["timestamp"]) < _UPDATE_CHECK_TTL:
-        return _update_check_cache["result"]
+    with _cache_lock:
+        if _update_check_cache["result"] and (now - _update_check_cache["timestamp"]) < _UPDATE_CHECK_TTL:
+            return _update_check_cache["result"]
 
     import subprocess as _sp
 
@@ -1800,8 +1875,9 @@ def check_update(admin: AdminUser):
         "mode": mode,
         "changelog": changelog,
     }
-    _update_check_cache["result"] = result
-    _update_check_cache["timestamp"] = now
+    with _cache_lock:
+        _update_check_cache["result"] = result
+        _update_check_cache["timestamp"] = now
     return result
 
 
@@ -1814,9 +1890,12 @@ def _notify_update_progress(stage, message, progress=0):
 
 
 def _do_graceful_restart():
+    global _is_updating
     time.sleep(1.5)
     try:
-        for rec in active_recorders.values():
+        with _recorders_lock:
+            recorders = list(active_recorders.values())
+        for rec in recorders:
             try:
                 rec.stop_recording()
             except Exception as e:
@@ -1830,27 +1909,38 @@ def _do_graceful_restart():
             bat_content += 'cd /d "' + os.getcwd() + '"\r\n'
             bat_content += 'call start_windows.bat\r\n'
             bat_content += 'del "%~f0"\r\n'
-            bat_path = os.path.join(os.getcwd(), "_update_restart.bat")
-            with open(bat_path, "w") as f:
-                f.write(bat_content)
-            import subprocess as _sp
-            _sp.Popen(["cmd", "/c", bat_path], creationflags=0x00000008)
+            bat_fd, bat_path = tempfile.mkstemp(suffix=".bat", prefix="vpack_restart_")
+            try:
+                with os.fdopen(bat_fd, "w") as f:
+                    f.write(bat_content)
+                subprocess.Popen(["cmd", "/c", bat_path], creationflags=0x00000008)
+            finally:
+                try:
+                    os.unlink(bat_path)
+                except Exception:
+                    pass
         else:
             sh_content = "#!/bin/bash\n"
             sh_content += "sleep 3\n"
             sh_content += 'cd "' + os.getcwd() + '"\n'
             sh_content += "bash start.sh\n"
             sh_content += 'rm -- "$0"\n'
-            sh_path = os.path.join(os.getcwd(), "_update_restart.sh")
-            with open(sh_path, "w") as f:
-                f.write(sh_content)
-            import subprocess as _sp
-            _sp.run(["chmod", "+x", sh_path])
-            _sp.Popen(["bash", sh_path], start_new_session=True)
+            sh_fd, sh_path = tempfile.mkstemp(suffix=".sh", prefix="vpack_restart_")
+            try:
+                with os.fdopen(sh_fd, "w") as f:
+                    f.write(sh_content)
+                subprocess.run(["chmod", "+x", sh_path])
+                subprocess.Popen(["bash", sh_path], start_new_session=True)
+            finally:
+                try:
+                    os.unlink(sh_path)
+                except Exception:
+                    pass
     except Exception as e:
         print(f"[RESTART] CRITICAL: graceful restart failed: {e}")
+        _is_updating = False
     finally:
-        os._exit(0)
+        sys.exit(0)
 
 
 def _update_dev():
@@ -1873,13 +1963,18 @@ def _update_dev():
         if r.returncode != 0:
             if had_stash:
                 _sp.run(["git", "stash", "pop"], capture_output=True, timeout=30)
+            print(f"[UPDATE] git pull failed: {r.stderr[:200]}")
             return {
                 "status": "error",
-                "message": f"Git pull thất bại: {r.stderr[:200]}",
+                "message": "Cập nhật thất bại.",
             }
 
         if had_stash:
-            _sp.run(["git", "stash", "pop"], capture_output=True, timeout=30)
+            pop_result = _sp.run(["git", "stash", "pop"], capture_output=True, text=True, timeout=30)
+            if pop_result.returncode != 0:
+                print(f"[UPDATE] WARNING: git stash pop failed. Changes preserved in stash.")
+                print(f"[UPDATE] Run 'git stash list' and 'git stash pop' manually.")
+                return {"status": "error", "message": "Cập nhật thành công nhưng có xung đột. Xem log."}
 
         _notify_update_progress("installing", "Đang cài đặt npm dependencies...", 50)
         if _platform.system() == "Windows":
@@ -1908,7 +2003,8 @@ def _update_dev():
         _notify_update_progress("restarting", "Đang chuẩn bị khởi động lại...", 90)
         return {"status": "restarting", "message": "Cập nhật thành công. Đang khởi động lại..."}
     except Exception as e:
-        return {"status": "error", "message": f"Lỗi cập nhật: {e}"}
+        print(f"[UPDATE] Error: {e}")
+        return {"status": "error", "message": "Lỗi cập nhật."}
 
 
 def _update_production():
@@ -2043,7 +2139,8 @@ def _update_production():
         db_path = os.path.join("recordings", "packing_records.db")
         if os.path.exists(db_path + ".bak"):
             shutil.copy2(db_path + ".bak", db_path)
-        return {"status": "error", "message": f"Lỗi cập nhật: {e}"}
+        print(f"[UPDATE] Error: {e}")
+        return {"status": "error", "message": "Lỗi cập nhật."}
 
 
 @app.post("/api/system/update")
@@ -2059,8 +2156,9 @@ def perform_update(admin: AdminUser):
 
     _is_updating = True
     try:
-        _update_check_cache["result"] = None
-        _update_check_cache["timestamp"] = 0
+        with _cache_lock:
+            _update_check_cache["result"] = None
+            _update_check_cache["timestamp"] = 0
         mode = "dev" if os.path.exists(".git") else "production"
         if mode == "dev":
             result = _update_dev()
@@ -2082,7 +2180,7 @@ def perform_update(admin: AdminUser):
         _update_lock.release()
         print(f"[UPDATE] Update failed: {e}")
         import traceback; traceback.print_exc()
-        return {"status": "error", "message": f"Lỗi cập nhật: {e}"}
+        return {"status": "error", "message": "Lỗi cập nhật."}
 
 
 # --- SERVE FRONTEND (PRODUCTION BUILD) ---

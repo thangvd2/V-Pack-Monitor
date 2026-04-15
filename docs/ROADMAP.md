@@ -1,6 +1,7 @@
 # V-Pack Monitor — Roadmap & Backlog (Updated 2026-04-15)
 
 ## COMPLETED
+- [x] v3.0.0 — Major Security Hardening (111 issues: Fernet encryption, FK enforcement, thread locks, path traversal prevention, HTTP status codes, input validation, recorder path sanitization, AbortController, confirm modal)
 - [x] v2.4.2 — Security & Stability Audit (22 issues fixed: FTS5 crash guard, Zip Slip prevention, SSE stale closure, CORS hardening, error boundary, search debounce)
 - [x] v2.4.1 — Bugfix (semver version comparison for auto-update)
 - [x] v2.4.0 — Video Search v2 (FTS5 full-text search, pagination, date range filter, status filter)

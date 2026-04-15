@@ -188,14 +188,20 @@ class TestInputLimits:
             assert user is not None, f"Failed to retrieve user ({label}): {name!r}"
             assert user["username"] == name
 
-    def test_create_user_very_long_username(self):
-        """A 300-character username should be stored without error (no app-level length check)."""
+    def test_create_user_very_long_username_rejected(self):
+        """A 300-character username should be rejected by the 50-char limit."""
         long_name = "A" * 300
-        uid = create_user(long_name, "Password123!", "OPERATOR")
+        with pytest.raises(ValueError, match="Username too long"):
+            create_user(long_name, "Password123!", "OPERATOR")
+
+    def test_create_user_at_max_length(self):
+        """A 50-character username (max allowed) should be stored successfully."""
+        max_name = "A" * 50
+        uid = create_user(max_name, "Password123!", "OPERATOR")
         assert uid is not None
-        user = get_user_by_username(long_name)
+        user = get_user_by_username(max_name)
         assert user is not None
-        assert len(user["username"]) == 300
+        assert len(user["username"]) == 50
 
     def test_set_settings_large_value(self):
         """A 10KB string value should roundtrip through set_settings / get_setting."""

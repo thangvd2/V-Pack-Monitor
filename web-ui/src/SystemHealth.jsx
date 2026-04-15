@@ -1,5 +1,5 @@
 /**
- * V-Pack Monitor - CamDongHang v2.2.0
+ * V-Pack Monitor - CamDongHang v2.4.2
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
@@ -7,10 +7,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Monitor, HardDrive, Clock, Activity, Wifi, Cpu, Server } from 'lucide-react';
-
-const API_BASE = window.location.hostname === 'localhost' && ['3000', '3001', '5173'].includes(window.location.port)
-  ? 'http://localhost:8001'
-  : window.location.origin;
+import API_BASE from './config';
 
 const STATUS_CONFIG = {
   ok: { color: '#34d399', bar: 'bg-emerald-500', dot: '🟢', label: 'Bình thường' },

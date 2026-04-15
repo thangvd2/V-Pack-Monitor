@@ -15,6 +15,17 @@ import telegram_bot
 
 _executor = None
 _lock = threading.Lock()
+_pending_count = 0
+_pending_lock = threading.Lock()
+_MAX_PENDING = 10  # Max queued video processing tasks
+
+_decrement_callback = None
+
+
+def set_decrement_callback(callback):
+    """Set the callback for decrementing processing count. Called by api.py at startup."""
+    global _decrement_callback
+    _decrement_callback = callback
 
 
 def _verify_video(filepath):
@@ -43,6 +54,14 @@ def _verify_video(filepath):
 
 
 def _decrement_processing(station_id):
+    # Prefer callback if set (avoids lazy import of api internals)
+    if _decrement_callback:
+        try:
+            _decrement_callback(station_id)
+            return
+        except Exception as e:
+            print(f"[WORKER] Processing count decrement failed: {e}")
+    # Fallback: import api directly (backward compat)
     try:
         import api
 
@@ -137,11 +156,30 @@ def _send_failed_alert(record_id, waybill, reason):
 
 
 def submit_stop_and_save(record_id, rec, waybill, station_id, save=True):
-    global _executor
+    global _executor, _pending_count
+
+    # Check pending count before submitting (bounded queue - H21)
+    with _pending_lock:
+        if _pending_count >= _MAX_PENDING:
+            print(f"[WORKER] WARNING: Too many pending tasks ({_pending_count}), dropping record {record_id}")
+            _decrement_processing(station_id)
+            return
+        _pending_count += 1
+
+    # Hold _lock during both check and submit to prevent race (M25)
     with _lock:
         if _executor is None:
             _executor = ThreadPoolExecutor(max_workers=1)
-    _executor.submit(_process_stop_and_save, record_id, rec, waybill, station_id, save)
+
+        def _wrapped():
+            global _pending_count
+            try:
+                _process_stop_and_save(record_id, rec, waybill, station_id, save)
+            finally:
+                with _pending_lock:
+                    _pending_count -= 1
+
+        _executor.submit(_wrapped)
 
 
 def shutdown():

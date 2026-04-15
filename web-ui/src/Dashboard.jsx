@@ -1,5 +1,5 @@
 /**
- * V-Pack Monitor - CamDongHang v2.2.0
+ * V-Pack Monitor - CamDongHang v2.4.2
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
@@ -13,10 +13,7 @@ import {
 } from 'recharts';
 
 import SystemHealth from './SystemHealth';
-
-const API_BASE = window.location.hostname === 'localhost' && ['3000', '3001', '5173'].includes(window.location.port)
-  ? 'http://localhost:8001'
-  : window.location.origin;
+import API_BASE from './config';
 
 const CHART_COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#c084fc', '#fb7185', '#38bdf8', '#a3e635'];
 

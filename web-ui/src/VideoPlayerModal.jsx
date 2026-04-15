@@ -1,11 +1,12 @@
 /**
- * V-Pack Monitor - CamDongHang v2.2.0
+ * V-Pack Monitor - CamDongHang v2.4.2
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
 
 import React, { useRef, useState, useEffect } from 'react';
 import { X, Play, Pause, Camera, Download, Volume2, VolumeX } from 'lucide-react';
+import API_BASE from './config';
 
 function formatTime(seconds) {
   if (!seconds || isNaN(seconds)) return '0:00';
@@ -32,6 +33,13 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
       videoRef.current.playbackRate = playbackRate;
     }
   }, [playbackRate]);
+
+  // Cleanup hideTimer on unmount
+  useEffect(() => {
+    return () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -220,14 +228,35 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
                   <span className="hidden md:inline">Snapshot</span>
                 </button>
 
-                <a
-                  href={videoUrl}
-                  download
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('vpack_token');
+                      // Extract record ID and file index from videoUrl
+                      const match = videoUrl.match(/\/records\/(\d+)\/download\/(\d+)/);
+                      if (!match) throw new Error('Invalid URL');
+                      const response = await fetch(`${API_BASE}/api/records/${match[1]}/download/${match[2]}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                      });
+                      if (!response.ok) throw new Error('Download failed');
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `video_${match[1]}_${match[2]}.mp4`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      window.URL.revokeObjectURL(url);
+                    } catch {
+                      // Download failure - non-critical
+                    }
+                  }}
                   className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors border border-white/5"
                   title="Tai video xuong"
                 >
                   <Download className="w-4 h-4" />
-                </a>
+                </button>
               </div>
             </div>
           </div>

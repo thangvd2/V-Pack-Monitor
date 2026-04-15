@@ -46,6 +46,10 @@ class TestSendMessage:
     @patch("database.get_setting")
     def test_send_message_missing_token(self, mock_get_setting):
         """Missing bot token should return (False, ...) without crashing."""
+        # Reset cached token so _get_bot_token() re-reads from DB
+        telegram_bot._cached_token = None
+        telegram_bot._cached_token_time = 0
+
         mock_get_setting.side_effect = lambda key, default="": {
             "TELEGRAM_BOT_TOKEN": "",
             "TELEGRAM_CHAT_ID": "987654321",

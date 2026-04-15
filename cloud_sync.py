@@ -9,6 +9,7 @@ import zipfile
 import datetime
 import sqlite3
 import json
+import threading
 from database import DB_FILE, get_setting
 import telegram_bot
 
@@ -25,7 +26,43 @@ from botocore.exceptions import NoCredentialsError
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 
+def _safe_video_path(path, recordings_dir=None):
+    """Validate video path is within recordings directory."""
+    if not recordings_dir:
+        recordings_dir = os.path.abspath("recordings")
+    path_abs = os.path.abspath(path)
+    if not path_abs.startswith(recordings_dir + os.sep) and path_abs != recordings_dir:
+        return False
+    return True
+
+
+_gdrive_creds = None
+_gdrive_creds_mtime = 0
+
+
+def _get_gdrive_creds():
+    """Cache and reuse GDrive service account credentials."""
+    global _gdrive_creds, _gdrive_creds_mtime
+    creds_path = "credentials.json"
+    try:
+        mtime = os.path.getmtime(creds_path)
+        if _gdrive_creds and mtime == _gdrive_creds_mtime:
+            return _gdrive_creds
+        from google.oauth2 import service_account
+        _gdrive_creds = service_account.Credentials.from_service_account_file(
+            creds_path, scopes=SCOPES
+        )
+        _gdrive_creds_mtime = mtime
+        return _gdrive_creds
+    except Exception:
+        return None
+
+
+_sync_lock = threading.Lock()
+
+
 def get_unsynced_records():
+    # TODO: Use database.get_connection() once available
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         # Lấy file chua sync từ ngày hqua trở về trước (tuỳ ý, hoặc lấy hết).
@@ -64,9 +101,13 @@ def create_backup_zip():
             added_any = False
             for path in video_paths.split(","):
                 path = path.strip()
-                if os.path.exists(path):
-                    zipf.write(path, arcname=os.path.basename(path))
-                    added_any = True
+                if not path or not os.path.exists(path):
+                    continue
+                if not _safe_video_path(path):
+                    print(f"[CLOUD] Skipping unsafe path: {path}")
+                    continue
+                zipf.write(path, arcname=os.path.basename(path))
+                added_any = True
             if added_any:
                 synced_ids.append(r_id)
 
@@ -83,7 +124,9 @@ def upload_to_gdrive(file_path, folder_id=None):
     if not os.path.exists(creds_path):
         raise FileNotFoundError("Chưa cấu hình File credentials.json cho Google Drive!")
 
-    creds = Credentials.from_service_account_file(creds_path, scopes=SCOPES)
+    creds = _get_gdrive_creds()
+    if not creds:
+        raise Exception("Không thể tải Google Drive credentials.")
     service = build("drive", "v3", credentials=creds)
 
     file_metadata = {"name": os.path.basename(file_path)}
@@ -124,6 +167,15 @@ def upload_to_s3(file_path, endpoint, access_key, secret_key, bucket_name):
 
 def process_cloud_sync():
     """Được gọi thông qua API Thủ công"""
+    if not _sync_lock.acquire(blocking=False):
+        return {"status": "error", "message": "Cloud sync already in progress."}
+    try:
+        return _process_cloud_sync_inner()
+    finally:
+        _sync_lock.release()
+
+
+def _process_cloud_sync_inner():
     provider = get_setting("CLOUD_PROVIDER", "NONE")
 
     if provider == "NONE":
@@ -152,7 +204,8 @@ def process_cloud_sync():
         # Thành công: Cập nhật CSDL
         mark_as_synced(synced_ids)
 
-        # Dọn file Zip dể tránh làm tràn ổ cứng
+        # Dọn file Zip để tránh làm tràn ổ cứng
+        # Note: Only the backup zip is deleted. Original video files remain on disk.
         if os.path.exists(zip_path):
             os.remove(zip_path)
 

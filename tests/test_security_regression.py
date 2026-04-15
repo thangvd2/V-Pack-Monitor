@@ -155,8 +155,8 @@ class TestSecurityRegression:
     # --- Test 15: Malformed IP in ping endpoint returns reachable=False ---
     def test_ping_malformed_ip_returns_false(self, client, admin_headers):
         r = client.get("/api/ping", headers=admin_headers, params={"ip": "999.999.999.999"})
-        assert r.status_code == 200
-        assert r.json()["reachable"] is False
+        assert r.status_code == 400
+        assert r.json()["status"] == "error"
 
     # --- Test 16: Oversized barcode handled gracefully (max_length=200) ---
     def test_scan_oversized_barcode_rejected(self, client, operator_headers, sample_station_id):

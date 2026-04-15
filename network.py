@@ -6,11 +6,13 @@
 
 """LAN scanner module - find device IP by MAC address using ARP table and ping sweep."""
 
+import ipaddress
 import platform
 import re
 import socket
 import subprocess
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional
 
 
@@ -18,6 +20,7 @@ def get_local_subnet() -> str:
     """Detect the local network subnet automatically."""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Falls back to hostname-based detection if no internet connectivity
         s.connect(("8.8.8.8", 80))
         local_ip = s.getsockname()[0]
         s.close()
@@ -115,6 +118,15 @@ def _ping_host(ip: str):
         pass
 
 
+def _is_private_ip(ip_str):
+    """Check if an IP address is in a private range."""
+    try:
+        addr = ipaddress.ip_address(ip_str)
+        return addr.is_private
+    except ValueError:
+        return False
+
+
 def scan_lan_for_mac(target_mac: str, subnet: Optional[str] = None) -> Optional[str]:
     """Scan the LAN to find a device's IP address by its MAC address.
 
@@ -141,32 +153,16 @@ def scan_lan_for_mac(target_mac: str, subnet: Optional[str] = None) -> Optional[
     prefix = subnet.rsplit(".", 1)[0]
     # e.g. '192.168.1.0/24' -> '192.168.1'
 
-    semaphore = threading.Semaphore(50)
-    threads = []
+    if not _is_private_ip(f"{prefix}.1"):
+        return None  # Don't scan non-private ranges
 
-    def _limited_ping(ip):
-        semaphore.acquire()
-        try:
-            _ping_host(ip)
-        finally:
-            semaphore.release()
-
-    for i in range(1, 255):
-        ip = f"{prefix}.{i}"
-        t = threading.Thread(target=_limited_ping, args=(ip,))
-        t.daemon = True
-        threads.append(t)
-        t.start()
-
-    # Wait for all pings with a hard timeout
-    import time as _time
-
-    deadline = _time.monotonic() + 12.0
-    for t in threads:
-        remaining = deadline - _time.monotonic()
-        if remaining <= 0:
-            break
-        t.join(timeout=remaining)
+    with ThreadPoolExecutor(max_workers=50) as executor:
+        futures = {executor.submit(_ping_host, f"{prefix}.{i}"): i for i in range(1, 255)}
+        for future in as_completed(futures, timeout=17):
+            try:
+                future.result(timeout=5)
+            except Exception:
+                pass
 
     # Step 3: Re-read ARP table after sweep
     for entry in _parse_arp_table():

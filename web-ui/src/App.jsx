@@ -1,22 +1,28 @@
 /**
- * V-Pack Monitor - CamDongHang v2.2.0
+ * V-Pack Monitor - CamDongHang v2.4.2
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { Search, MonitorPlay, Video, Calendar, Box, PackageCheck, Settings, Trash2, HardDrive, Plus, Monitor, ShieldCheck, BarChart3, CloudUpload, LogOut, User, Users, LayoutGrid, Maximize2, Activity, RefreshCw } from 'lucide-react';
 import SetupModal from './SetupModal';
 import VideoPlayerModal from './VideoPlayerModal';
 import UserManagementModal from './UserManagementModal';
 import Dashboard from './Dashboard';
-
-const API_BASE = window.location.hostname === 'localhost' && ['3000', '3001', '5173'].includes(window.location.port) 
-  ? 'http://localhost:8001' 
-  : window.location.origin;
+import API_BASE from './config';
 
 const MTX_HOST = window.location.hostname;
+
+// Named constants
+const STATION_POLL_INTERVAL = 10000;
+const BARCODE_TIMEOUT = 100;
+const HEARTBEAT_INTERVAL = 30000;
+const RESTART_DELAY = 5000;
+const SEARCH_DEBOUNCE = 300;
+const TOAST_DURATION = 2000;
+const ERROR_TOAST_DURATION = 3000;
 
 function MtxFallback() {
   return (
@@ -41,7 +47,7 @@ function StationSelectionScreen({ stations, stationStatusList, fetchStationStatu
       setLoading(false);
     };
     load();
-    const interval = setInterval(fetchStationStatus, 10000);
+    const interval = setInterval(fetchStationStatus, STATION_POLL_INTERVAL);
     return () => clearInterval(interval);
   }, []);
 
@@ -240,10 +246,49 @@ function App() {
   const dateFromRef = useRef(dateFrom);
   const dateToRef = useRef(dateTo);
   const statusFilterRef = useRef(statusFilter);
+  const abortControllerRef = useRef(null);
+  const barcodeSimInputRef = useRef(null);
   useEffect(() => { recordsPageRef.current = recordsPage; }, [recordsPage]);
   useEffect(() => { dateFromRef.current = dateFrom; }, [dateFrom]);
   useEffect(() => { dateToRef.current = dateTo; }, [dateTo]);
   useEffect(() => { statusFilterRef.current = statusFilter; }, [statusFilter]);
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState({ show: false, message: '', onConfirm: null });
+  const showConfirmDialog = useCallback((message, onConfirm) => {
+    setConfirmDialog({ show: true, message, onConfirm });
+  }, []);
+
+  // Station switch race guard
+  const [switchingStation, setSwitchingStation] = useState(false);
+
+  // Toast helper
+  const showToast = useCallback((msg, type = 'info') => {
+    setToast(msg);
+    setTimeout(() => setToast(null), type === 'error' ? ERROR_TOAST_DURATION : TOAST_DURATION);
+  }, []);
+
+  // Download via fetch+blob (no token in URL)
+  const handleDownload = useCallback(async (recordId, fileIndex) => {
+    try {
+      const token = localStorage.getItem('vpack_token');
+      const response = await fetch(`${API_BASE}/api/records/${recordId}/download/${fileIndex}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Download failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `video_${recordId}_${fileIndex}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      showToast('Tải video thất bại.', 'error');
+    }
+  }, [showToast]);
 
   useEffect(() => {
     const token = localStorage.getItem('vpack_token');
@@ -270,9 +315,11 @@ function App() {
 
   useEffect(() => {
     if (!currentUser) return;
+    let active = true;
     axios.get(`${API_BASE}/api/mtx-status`)
-      .then(() => setMtxAvailable(true))
-      .catch(() => setMtxAvailable(false));
+      .then(() => { if (active) setMtxAvailable(true); })
+      .catch(() => { if (active) setMtxAvailable(false); });
+    return () => { active = false; };
   }, [currentUser]);
 
   useEffect(() => {
@@ -280,8 +327,10 @@ function App() {
     const interval = setInterval(async () => {
       try {
         await axios.post(`${API_BASE}/api/sessions/heartbeat?session_id=${activeSessionId}`);
-      } catch {}
-    }, 30000);
+      } catch {
+        // Expected failure during cleanup/unmount
+      }
+    }, HEARTBEAT_INTERVAL);
     return () => clearInterval(interval);
   }, [activeSessionId, currentUser]);
 
@@ -301,9 +350,11 @@ function App() {
     return () => axios.interceptors.response.eject(interceptor);
   }, []);
 
+  const stationsIdStr = stations.map(s => s.id).join(',');
+
   useEffect(() => {
     const stationIds = viewMode === 'grid'
-      ? stations.map(s => s.id).join(',')
+      ? stationsIdStr
       : String(activeStationId || '');
     const sseToken = localStorage.getItem('vpack_token');
     const es = new EventSource(`${API_BASE}/api/events?stations=${stationIds}${sseToken ? '&token=' + encodeURIComponent(sseToken) : ''}`);
@@ -331,6 +382,7 @@ function App() {
                 setCurrentWaybill('');
                 activeRecordIdRef.current = null;
               }
+              fetchStorageInfo();
             }
             fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
           }
@@ -349,6 +401,7 @@ function App() {
               activeRecordIdRef.current = null;
             }
             fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
+            fetchStorageInfo();
           } else if (data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
             if (data.record_id === activeRecordIdRef.current) {
               setPackingStatus('idle');
@@ -356,9 +409,12 @@ function App() {
               activeRecordIdRef.current = null;
             }
             fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
+            fetchStorageInfo();
           }
         }
-      } catch {}
+      } catch {
+        // SSE parse failure - ignore
+      }
     });
 
     es.addEventListener('update_progress', (evt) => {
@@ -368,20 +424,23 @@ function App() {
         if (data.stage === 'restarting') {
           setTimeout(() => {
             window.location.reload();
-          }, 5000);
+          }, RESTART_DELAY);
         }
-      } catch {}
+      } catch {
+        // SSE parse failure - ignore
+      }
     });
 
     es.onerror = () => {};
 
     return () => es.close();
-  }, [activeStationId, viewMode, stations]);
+  }, [activeStationId, viewMode, stationsIdStr]);
 
   // Init fetch
   useEffect(() => {
     if (!currentUser) return;
     fetchStations();
+    fetchStorageInfo();
     if (currentUser.role === 'ADMIN') {
       checkSettings();
       checkLiveQuality();
@@ -395,7 +454,9 @@ function App() {
       if (res.data) {
         setUpdateInfo(res.data);
       }
-    } catch {}
+    } catch {
+      // Update check is optional
+    }
   };
 
   const fetchStations = async () => {
@@ -405,8 +466,8 @@ function App() {
       if (res.data.data.length > 0 && !activeStationId) {
         setActiveStationId(res.data.data[0].id);
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      showToast('Không thể tải danh sách trạm.', 'error');
     }
   };
 
@@ -440,7 +501,7 @@ function App() {
     };
 
     fetchReconnect();
-    intervalId = setInterval(fetchReconnect, 10000);
+    intervalId = setInterval(fetchReconnect, STATION_POLL_INTERVAL);
     return () => { active = false; if (intervalId) clearInterval(intervalId); };
   }, [activeStationId]);
 
@@ -451,10 +512,11 @@ function App() {
          setAnalytics(res.data.data);
       }
      } catch {
+      // Analytics fetch is non-critical
     }
   };
 
-  // Lấy trạng thái ghi hình ban đầu 
+  // Lấy trạng thái ghi hình ban đầu
   const fetchStatus = async (sid) => {
     try {
       const res = await axios.get(`${API_BASE}/api/status?station_id=${sid}`);
@@ -466,6 +528,7 @@ function App() {
         setCurrentWaybill('');
       }
     } catch {
+      // Status fetch is non-critical
     }
   };
 
@@ -482,22 +545,31 @@ function App() {
           ...prev,
           [st.id]: { status: isPacking ? 'packing' : 'idle', waybill: res.data.waybill || '' }
         }));
-      }).catch(() => {});
+      }).catch(() => {
+        // Non-critical per-station status fetch
+      });
     });
   }, [viewMode, stations]);
 
-  // Fetch records
+  // Fetch records (with AbortController)
   useEffect(() => {
     if (activeStationId && currentUser) {
       setRecordsPage(1);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
       const debounce = setTimeout(() => {
-        fetchRecords(searchTerm, activeStationId, 1);
-      }, 300);
-      return () => clearTimeout(debounce);
+        fetchRecords(searchTerm, activeStationId, 1, abortControllerRef.current.signal);
+      }, SEARCH_DEBOUNCE);
+      return () => {
+        clearTimeout(debounce);
+        if (abortControllerRef.current) abortControllerRef.current.abort();
+      };
     }
   }, [searchTerm, activeStationId, currentUser, dateFrom, dateTo, statusFilter]);
 
-  const fetchRecords = async (query = '', sid = activeStationId, page = 1) => {
+  const fetchRecords = async (query = '', sid = activeStationId, page = 1, signal) => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -509,16 +581,15 @@ function App() {
       if (statusFilter) params.set('status', statusFilter);
       params.set('limit', '20');
 
-      const res = await axios.get(`${API_BASE}/api/records?${params.toString()}`);
+      const res = await axios.get(`${API_BASE}/api/records?${params.toString()}`, { signal });
       setRecords(res.data.records);
       setRecordsTotal(res.data.total);
       setRecordsTotalPages(res.data.total_pages);
       setRecordsPage(res.data.page);
       setLoading(false);
-      fetchStorageInfo();
       fetchAnalytics(sid);
     } catch (err) {
-      console.error(err);
+      if (axios.isCancel(err) || err.name === 'CanceledError') return;
       setLoading(false);
     }
   };
@@ -529,8 +600,8 @@ function App() {
       if (res.data.data) {
         setStorageInfo(res.data.data);
       }
-    } catch (err) {
-      console.error('Storage info error:', err);
+    } catch {
+      // Non-critical - storage info optional
     }
   };
 
@@ -542,10 +613,10 @@ function App() {
         setActiveStationId(stationId);
         setStationAssigned(true);
       } else {
-        alert(res.data.message || 'Không thể chọn trạm.');
+        showToast(res.data.message || 'Không thể chọn trạm.', 'error');
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Lỗi khi chọn trạm.');
+      showToast(err.response?.data?.message || 'Lỗi khi chọn trạm.', 'error');
     }
   };
 
@@ -553,7 +624,9 @@ function App() {
     if (!stationId) return;
     try {
       await axios.post(`${API_BASE}/api/sessions/release?station_id=${stationId}`);
-    } catch {}
+    } catch {
+      // Best-effort release
+    }
     setActiveSessionId(null);
   };
 
@@ -573,6 +646,7 @@ function App() {
       const response = await axios.get(`${API_BASE}/api/settings`);
       setInitialSettings(response.data.data || {});
     } catch {
+      // Settings fetch is non-critical
     }
   };
 
@@ -582,7 +656,9 @@ function App() {
       if (response.data.quality) {
         setRecordStreamType(response.data.quality);
       }
-    } catch {}
+    } catch {
+      // Live quality check is non-critical
+    }
   };
 
   const toggleRecordStream = async () => {
@@ -590,9 +666,10 @@ function App() {
     try {
       const res = await axios.post(`${API_BASE}/api/live-stream-quality`, { quality: newType });
       setRecordStreamType(newType);
-      setToast(res.data.message || (newType === 'main' ? 'Live: 1080p (Main)' : 'Live: 480p (Sub)'));
-      setTimeout(() => setToast(null), 2000);
-    } catch {}
+      showToast(res.data.message || (newType === 'main' ? 'Live: 1080p (Main)' : 'Live: 480p (Sub)'));
+    } catch {
+      showToast('Không thể đổi chất lượng live.', 'error');
+    }
   };
 
   // --- Hàm gọi API Scan ---
@@ -610,7 +687,7 @@ function App() {
       } else if (res.data.status === 'error') {
         if (res.data.message) {
           setToast(res.data.message);
-          setTimeout(() => setToast(null), 3000);
+          setTimeout(() => setToast(null), ERROR_TOAST_DURATION);
         }
         setPackingStatus('idle');
         setCurrentWaybill('');
@@ -620,8 +697,8 @@ function App() {
         setCurrentWaybill('');
         fetchRecords(searchTerm, activeStationId, recordsPageRef.current);
       }
-    } catch (err) {
-      console.error("Barcode Lỗi", err);
+    } catch {
+      showToast('Lỗi quét mã vạch.', 'error');
     }
   };
 
@@ -630,7 +707,7 @@ function App() {
     if (currentUser?.role === 'ADMIN') {
       executeSecureAction(action);
     } else {
-      alert('Yêu cầu quyền Administrator.');
+      showToast('Yêu cầu quyền Administrator.', 'error');
     }
   };
 
@@ -693,14 +770,14 @@ function App() {
   };
 
   const doDeleteRecord = async (id, waybill_code) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xoá bản ghi "${waybill_code}" không?`)) {
+    showConfirmDialog(`Bạn có chắc chắn muốn xoá bản ghi "${waybill_code}" không?`, async () => {
       try {
         await axios.delete(`${API_BASE}/api/records/${id}`);
         fetchRecords(searchTerm, activeStationId, recordsPage);
-      } catch (err) {
-        alert("Có lỗi xảy ra khi xoá.");
+      } catch {
+        showToast('Có lỗi xảy ra khi xoá.', 'error');
       }
-    }
+    });
   };
 
   const doCloudSync = async () => {
@@ -708,14 +785,14 @@ function App() {
       setLoading(true);
       const res = await axios.post(`${API_BASE}/api/cloud-sync`);
       if (res.data.status === 'success') {
-        alert(res.data.message);
+        showToast(res.data.message || 'Đồng bộ thành công.');
       } else {
-        alert("Lỗi Upload: " + res.data.message);
+        showToast('Lỗi Upload: ' + res.data.message, 'error');
       }
       setLoading(false);
-    } catch (e) {
+    } catch {
       setLoading(false);
-      alert("Đã xảy ra lỗi khi đồng bộ Đám mây.");
+      showToast('Đã xảy ra lỗi khi đồng bộ Đám mây.', 'error');
     }
   };
 
@@ -747,7 +824,7 @@ function App() {
         if (timeoutId) clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
           barcodeBuffer = '';
-        }, 100); 
+        }, BARCODE_TIMEOUT); 
       }
     };
 
@@ -762,8 +839,24 @@ function App() {
     setSearchTerm(e.target.value);
   };
   
-  const activeStation = stations.find(s => s.id === activeStationId) || {};
+  const activeStation = useMemo(() => stations.find(s => s.id === activeStationId) || {}, [stations, activeStationId]);
   const hasCam2 = activeStation?.ip_camera_2 && activeStation.ip_camera_2.trim() !== '';
+
+  const doChangePassword = useCallback(async () => {
+    setChangePasswordError('');
+    if (changePasswordForm.new_password.length < 6) { setChangePasswordError('Mật khẩu mới phải có ít nhất 6 ký tự.'); return; }
+    if (changePasswordForm.new_password !== changePasswordForm.confirm_password) { setChangePasswordError('Mật khẩu xác nhận không khớp.'); return; }
+    try {
+      await axios.put(`${API_BASE}/api/auth/change-password`, { old_password: changePasswordForm.old_password, new_password: changePasswordForm.new_password });
+      setChangePasswordSuccess('Đổi mật khẩu thành công!');
+      setChangePasswordForm({ old_password: '', new_password: '', confirm_password: '' });
+      const updatedUser = { ...currentUser, must_change_password: 0 };
+      setCurrentUser(updatedUser);
+      localStorage.setItem('vpack_user', JSON.stringify(updatedUser));
+    } catch (err) {
+      setChangePasswordError(err.response?.data?.detail || 'Mật khẩu cũ không đúng.');
+    }
+  }, [changePasswordForm, currentUser]);
 
   useEffect(() => {
     if (!hasCam2) setCameraMode('single-cam');
@@ -825,7 +918,7 @@ function App() {
             </button>
           </form>
           <p className="text-center text-xs text-slate-500 mt-6">
-            V-Pack Monitor v2.2.0 • VDT
+            V-Pack Monitor • VDT
           </p>
         </div>
       </div>
@@ -954,37 +1047,13 @@ function App() {
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
                     onKeyDown={e => {
                       if (e.key === 'Enter') {
-                        setChangePasswordError('');
-                        if (changePasswordForm.new_password.length < 6) { setChangePasswordError('Mật khẩu mới phải có ít nhất 6 ký tự.'); return; }
-                        if (changePasswordForm.new_password !== changePasswordForm.confirm_password) { setChangePasswordError('Mật khẩu xác nhận không khớp.'); return; }
-                        axios.put(`${API_BASE}/api/auth/change-password`, { old_password: changePasswordForm.old_password, new_password: changePasswordForm.new_password })
-                          .then(() => {
-                            setChangePasswordSuccess('Đổi mật khẩu thành công!');
-                            setChangePasswordForm({ old_password: '', new_password: '', confirm_password: '' });
-                            const updatedUser = { ...currentUser, must_change_password: 0 };
-                            setCurrentUser(updatedUser);
-                            localStorage.setItem('vpack_user', JSON.stringify(updatedUser));
-                          })
-                          .catch(err => { setChangePasswordError(err.response?.data?.detail || 'Mật khẩu cũ không đúng.'); });
+                        doChangePassword();
                       }
                     }}
                   />
                 </div>
                 <button
-                  onClick={() => {
-                    setChangePasswordError('');
-                    if (changePasswordForm.new_password.length < 6) { setChangePasswordError('Mật khẩu mới phải có ít nhất 6 ký tự.'); return; }
-                    if (changePasswordForm.new_password !== changePasswordForm.confirm_password) { setChangePasswordError('Mật khẩu xác nhận không khớp.'); return; }
-                    axios.put(`${API_BASE}/api/auth/change-password`, { old_password: changePasswordForm.old_password, new_password: changePasswordForm.new_password })
-                      .then(() => {
-                        setChangePasswordSuccess('Đổi mật khẩu thành công!');
-                        setChangePasswordForm({ old_password: '', new_password: '', confirm_password: '' });
-                        const updatedUser = { ...currentUser, must_change_password: 0 };
-                        setCurrentUser(updatedUser);
-                        localStorage.setItem('vpack_user', JSON.stringify(updatedUser));
-                      })
-                      .catch(err => { setChangePasswordError(err.response?.data?.detail || 'Mật khẩu cũ không đúng.'); });
-                  }}
+                  onClick={doChangePassword}
                   className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 rounded-xl font-semibold text-white shadow-lg transition-all text-sm"
                 >
                   Xác Nhận Đổi Mật Khẩu
@@ -1107,34 +1176,39 @@ function App() {
               <select 
                 value={activeStationId} 
                 onChange={async (e) => {
-                  const newId = Number(e.target.value);
-                  if (currentUser?.role === 'OPERATOR' && activeStationId !== newId) {
-                    try {
-                      const statusRes = await axios.get(`${API_BASE}/api/sessions/station-status`);
-                      const targetStatus = (statusRes.data.data || []).find(s => s.station_id === newId);
-                      if (targetStatus?.occupied && targetStatus?.occupied_by !== currentUser.username) {
-                        alert('Trạm này đang được sử dụng bởi ' + (targetStatus.occupied_by_name || targetStatus.occupied_by));
-                        return;
-                      }
-                      await releaseStation(activeStationId);
-                      const acquireRes = await axios.post(`${API_BASE}/api/sessions/acquire?station_id=${newId}`);
-                      if (acquireRes.data.status === 'success') {
-                        setActiveSessionId(acquireRes.data.session_id);
-                        setActiveStationId(newId);
-                      } else {
-                        alert(acquireRes.data.message || 'Không thể chuyển trạm.');
-                        const reacquireRes = await axios.post(`${API_BASE}/api/sessions/acquire?station_id=${activeStationId}`);
-                        if (reacquireRes.data.status === 'success') {
-                          setActiveSessionId(reacquireRes.data.session_id);
-                        }
-                      }
-                    } catch {
-                      alert('Lỗi khi chuyển trạm.');
-                    }
-                  } else {
-                    setActiveStationId(newId);
-                  }
-                }}
+                   const newId = Number(e.target.value);
+                   if (switchingStation) return;
+                   if (currentUser?.role === 'OPERATOR' && activeStationId !== newId) {
+                     setSwitchingStation(true);
+                     try {
+                       const statusRes = await axios.get(`${API_BASE}/api/sessions/station-status`);
+                       const targetStatus = (statusRes.data.data || []).find(s => s.station_id === newId);
+                       if (targetStatus?.occupied && targetStatus?.occupied_by !== currentUser.username) {
+                         showToast('Trạm này đang được sử dụng bởi ' + (targetStatus.occupied_by_name || targetStatus.occupied_by), 'error');
+                         return;
+                       }
+                       await releaseStation(activeStationId);
+                       const acquireRes = await axios.post(`${API_BASE}/api/sessions/acquire?station_id=${newId}`);
+                       if (acquireRes.data.status === 'success') {
+                         setActiveSessionId(acquireRes.data.session_id);
+                         setActiveStationId(newId);
+                       } else {
+                         showToast(acquireRes.data.message || 'Không thể chuyển trạm.', 'error');
+                         const reacquireRes = await axios.post(`${API_BASE}/api/sessions/acquire?station_id=${activeStationId}`);
+                         if (reacquireRes.data.status === 'success') {
+                           setActiveSessionId(reacquireRes.data.session_id);
+                         }
+                       }
+                     } catch {
+                       showToast('Lỗi khi chuyển trạm.', 'error');
+                     } finally {
+                       setSwitchingStation(false);
+                     }
+                   } else {
+                     setActiveStationId(newId);
+                   }
+                 }}
+                 disabled={switchingStation}
                 className="bg-transparent text-slate-200 focus:outline-none appearance-none font-semibold cursor-pointer pr-4 min-h-[44px]"
              >
                 {stations.map(st => (
@@ -1540,28 +1614,28 @@ function App() {
                 
                 <div className="flex flex-col sm:flex-row gap-3">
                    <input
-                     type="text"
-                     placeholder="Nhập mã vận đơn (VD: SPX12345)"
-                     className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 md:py-2.5 text-base md:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500/50 font-mono min-h-[44px]"
-                     id="simulated-barcode-input"
-                     inputMode="text"
-                     enterKeyHint="send"
-                     onKeyDown={(e) => {
-                        if (e.key === 'Enter' && e.target.value.trim()) {
-                            sendScanAction(e.target.value.trim());
-                            e.target.value = '';
-                        }
-                     }}
-                   />
-                   <div className="flex gap-2 sm:gap-3">
-                     <button 
-                       onClick={() => {
-                         const inputUI = document.getElementById('simulated-barcode-input');
-                         if(inputUI.value.trim()) {
-                           sendScanAction(inputUI.value.trim());
-                           inputUI.value = '';
+                      type="text"
+                      placeholder="Nhập mã vận đơn (VD: SPX12345)"
+                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 md:py-2.5 text-base md:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500/50 font-mono min-h-[44px]"
+                      ref={barcodeSimInputRef}
+                      inputMode="text"
+                      enterKeyHint="send"
+                      onKeyDown={(e) => {
+                         if (e.key === 'Enter' && e.target.value.trim()) {
+                             sendScanAction(e.target.value.trim());
+                             e.target.value = '';
                          }
-                       }}
+                      }}
+                    />
+                    <div className="flex gap-2 sm:gap-3">
+                      <button 
+                        onClick={() => {
+                          const inputUI = barcodeSimInputRef.current;
+                          if (inputUI && inputUI.value.trim()) {
+                            sendScanAction(inputUI.value.trim());
+                            inputUI.value = '';
+                          }
+                        }}
                        className="flex-1 sm:flex-none px-4 md:px-6 py-3.5 md:py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl font-medium text-white shadow-lg transition-colors border border-purple-400/20 min-h-[44px] text-base md:text-sm"
                      >
                        <span className="md:hidden">Ghi</span>
@@ -1754,6 +1828,19 @@ function App() {
         )}
         
       </div>
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmDialog.show && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-zinc-800 rounded-lg p-6 max-w-sm">
+            <p className="text-white mb-4">{confirmDialog.message}</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setConfirmDialog({ show: false })} className="px-4 py-2 text-zinc-400 hover:text-white">Huỷ</button>
+              <button onClick={() => { confirmDialog.onConfirm?.(); setConfirmDialog({ show: false }); }} className="px-4 py-2 bg-red-600 text-white rounded-lg">Xác nhận</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

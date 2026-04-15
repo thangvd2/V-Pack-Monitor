@@ -22,7 +22,7 @@ class TestLogin:
 
     def test_login_wrong_password(self, client):
         r = client.post("/api/auth/login", json={"username": "admin", "password": "wrong"})
-        assert r.status_code == 200
+        assert r.status_code == 401
         assert r.json()["status"] == "error"
 
     def test_login_nonexistent_user(self, client):

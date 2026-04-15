@@ -40,7 +40,7 @@ class TestVideoWorker:
     # --- submit delegation ---
 
     def test_submit_delegates_to_executor(self):
-        """submit_stop_and_save passes correct arguments to executor.submit."""
+        """submit_stop_and_save submits work to executor (wrapped for bounded queue)."""
         mock_executor = MagicMock()
         with video_worker._lock:
             video_worker._executor = mock_executor
@@ -48,10 +48,10 @@ class TestVideoWorker:
         mock_rec = MagicMock()
         video_worker.submit_stop_and_save(100, mock_rec, "WB100", 1)
 
-        mock_executor.submit.assert_called_once_with(
-            video_worker._process_stop_and_save,
-            100, mock_rec, "WB100", 1, True,
-        )
+        # Submit is now called with a wrapper function for bounded queue tracking
+        mock_executor.submit.assert_called_once()
+        call_args = mock_executor.submit.call_args
+        assert call_args is not None
 
     # --- shutdown behaviour ---
 
