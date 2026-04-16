@@ -12,6 +12,7 @@ import VideoPlayerModal from './VideoPlayerModal';
 import UserManagementModal from './UserManagementModal';
 import Dashboard from './Dashboard';
 import API_BASE from './config';
+import { playScanStart, playRecordingStop, playVideoReady } from './utils/notificationSounds';
 
 const MTX_HOST = window.location.hostname;
 
@@ -372,9 +373,16 @@ function App() {
           }));
           if (data.station_id === activeStationId) {
             if (isRecording) {
+              playScanStart();
               setPackingStatus('packing');
               setCurrentWaybill(waybill);
               activeRecordIdRef.current = data.record_id;
+            }
+            if (data.status === 'PROCESSING') {
+              playRecordingStop();
+            }
+            if (data.status === 'READY') {
+              playVideoReady();
             }
             if (data.status === 'PROCESSING' || data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
               if (data.record_id === activeRecordIdRef.current) {
@@ -390,11 +398,13 @@ function App() {
           if (data.station_id !== activeStationId) return;
           
           if (data.status === 'RECORDING') {
+            playScanStart();
             setPackingStatus('packing');
             setCurrentWaybill(data.waybill || '');
             activeRecordIdRef.current = data.record_id;
             fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
           } else if (data.status === 'PROCESSING') {
+            playRecordingStop();
             if (data.record_id === activeRecordIdRef.current) {
               setPackingStatus('idle');
               setCurrentWaybill('');
@@ -402,7 +412,16 @@ function App() {
             }
             fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
             fetchStorageInfo();
-          } else if (data.status === 'READY' || data.status === 'FAILED' || data.status === 'DELETED') {
+          } else if (data.status === 'READY') {
+            playVideoReady();
+            if (data.record_id === activeRecordIdRef.current) {
+              setPackingStatus('idle');
+              setCurrentWaybill('');
+              activeRecordIdRef.current = null;
+            }
+            fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
+            fetchStorageInfo();
+          } else if (data.status === 'FAILED' || data.status === 'DELETED') {
             if (data.record_id === activeRecordIdRef.current) {
               setPackingStatus('idle');
               setCurrentWaybill('');
