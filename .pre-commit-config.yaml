@@ -35,3 +35,8 @@ repos:
         stages: [pre-push]
         pass_filenames: false
         always_run: true
+      - id: eslint
+        name: eslint (frontend)
+        entry: bash -c 'files=(); for f in "$@"; do files+=("${f#web-ui/}"); done; cd web-ui && npx eslint "${files[@]}"' --
+        language: system
+        files: ^web-ui/src/.*\.(js|jsx)$

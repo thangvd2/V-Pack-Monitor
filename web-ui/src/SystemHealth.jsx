@@ -37,7 +37,7 @@ function StatusCard({ title, icon: Icon, value, subtitle, status, percent }) {
   );
 }
 
-export default function SystemHealth({ currentUser }) {
+export default function SystemHealth({ currentUser: _currentUser }) {
   const [health, setHealth] = useState(null);
   const [processes, setProcesses] = useState(null);
   const [network, setNetwork] = useState(null);
@@ -56,7 +56,7 @@ export default function SystemHealth({ currentUser }) {
       if (procRes.status === 'fulfilled') setProcesses(procRes.value.data);
       if (netRes.status === 'fulfilled') setNetwork(netRes.value.data);
       setError(null);
-    } catch (err) {
+    } catch {
       setError('Không thể tải dữ liệu hệ thống');
     } finally {
       setLoading(false);
