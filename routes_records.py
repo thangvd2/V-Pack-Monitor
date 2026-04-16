@@ -116,6 +116,8 @@ def register_routes(app):
         if barcode == "EXIT":
             if current_recorder:
                 api._cancel_recording_timer(sid)
+                with api._recording_timers_lock:
+                    api._recording_start_times.pop(sid, None)
                 database.update_record_status(current_record_id, "PROCESSING")
                 api.notify_sse(
                     "video_status",
@@ -147,6 +149,8 @@ def register_routes(app):
         if barcode == "STOP":
             if current_recorder:
                 api._cancel_recording_timer(sid)
+                with api._recording_timers_lock:
+                    api._recording_start_times.pop(sid, None)
                 database.update_record_status(current_record_id, "PROCESSING")
                 api.notify_sse(
                     "video_status",
@@ -267,10 +271,11 @@ def register_routes(app):
             )
             warning_timer.daemon = True
             warning_timer.start()
+            api._recording_warning_timers[sid] = warning_timer
             stop_timer = threading.Timer(
                 api._MAX_RECORDING_SECONDS,
                 api._auto_stop_recording,
-                args=[sid],
+                args=[sid, record_id],
             )
             stop_timer.daemon = True
             stop_timer.start()

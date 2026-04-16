@@ -81,6 +81,7 @@ def client(isolate_db, monkeypatch):
     monkeypatch.setattr(api, "reconnect_status", {})
     monkeypatch.setattr(api, "_recording_timers", {})
     monkeypatch.setattr(api, "_recording_start_times", {})
+    monkeypatch.setattr(api, "_recording_warning_timers", {})
     monkeypatch.setattr(routes_auth, "_login_attempts", {})
     with (
         patch.object(api.CameraStreamManager, "start"),

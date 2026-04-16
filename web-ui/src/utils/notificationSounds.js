@@ -5,13 +5,23 @@
 
 let audioCtx = null;
 
-function getAudioContext() {
+const _lastPlayed = {};
+const COOLDOWN_MS = 600;
+
+function _shouldPlay(soundType) {
+  const now = Date.now();
+  if (now - (_lastPlayed[soundType] || 0) < COOLDOWN_MS) return false;
+  _lastPlayed[soundType] = now;
+  return true;
+}
+
+async function getAudioContext() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   // Resume if suspended (browser autoplay policy)
   if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
+    await audioCtx.resume();
   }
   return audioCtx;
 }
@@ -20,9 +30,10 @@ function getAudioContext() {
  * Short ascending beep: 440Hz → 880Hz over 150ms.
  * Played when barcode is scanned and recording STARTS.
  */
-export function playScanStart() {
+export async function playScanStart() {
+  if (!_shouldPlay('scan-start')) return;
   try {
-    const ctx = getAudioContext();
+    const ctx = await getAudioContext();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
@@ -32,10 +43,14 @@ export function playScanStart() {
     osc.frequency.linearRampToValueAtTime(880, ctx.currentTime + 0.15);
     gain.gain.setValueAtTime(0.3, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+    osc.onended = () => {
+      gain.disconnect();
+      osc.disconnect();
+    };
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.2);
-  } catch {
-    // Audio not available — silent fallback
+  } catch (err) {
+    console.warn('[notificationSounds]', err.message);
   }
 }
 
@@ -43,9 +58,10 @@ export function playScanStart() {
  * Short descending beep: 880Hz → 440Hz over 150ms.
  * Played when recording STOPS (STOP scanned or auto-stopped).
  */
-export function playRecordingStop() {
+export async function playRecordingStop() {
+  if (!_shouldPlay('recording-stop')) return;
   try {
-    const ctx = getAudioContext();
+    const ctx = await getAudioContext();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
@@ -55,10 +71,14 @@ export function playRecordingStop() {
     osc.frequency.linearRampToValueAtTime(440, ctx.currentTime + 0.15);
     gain.gain.setValueAtTime(0.3, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+    osc.onended = () => {
+      gain.disconnect();
+      osc.disconnect();
+    };
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.2);
-  } catch {
-    // Audio not available — silent fallback
+  } catch (err) {
+    console.warn('[notificationSounds]', err.message);
   }
 }
 
@@ -66,9 +86,10 @@ export function playRecordingStop() {
  * Pleasant two-tone chime: 523Hz (C5) then 784Hz (G5).
  * Played when video processing is COMPLETE (READY status).
  */
-export function playVideoReady() {
+export async function playVideoReady() {
+  if (!_shouldPlay('video-ready')) return;
   try {
-    const ctx = getAudioContext();
+    const ctx = await getAudioContext();
 
     // First note: C5 (523Hz)
     const osc1 = ctx.createOscillator();
@@ -79,6 +100,10 @@ export function playVideoReady() {
     osc1.frequency.setValueAtTime(523, ctx.currentTime);
     gain1.gain.setValueAtTime(0.3, ctx.currentTime);
     gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+    osc1.onended = () => {
+      gain1.disconnect();
+      osc1.disconnect();
+    };
     osc1.start(ctx.currentTime);
     osc1.stop(ctx.currentTime + 0.2);
 
@@ -91,9 +116,25 @@ export function playVideoReady() {
     osc2.frequency.setValueAtTime(784, ctx.currentTime + 0.15);
     gain2.gain.setValueAtTime(0.3, ctx.currentTime + 0.15);
     gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+    osc2.onended = () => {
+      gain2.disconnect();
+      osc2.disconnect();
+    };
     osc2.start(ctx.currentTime + 0.15);
     osc2.stop(ctx.currentTime + 0.35);
-  } catch {
-    // Audio not available — silent fallback
+  } catch (err) {
+    console.warn('[notificationSounds]', err.message);
   }
 }
+
+// Warm up AudioContext on first user gesture so resume() is a no-op later
+function _initOnGesture() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  document.removeEventListener('click', _initOnGesture);
+  document.removeEventListener('keydown', _initOnGesture);
+}
+document.addEventListener('click', _initOnGesture);
+document.addEventListener('keydown', _initOnGesture);
