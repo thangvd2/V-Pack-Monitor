@@ -32,19 +32,6 @@ const isValidIPv6 = (ip) => {
 
 const isValidIP = (ip) => isValidIPv4(ip) || isValidIPv6(ip);
 
-const isLANIPv4 = (ip) => {
-  if (!isValidIPv4(ip)) return false;
-  const [a, b] = ip.split('.').map(Number);
-  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
-};
-
-const isLANIPv6 = (ip) => {
-  const l = ip.toLowerCase();
-  return l.startsWith('fd') || l.startsWith('fc') || l.startsWith('fe80') || l === '::1';
-};
-
-const isLANIP = (ip) => isLANIPv4(ip) || isLANIPv6(ip);
-
 const isReservedIP = (ip) => {
   if (isValidIPv4(ip)) {
     const [a] = ip.split('.').map(Number);
@@ -54,7 +41,7 @@ const isReservedIP = (ip) => {
 };
 
 const isValidMAC = (mac) => {
-  const raw = mac.replace(/[\s:\-\.]/g, '').toUpperCase();
+  const raw = mac.replace(/[\s:.-]/g, '').toUpperCase();
   if (raw.length !== 12 || !/^[0-9A-F]{12}$/.test(raw)) return false;
   if (raw === '000000000000' || raw === 'FFFFFFFFFFFF') return false;
   return true;
@@ -125,6 +112,7 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
     const handler = (e) => { if (e.key === 'Escape') handleCancel(); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, dirty]);
 
   const markDirty = useCallback(() => setDirty(true), []);
@@ -133,9 +121,26 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
     setTouched(prev => ({ ...prev, [field]: true }));
   }, []);
 
+  const excludeId = currentStation?.id || 0;
+
+  const checkConflicts = useCallback(() => {
+    if (conflictTimerRef.current) clearTimeout(conflictTimerRef.current);
+    conflictTimerRef.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams();
+        if (ip1) params.set('ip', ip1);
+        if (ip2 && ip2.trim()) params.set('ip2', ip2);
+        if (macAddress) params.set('mac', macAddress);
+        if (name) params.set('name', name);
+        params.set('exclude_id', excludeId);
+        const res = await axios.get(`${API_BASE}/api/stations/check-conflict?${params}`);
+        setWarnings(res.data.warnings || []);
+      } catch { setWarnings([]); }
+    }, 300);
+  }, [ip1, ip2, macAddress, name, excludeId]);
+
   if (!isOpen) return null;
 
-  const excludeId = currentStation?.id || 0;
   const showIp2 = MODES_NEED_IP2.includes(cameraMode);
 
   const validate = () => {
@@ -163,22 +168,6 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
     if (!touched[fieldName]) return 'border-white/10';
     return hasError ? 'border-red-500/60' : 'border-emerald-500/40';
   };
-
-  const checkConflicts = useCallback(() => {
-    if (conflictTimerRef.current) clearTimeout(conflictTimerRef.current);
-    conflictTimerRef.current = setTimeout(async () => {
-      try {
-        const params = new URLSearchParams();
-        if (ip1) params.set('ip', ip1);
-        if (ip2 && ip2.trim()) params.set('ip2', ip2);
-        if (macAddress) params.set('mac', macAddress);
-        if (name) params.set('name', name);
-        params.set('exclude_id', excludeId);
-        const res = await axios.get(`${API_BASE}/api/stations/check-conflict?${params}`);
-        setWarnings(res.data.warnings || []);
-      } catch { setWarnings([]); }
-    }, 300);
-  }, [ip1, ip2, macAddress, name, excludeId]);
 
   const handleTestIp = async () => {
     if (!ip1 || !isValidIP(ip1)) return;
@@ -311,7 +300,7 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
   };
 
   const formatMac = (val) => {
-    const raw = val.replace(/[\s:\-\.]/g, '').toUpperCase();
+    const raw = val.replace(/[\s:.-]/g, '').toUpperCase();
     if (raw.length === 12) return raw.match(/.{2}/g).join(':');
     return val;
   };
@@ -472,7 +461,7 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
                   <button
                     type="button"
                     onClick={async () => {
-                      const raw = macAddress.replace(/[\s:\-\.]/g, '').toUpperCase();
+                      const raw = macAddress.replace(/[\s:.-]/g, '').toUpperCase();
                       if (raw.length !== 12) {
                         setDiscoverResult('❌ MAC không hợp lệ (cần 12 ký tự hex).');
                         return;

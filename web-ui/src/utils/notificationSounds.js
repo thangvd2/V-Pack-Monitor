@@ -127,6 +127,45 @@ export async function playVideoReady() {
   }
 }
 
+/**
+ * Urgent double-beep at 660Hz.
+ * Played when recording will auto-stop in 60 seconds (warning event).
+ */
+export async function playRecordingWarning() {
+  if (!_shouldPlay('recording-warning')) return;
+  try {
+    const ctx = await getAudioContext();
+
+    // First beep
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'square';
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.frequency.setValueAtTime(660, ctx.currentTime);
+    gain1.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    osc1.onended = () => { gain1.disconnect(); osc1.disconnect(); };
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.15);
+
+    // Second beep — 200ms after first
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'square';
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.frequency.setValueAtTime(660, ctx.currentTime + 0.2);
+    gain2.gain.setValueAtTime(0.25, ctx.currentTime + 0.2);
+    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+    osc2.onended = () => { gain2.disconnect(); osc2.disconnect(); };
+    osc2.start(ctx.currentTime + 0.2);
+    osc2.stop(ctx.currentTime + 0.35);
+  } catch (err) {
+    console.warn('[notificationSounds]', err.message);
+  }
+}
+
 // Warm up AudioContext on first user gesture so resume() is a no-op later
 function _initOnGesture() {
   if (!audioCtx) {

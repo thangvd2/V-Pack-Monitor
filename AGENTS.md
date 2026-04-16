@@ -10,9 +10,10 @@
 ## BEFORE EVERY COMMIT
 1. `pytest tests/ -v` — must pass
 2. `npm run build` in `web-ui/` — must pass (if frontend changed)
-3. `lsp_diagnostics` on changed Python files — no new errors
-4. No hardcode secrets/credentials
-5. No silent `except: pass` — must log the error
+3. `npm run lint` in `web-ui/` — must pass (if frontend changed)
+4. `lsp_diagnostics` on changed Python files — no new errors
+5. No hardcode secrets/credentials
+6. No silent `except: pass` — must log the error
 
 ## CODE RULES
 - Match existing patterns in the codebase
@@ -22,6 +23,8 @@
 - Bug fixes: fix minimally, never refactor while fixing
 - New Python dependencies: add to `requirements-dev.txt` (dev) or `requirements.txt` (prod) AND explain why
 - New npm dependencies: add via `npm install` AND explain why
+- **Frontend-Backend sync**: When adding SSE event or API response field in backend, MUST add frontend handler in the SAME commit
+- **React stale closures**: Variables used inside useEffect/useState callbacks must be in deps array or accessed via ref (enforced by `eslint-plugin-react-hooks`)
 
 ## MANDATORY PRE-PUSH REVIEW (EVERY FEATURE)
 Before pushing ANY new feature or significant change:

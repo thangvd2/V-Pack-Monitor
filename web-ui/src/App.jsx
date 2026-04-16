@@ -12,7 +12,7 @@ import VideoPlayerModal from './VideoPlayerModal';
 import UserManagementModal from './UserManagementModal';
 import Dashboard from './Dashboard';
 import API_BASE from './config';
-import { playScanStart, playRecordingStop, playVideoReady } from './utils/notificationSounds';
+import { playScanStart, playRecordingStop, playVideoReady, playRecordingWarning } from './utils/notificationSounds';
 
 const MTX_HOST = window.location.hostname;
 
@@ -22,8 +22,7 @@ const BARCODE_TIMEOUT = 100;
 const HEARTBEAT_INTERVAL = 30000;
 const RESTART_DELAY = 5000;
 const SEARCH_DEBOUNCE = 300;
-const TOAST_DURATION = 2000;
-const ERROR_TOAST_DURATION = 3000;
+const TOAST_DURATIONS = { info: 2000, error: 3000, warning: 5000 };
 
 function MtxFallback() {
   return (
@@ -50,6 +49,7 @@ function StationSelectionScreen({ stations, stationStatusList, fetchStationStatu
     load();
     const interval = setInterval(fetchStationStatus, STATION_POLL_INTERVAL);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: polling interval — adding fetchStationStatus would reset interval every render
   }, []);
 
   const getStatusForStation = (stationId) => {
@@ -247,6 +247,8 @@ function App() {
   const dateFromRef = useRef(dateFrom);
   const dateToRef = useRef(dateTo);
   const statusFilterRef = useRef(statusFilter);
+  const stationsRef = useRef(stations);
+  useEffect(() => { stationsRef.current = stations; }, [stations]);
   const abortControllerRef = useRef(null);
   const barcodeSimInputRef = useRef(null);
   useEffect(() => { recordsPageRef.current = recordsPage; }, [recordsPage]);
@@ -263,33 +265,13 @@ function App() {
   // Station switch race guard
   const [switchingStation, setSwitchingStation] = useState(false);
 
-  // Toast helper
+  // Toast helper (race-safe: clears previous timeout before setting new one)
+  const toastTimeoutRef = useRef(null);
   const showToast = useCallback((msg, type = 'info') => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToast(msg);
-    setTimeout(() => setToast(null), type === 'error' ? ERROR_TOAST_DURATION : TOAST_DURATION);
+    toastTimeoutRef.current = setTimeout(() => setToast(null), TOAST_DURATIONS[type] ?? TOAST_DURATIONS.info);
   }, []);
-
-  // Download via fetch+blob (no token in URL)
-  const handleDownload = useCallback(async (recordId, fileIndex) => {
-    try {
-      const token = localStorage.getItem('vpack_token');
-      const response = await fetch(`${API_BASE}/api/records/${recordId}/download/${fileIndex}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!response.ok) throw new Error('Download failed');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `video_${recordId}_${fileIndex}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      showToast('Tải video thất bại.', 'error');
-    }
-  }, [showToast]);
 
   useEffect(() => {
     const token = localStorage.getItem('vpack_token');
@@ -450,9 +432,23 @@ function App() {
       }
     });
 
+    es.addEventListener('recording_warning', (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        const sec = data.remaining_seconds || 60;
+        const station = stationsRef.current.find(s => s.id === data.station_id);
+        const name = station ? station.name : '';
+        showToast(`⚠️ ${name ? name + ': ' : ''}Tự động dừng sau ${sec}s`, 'warning');
+        playRecordingWarning();
+      } catch {
+        // SSE parse failure - ignore
+      }
+    });
+
     es.onerror = () => {};
 
     return () => es.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: SSE reconnect controlled by activeStationId/viewMode, not showToast identity
   }, [activeStationId, viewMode, stationsIdStr]);
 
   // Init fetch
@@ -465,6 +461,7 @@ function App() {
       checkLiveQuality();
       checkForUpdate();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: fetch on currentUser change only, not on fetchStations identity
   }, [currentUser]);
 
   const checkForUpdate = async () => {
@@ -568,6 +565,7 @@ function App() {
         // Non-critical per-station status fetch
       });
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: rebuilds on viewMode/stations change, reads latest state from setters
   }, [viewMode, stations]);
 
   // Fetch records (with AbortController)
@@ -586,6 +584,7 @@ function App() {
         if (abortControllerRef.current) abortControllerRef.current.abort();
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: debounced by searchTerm/activeStationId changes, fetchRecords reads fresh state
   }, [searchTerm, activeStationId, currentUser, dateFrom, dateTo, statusFilter]);
 
   const fetchRecords = async (query = '', sid = activeStationId, page = 1, signal) => {
@@ -705,8 +704,7 @@ function App() {
         setCurrentWaybill(finalBarcode);
       } else if (res.data.status === 'error') {
         if (res.data.message) {
-          setToast(res.data.message);
-          setTimeout(() => setToast(null), ERROR_TOAST_DURATION);
+          showToast(res.data.message, 'error');
         }
         setPackingStatus('idle');
         setCurrentWaybill('');
@@ -766,7 +764,7 @@ function App() {
       } else {
         setLoginError(res.data.message || 'Đăng nhập thất bại.');
       }
-    } catch (err) {
+    } catch {
       setLoginError('Lỗi kết nối server.');
     }
   };
@@ -852,6 +850,7 @@ function App() {
       window.removeEventListener('keydown', handleKeyDown);
       if (timeoutId) clearTimeout(timeoutId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: scanner bound to searchTerm/activeStationId, sendScanAction reads fresh state
   }, [searchTerm, activeStationId, currentUser]); 
 
   const handleSearch = (e) => {
@@ -879,7 +878,7 @@ function App() {
 
   useEffect(() => {
     if (!hasCam2) setCameraMode('single-cam');
-  }, [activeStationId]);
+  }, [activeStationId, hasCam2]);
 
   if (authLoading) {
     return (
@@ -1155,7 +1154,7 @@ function App() {
                       setUpdating(false);
                       setUpdateProgress({ stage: 'error', message: res.data.message, progress: 0 });
                     }
-                  } catch (err) {
+                  } catch {
                     if (!updateProgress || updateProgress.stage !== 'restarting') {
                       setUpdating(false);
                       setUpdateProgress({ stage: 'error', message: 'Lỗi kết nối server.', progress: 0 });
