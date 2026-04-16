@@ -2,6 +2,48 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v3.1.0] - 2026-04-17 (Auto-Stop Recording + Quality Enforcement)
+
+### ✨ Tính Năng Mới
+- **Auto-stop recording sau 10 phút**: Nếu operator quên scan STOP, hệ thống tự động dừng và lưu video sau 10 phút. Cảnh báo SSE `recording_warning` emit khi còn 60 giây.
+- **FFmpeg hard cap**: `-t 600` thêm vào tất cả 3 recording modes (SINGLE, DUAL_FILE, PIP) — belt-and-suspenders safety.
+- **Notification sounds**: Web Audio API synthesized sounds cho 3 events: recording start (ascending beep), recording stop (descending beep), video ready (two-tone chime). Warning sound (660Hz double-beep) cho auto-stop cảnh báo. Zero external dependencies.
+
+### 🐛 Bug Fixes
+- **`recording_warning` SSE listener**: Backend emit event nhưng frontend không có listener — operator không bao giờ thấy cảnh báo trước khi auto-stop. Fixed.
+- **`showToast` race condition**: Multiple rapid toasts (2+ trạm cùng lúc) ghi đè lẫn nhau. Fixed với `toastTimeoutRef`.
+- **SetupModal rules-of-hooks violation**: `useCallback` sau early return → latent crash bug. Fixed: move hook trước early return.
+
+### 🛡️ Quality Enforcement
+- **ESLint: 0 errors, 0 warnings** — Fix tất cả 27 pre-existing issues (dead code, unused vars, missing deps, regex escapes).
+- **ESLint in CI**: Frontend-build job giờ chạy `npm run lint` trước build.
+- **ESLint in pre-commit**: Local hook block commit nếu frontend lint fail.
+- **Toast duration refactor**: `TOAST_DURATIONS` map thay ternary chain (info: 2s, error: 3s, warning: 5s).
+- **AGENTS.md**: Thêm SSE sync rule + React stale closure rule + `npm run lint` check.
+
+### 📁 Files Thay Đổi
+| File | Changes |
+|---|---|
+| `api.py` | Timer infrastructure, `_auto_stop_recording()`, `_emit_recording_warning()` |
+| `routes_records.py` | Timer start/cancel on scan events |
+| `recorder.py` | `-t 600` FFmpeg cap in all 3 modes |
+| `web-ui/src/App.jsx` | SSE listener, toast refactor, ESLint fixes |
+| `web-ui/src/SetupModal.jsx` | Rules-of-hooks fix, dead code removal, regex cleanup |
+| `web-ui/src/utils/notificationSounds.js` | New — Web Audio API sound synthesis (4 sounds) |
+| `web-ui/src/SystemHealth.jsx` | ESLint cleanup |
+| `web-ui/src/UserManagementModal.jsx` | ESLint cleanup |
+| `web-ui/eslint.config.js` | argsIgnorePattern for false positives |
+| `AGENTS.md` | SSE sync + React rules + lint check |
+| `.github/workflows/ci.yml` | ESLint step in frontend-build |
+| `.pre-commit-config.yaml` | ESLint local hook |
+
+### 🧪 Tests
+- 316 Python tests (11 new in `test_auto_stop_timer.py`)
+- ESLint 0/0 across 5 frontend files
+- Frontend build clean
+
+---
+
 ## [v3.0.0] - 2026-04-16 (Architecture Overhaul & Major Security Hardening) 🎉 MAJOR RELEASE
 
 ### 🏗️ Kiến Trúc Lớn
