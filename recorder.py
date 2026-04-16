@@ -11,6 +11,8 @@ import threading
 from datetime import datetime
 import platform
 
+_MAX_RECORDING_SECONDS = 600
+
 
 def _ffmpeg_bin(name):
     base = os.path.dirname(os.path.abspath(__file__))
@@ -171,6 +173,8 @@ class CameraRecorder:
                     "copy",
                     "-f",
                     "mpegts",
+                    "-t",
+                    str(_MAX_RECORDING_SECONDS),
                     tmpfile,
                 ],
                 final_path=filepath,
@@ -194,6 +198,8 @@ class CameraRecorder:
                     "copy",
                     "-f",
                     "mpegts",
+                    "-t",
+                    str(_MAX_RECORDING_SECONDS),
                     tmp1,
                 ],
                 final_path=file1,
@@ -216,6 +222,8 @@ class CameraRecorder:
                     "copy",
                     "-f",
                     "mpegts",
+                    "-t",
+                    str(_MAX_RECORDING_SECONDS),
                     tmp2,
                 ],
                 final_path=file2,
@@ -252,6 +260,8 @@ class CameraRecorder:
                     "aac",
                     "-f",
                     "mpegts",
+                    "-t",
+                    str(_MAX_RECORDING_SECONDS),
                     tmpfile,
                 ]
             else:
@@ -282,6 +292,8 @@ class CameraRecorder:
                     "aac",
                     "-f",
                     "mpegts",
+                    "-t",
+                    str(_MAX_RECORDING_SECONDS),
                     tmpfile,
                 ]
             self._launch_ffmpeg(command, final_path=filepath)

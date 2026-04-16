@@ -27,6 +27,9 @@ import video_worker
 
 _SERVER_START_TIME = time.time()
 
+_MAX_RECORDING_SECONDS = 600  # 10 minutes hard cap
+_RECORDING_WARNING_SECONDS = 540  # 9 minutes — emit warning SSE event
+
 
 def _read_version():
     try:
@@ -59,6 +62,11 @@ _station_locks = {}  # {station_id: threading.Lock} — prevents double-scan per
 stream_managers = {}
 
 reconnect_status = {}
+
+_recording_timers = {}  # {station_id: threading.Timer} — auto-stop timers
+_recording_timers_lock = threading.Lock()
+_recording_start_times = {}  # {station_id: float} — epoch seconds when recording started
+_recording_warning_timers = {}  # {station_id: threading.Timer} — warning timers
 
 # Per-concern locks for shared mutable state
 _recorders_lock = threading.Lock()  # guards active_recorders, active_waybills, active_record_ids
@@ -286,6 +294,84 @@ def get_rtsp_sub_url(ip, safety_code, channel=1, brand="imou"):
 import telegram_bot
 
 
+def _cancel_recording_timer(station_id):
+    with _recording_timers_lock:
+        timer = _recording_timers.pop(station_id, None)
+        warning_timer = _recording_warning_timers.pop(station_id, None)
+    if timer:
+        timer.cancel()
+    if warning_timer:
+        warning_timer.cancel()
+
+
+def _auto_stop_recording(station_id, expected_record_id):
+    with _station_locks_lock:
+        lock = _station_locks.setdefault(station_id, threading.Lock())
+    with lock:
+        with _recorders_lock:
+            recorder_inst = active_recorders.get(station_id)
+            waybill = active_waybills.get(station_id)
+            record_id = active_record_ids.get(station_id)
+
+        if not recorder_inst or not record_id or record_id != expected_record_id:
+            # Recording already stopped or different recording — bail out
+            with _recording_timers_lock:
+                _recording_timers.pop(station_id, None)
+                _recording_start_times.pop(station_id, None)
+            return
+
+        database.update_record_status(record_id, "PROCESSING")
+        notify_sse(
+            "video_status",
+            {
+                "station_id": station_id,
+                "status": "PROCESSING",
+                "record_id": record_id,
+                "auto_stopped": True,
+            },
+        )
+        with _processing_lock:
+            _processing_count[station_id] = _processing_count.get(station_id, 0) + 1
+        with _recorders_lock:
+            active_recorders.pop(station_id, None)
+            active_waybills.pop(station_id, None)
+            active_record_ids.pop(station_id, None)
+
+        _cancel_recording_timer(station_id)
+        with _recording_timers_lock:
+            _recording_start_times.pop(station_id, None)
+
+        submitted = video_worker.submit_stop_and_save(record_id, recorder_inst, waybill, station_id, save=True)
+        if not submitted:
+            database.update_record_status(record_id, "FAILED")
+            with _processing_lock:
+                _processing_count.pop(station_id, None)
+            notify_sse(
+                "video_status",
+                {
+                    "station_id": station_id,
+                    "status": "FAILED",
+                    "record_id": record_id,
+                },
+            )
+
+        database.log_audit(0, "AUTO_STOP", f"Station {station_id} - max duration reached")
+
+
+def _emit_recording_warning(station_id):
+    with _recorders_lock:
+        if station_id not in active_recorders:
+            return
+    remaining = _MAX_RECORDING_SECONDS - _RECORDING_WARNING_SECONDS
+    notify_sse(
+        "recording_warning",
+        {
+            "station_id": station_id,
+            "remaining_seconds": remaining,
+        },
+    )
+
+
 def _preflight_checks(station_id):
     with _recorders_lock:
         if station_id in active_recorders:
@@ -467,6 +553,14 @@ async def lifespan(app: FastAPI):
 
     yield
     cleanup_task.cancel()
+    with _recording_timers_lock:
+        for timer in _recording_timers.values():
+            timer.cancel()
+        _recording_timers.clear()
+        for timer in _recording_warning_timers.values():
+            timer.cancel()
+        _recording_warning_timers.clear()
+        _recording_start_times.clear()
     with _streams_lock:
         managers = list(stream_managers.values())
     for manager in managers:

@@ -9,6 +9,7 @@ import json
 import asyncio
 import queue
 import threading
+import time
 import urllib.request
 
 from fastapi import Request, HTTPException
@@ -114,6 +115,9 @@ def register_routes(app):
 
         if barcode == "EXIT":
             if current_recorder:
+                api._cancel_recording_timer(sid)
+                with api._recording_timers_lock:
+                    api._recording_start_times.pop(sid, None)
                 database.update_record_status(current_record_id, "PROCESSING")
                 api.notify_sse(
                     "video_status",
@@ -127,6 +131,8 @@ def register_routes(app):
                     api._processing_count[sid] = api._processing_count.get(sid, 0) + 1
                 with api._recorders_lock:
                     api.active_recorders.pop(sid, None)
+                    api.active_waybills.pop(sid, None)
+                    api.active_record_ids.pop(sid, None)
                 video_worker.submit_stop_and_save(
                     current_record_id,
                     current_recorder,
@@ -142,6 +148,9 @@ def register_routes(app):
 
         if barcode == "STOP":
             if current_recorder:
+                api._cancel_recording_timer(sid)
+                with api._recording_timers_lock:
+                    api._recording_start_times.pop(sid, None)
                 database.update_record_status(current_record_id, "PROCESSING")
                 api.notify_sse(
                     "video_status",
@@ -155,6 +164,8 @@ def register_routes(app):
                     api._processing_count[sid] = api._processing_count.get(sid, 0) + 1
                 with api._recorders_lock:
                     api.active_recorders.pop(sid, None)
+                    api.active_waybills.pop(sid, None)
+                    api.active_record_ids.pop(sid, None)
                 database.log_audit(
                     current_user["id"],
                     "STOP_RECORD",
@@ -249,6 +260,26 @@ def register_routes(app):
             api.active_record_ids[sid] = record_id
             api.active_recorders[sid] = new_recorder
         new_recorder.start_recording(barcode)
+
+        api._cancel_recording_timer(sid)
+        with api._recording_timers_lock:
+            api._recording_start_times[sid] = time.time()
+            warning_timer = threading.Timer(
+                api._RECORDING_WARNING_SECONDS,
+                api._emit_recording_warning,
+                args=[sid],
+            )
+            warning_timer.daemon = True
+            warning_timer.start()
+            api._recording_warning_timers[sid] = warning_timer
+            stop_timer = threading.Timer(
+                api._MAX_RECORDING_SECONDS,
+                api._auto_stop_recording,
+                args=[sid, record_id],
+            )
+            stop_timer.daemon = True
+            stop_timer.start()
+            api._recording_timers[sid] = stop_timer
 
         database.log_audit(
             current_user["id"],
