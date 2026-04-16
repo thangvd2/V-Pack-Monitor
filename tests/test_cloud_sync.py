@@ -117,11 +117,12 @@ class TestProcessCloudSync:
 
         mock_tg.assert_not_called()
 
+    @patch("cloud_sync.mark_as_synced")
     @patch("cloud_sync.telegram_bot.send_telegram_message")
     @patch("cloud_sync.upload_to_s3")
     @patch("cloud_sync.create_backup_zip")
     @patch("cloud_sync.get_setting")
-    def test_s3_sync_success_path(self, mock_get_setting, mock_create_zip, mock_upload_s3, mock_tg):
+    def test_s3_sync_success_path(self, mock_get_setting, mock_create_zip, mock_upload_s3, mock_tg, mock_mark_synced):
         """Full S3 sync flow: create zip, upload, mark synced, notify telegram."""
         mock_get_setting.side_effect = lambda key, default=None: {
             "CLOUD_PROVIDER": "S3",
@@ -138,6 +139,7 @@ class TestProcessCloudSync:
             cloud_sync.process_cloud_sync()
 
         mock_upload_s3.assert_called_once_with(tmp_path, "https://s3.example.com", "AK_TEST", "SK_TEST", "bucket1")
+        mock_mark_synced.assert_called_once_with([1, 2])
         mock_tg.assert_called_once()
         tg_msg = mock_tg.call_args[0][0]
         assert "Cloud Sync Hoàn Tất" in tg_msg
