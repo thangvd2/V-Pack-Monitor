@@ -20,8 +20,19 @@
 - No `as any`, `@ts-ignore`, `@ts-expect-error`
 - No deleting tests to make them pass
 - Bug fixes: fix minimally, never refactor while fixing
-- New Python dependencies: add to `requirements.txt` AND explain why
+- New Python dependencies: add to `requirements-dev.txt` (dev) or `requirements.txt` (prod) AND explain why
 - New npm dependencies: add via `npm install` AND explain why
+
+## MANDATORY PRE-PUSH REVIEW (EVERY FEATURE)
+Before pushing ANY new feature or significant change:
+1. **Self-review**: Fire 2+ explore agents in parallel to audit the code for edge cases, race conditions, thread safety, and error handling
+2. **Test coverage**: New backend logic MUST have corresponding tests. No exceptions.
+3. **No tests = not done**: If you can't write tests for it, explain why in the PR and flag it as untested
+4. **Thread safety audit**: Any code using threading, locks, timers, or shared state MUST be reviewed for:
+   - Lock ordering (deadlock risk)
+   - Race conditions (concurrent access without locks)
+   - Resource leaks (timers, threads, connections not cleaned up)
+   - Stale references (captured variables in callbacks that may be outdated)
 
 ## PROJECT STRUCTURE
 - `api.py` — FastAPI app, shared state, lifespan, helpers (DO NOT add routes here)
