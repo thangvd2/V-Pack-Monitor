@@ -1,6 +1,5 @@
 import os
 import sys
-import pytest
 import sqlite3
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -45,7 +44,6 @@ from database import (
     log_audit,
     cleanup_audit_log,
     get_audit_logs,
-    get_active_sessions,
     get_session_by_id,
     end_session_by_id,
     get_hourly_stats,
@@ -72,6 +70,7 @@ class TestEncryption:
 
     def test_decrypt_corrupted_data_returns_ciphertext(self):
         import base64
+
         bad = _ENCRYPT_PREFIX + base64.b64encode(b"\xff\xfe\xfd\xfc\xfb").decode()
         result = _decrypt_value(bad)
         assert result == bad
@@ -93,10 +92,18 @@ class TestInitDb:
         monkeypatch.setattr("database._DB_DIR", str(tmp_path / "recordings"))
         init_db()
         with sqlite3.connect(db_path) as conn:
-            tables = [r[0] for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-            ).fetchall()]
-        for expected in ["packing_video", "system_settings", "stations", "users", "sessions", "audit_log", "revoked_tokens"]:
+            tables = [
+                r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
+            ]
+        for expected in [
+            "packing_video",
+            "system_settings",
+            "stations",
+            "users",
+            "sessions",
+            "audit_log",
+            "revoked_tokens",
+        ]:
             assert expected in tables
 
     def test_default_admin_created(self):
@@ -108,6 +115,7 @@ class TestInitDb:
     def test_default_admin_password_is_08012011(self):
         admin = get_user_by_username("admin")
         import bcrypt
+
         assert bcrypt.checkpw("08012011".encode(), admin["password_hash"].encode())
 
     def test_idempotent(self):
@@ -182,8 +190,28 @@ class TestRecords:
         assert results[0][1] == "ALPHA-001"
 
     def test_get_records_by_station(self):
-        sid1 = add_station({"name": "S1", "ip_camera_1": "10.0.0.1", "ip_camera_2": "", "safety_code": "X", "camera_mode": "SINGLE", "camera_brand": "imou", "mac_address": ""})
-        sid2 = add_station({"name": "S2", "ip_camera_1": "10.0.0.2", "ip_camera_2": "", "safety_code": "Y", "camera_mode": "SINGLE", "camera_brand": "imou", "mac_address": ""})
+        sid1 = add_station(
+            {
+                "name": "S1",
+                "ip_camera_1": "10.0.0.1",
+                "ip_camera_2": "",
+                "safety_code": "X",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
+        sid2 = add_station(
+            {
+                "name": "S2",
+                "ip_camera_1": "10.0.0.2",
+                "ip_camera_2": "",
+                "safety_code": "Y",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
         create_record(sid1, "WB-S1", "SINGLE")
         create_record(sid2, "WB-S2", "SINGLE")
         results = get_records(station_id=sid1)
@@ -213,7 +241,10 @@ class TestRecords:
         rid = create_record(sample_station_id, "OLD-WB", "SINGLE")
         update_record_status(rid, "READY", video_paths=fake_video)
         with sqlite3.connect(database.DB_FILE) as conn:
-            conn.execute("UPDATE packing_video SET recorded_at = datetime('now', '-10 days') WHERE id = ?", (rid,))
+            conn.execute(
+                "UPDATE packing_video SET recorded_at = datetime('now', '-10 days') WHERE id = ?",
+                (rid,),
+            )
             conn.commit()
         assert os.path.exists(fake_video)
         cleanup_old_records(days=7)
@@ -234,35 +265,106 @@ class TestRecords:
 
 class TestStations:
     def test_add_get_station(self):
-        sid = add_station({"name": "Station A", "ip_camera_1": "192.168.1.1", "ip_camera_2": "", "safety_code": "ABC", "camera_mode": "SINGLE", "camera_brand": "imou", "mac_address": ""})
+        sid = add_station(
+            {
+                "name": "Station A",
+                "ip_camera_1": "192.168.1.1",
+                "ip_camera_2": "",
+                "safety_code": "ABC",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
         s = get_station(sid)
         assert s is not None
         assert s["name"] == "Station A"
         assert s["ip_camera_1"] == "192.168.1.1"
 
     def test_get_stations_list(self):
-        add_station({"name": "S1", "ip_camera_1": "10.0.0.1", "ip_camera_2": "", "safety_code": "X", "camera_mode": "SINGLE", "camera_brand": "imou", "mac_address": ""})
-        add_station({"name": "S2", "ip_camera_1": "10.0.0.2", "ip_camera_2": "", "safety_code": "Y", "camera_mode": "SINGLE", "camera_brand": "imou", "mac_address": ""})
+        add_station(
+            {
+                "name": "S1",
+                "ip_camera_1": "10.0.0.1",
+                "ip_camera_2": "",
+                "safety_code": "X",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
+        add_station(
+            {
+                "name": "S2",
+                "ip_camera_1": "10.0.0.2",
+                "ip_camera_2": "",
+                "safety_code": "Y",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
         stations = get_stations()
         assert len(stations) >= 2
 
     def test_update_station(self):
-        sid = add_station({"name": "Old", "ip_camera_1": "1.1.1.1", "ip_camera_2": "", "safety_code": "X", "camera_mode": "SINGLE", "camera_brand": "imou", "mac_address": ""})
-        update_station(sid, {"name": "New", "ip_camera_1": "2.2.2.2", "ip_camera_2": "3.3.3.3", "safety_code": "Y", "camera_mode": "DUAL_FILE", "camera_brand": "dahua", "mac_address": "11:22:33:44:55:66"})
+        sid = add_station(
+            {
+                "name": "Old",
+                "ip_camera_1": "1.1.1.1",
+                "ip_camera_2": "",
+                "safety_code": "X",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
+        update_station(
+            sid,
+            {
+                "name": "New",
+                "ip_camera_1": "2.2.2.2",
+                "ip_camera_2": "3.3.3.3",
+                "safety_code": "Y",
+                "camera_mode": "DUAL_FILE",
+                "camera_brand": "dahua",
+                "mac_address": "11:22:33:44:55:66",
+            },
+        )
         s = get_station(sid)
         assert s["name"] == "New"
         assert s["ip_camera_1"] == "2.2.2.2"
         assert s["camera_brand"] == "dahua"
 
     def test_update_station_ip_allowed_fields(self):
-        sid = add_station({"name": "IP Test", "ip_camera_1": "1.1.1.1", "ip_camera_2": "", "safety_code": "X", "camera_mode": "SINGLE", "camera_brand": "imou", "mac_address": ""})
+        sid = add_station(
+            {
+                "name": "IP Test",
+                "ip_camera_1": "1.1.1.1",
+                "ip_camera_2": "",
+                "safety_code": "X",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
         update_station_ip(sid, "ip_camera_1", "10.0.0.100")
         assert get_station(sid)["ip_camera_1"] == "10.0.0.100"
         update_station_ip(sid, "ip_camera_2", "10.0.0.200")
         assert get_station(sid)["ip_camera_2"] == "10.0.0.200"
 
     def test_update_station_ip_rejects_invalid_field(self):
-        sid = add_station({"name": "IP Test 2", "ip_camera_1": "1.1.1.1", "ip_camera_2": "", "safety_code": "X", "camera_mode": "SINGLE", "camera_brand": "imou", "mac_address": ""})
+        sid = add_station(
+            {
+                "name": "IP Test 2",
+                "ip_camera_1": "1.1.1.1",
+                "ip_camera_2": "",
+                "safety_code": "X",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
         with sqlite3.connect(database.DB_FILE) as conn:
             before = conn.execute("SELECT ip_camera_1 FROM stations WHERE id=?", (sid,)).fetchone()[0]
         update_station_ip(sid, "malicious_field", "evil")
@@ -271,7 +373,17 @@ class TestStations:
         assert before == after
 
     def test_delete_station(self):
-        sid = add_station({"name": "To Delete", "ip_camera_1": "1.1.1.1", "ip_camera_2": "", "safety_code": "X", "camera_mode": "SINGLE", "camera_brand": "imou", "mac_address": ""})
+        sid = add_station(
+            {
+                "name": "To Delete",
+                "ip_camera_1": "1.1.1.1",
+                "ip_camera_2": "",
+                "safety_code": "X",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
         delete_station(sid)
         assert get_station(sid) is None
 
@@ -321,6 +433,7 @@ class TestUsers:
         uid = create_user("pwchange", "OldPassword!", "OPERATOR")
         update_user_password(uid, "NewPassword!")
         import bcrypt
+
         user = get_user_by_username("pwchange")
         assert bcrypt.checkpw("NewPassword!".encode(), user["password_hash"].encode())
         assert not bcrypt.checkpw("OldPassword!".encode(), user["password_hash"].encode())
@@ -335,6 +448,7 @@ class TestUsers:
         update_user(uid, is_active=1)
         user = get_user_by_username("mcpuser")
         import sqlite3
+
         with sqlite3.connect(database.DB_FILE) as conn:
             conn.execute("UPDATE users SET must_change_password = 1 WHERE id = ?", (uid,))
             conn.commit()
@@ -353,7 +467,7 @@ class TestUsers:
 
 class TestSessions:
     def test_create_get_active_session(self, admin_user_id, sample_station_id):
-        sid = create_session(admin_user_id, sample_station_id)
+        create_session(admin_user_id, sample_station_id)
         session = get_active_session(sample_station_id)
         assert session is not None
         assert session["user_id"] == admin_user_id
@@ -367,15 +481,19 @@ class TestSessions:
     def test_expire_stale_sessions(self, admin_user_id, sample_station_id):
         sid = create_session(admin_user_id, sample_station_id)
         import sqlite3
+
         with sqlite3.connect(database.DB_FILE) as conn:
-            conn.execute("UPDATE sessions SET last_heartbeat = datetime('now', '-2 minutes') WHERE id = ?", (sid,))
+            conn.execute(
+                "UPDATE sessions SET last_heartbeat = datetime('now', '-2 minutes') WHERE id = ?",
+                (sid,),
+            )
             conn.commit()
         count = expire_stale_sessions(timeout_seconds=60)
         assert count >= 1
         assert get_active_session(sample_station_id) is None
 
     def test_expire_does_not_affect_recent_sessions(self, admin_user_id, sample_station_id):
-        sid = create_session(admin_user_id, sample_station_id)
+        create_session(admin_user_id, sample_station_id)
         count = expire_stale_sessions(timeout_seconds=600)
         assert count == 0
         assert get_active_session(sample_station_id) is not None
@@ -383,10 +501,12 @@ class TestSessions:
     def test_update_session_heartbeat(self, admin_user_id, sample_station_id):
         sid = create_session(admin_user_id, sample_station_id)
         import sqlite3
+
         with sqlite3.connect(database.DB_FILE) as conn:
             old_hb = conn.execute("SELECT last_heartbeat FROM sessions WHERE id=?", (sid,)).fetchone()[0]
         update_session_heartbeat(sid)
         import sqlite3
+
         with sqlite3.connect(database.DB_FILE) as conn:
             new_hb = conn.execute("SELECT last_heartbeat FROM sessions WHERE id=?", (sid,)).fetchone()[0]
         assert new_hb >= old_hb
@@ -425,6 +545,7 @@ class TestAudit:
     def test_cleanup_audit_log(self, admin_user_id):
         log_audit(admin_user_id, "OLD_ACTION")
         import sqlite3
+
         with sqlite3.connect(database.DB_FILE) as conn:
             conn.execute("UPDATE audit_log SET created_at = datetime('now', '-100 days') WHERE action = 'OLD_ACTION'")
             conn.commit()
@@ -457,7 +578,17 @@ class TestAnalytics:
         assert len(trend) == 14
 
     def test_stations_comparison(self):
-        sid1 = add_station({"name": "Comp1", "ip_camera_1": "10.0.0.10", "ip_camera_2": "", "safety_code": "X", "camera_mode": "SINGLE", "camera_brand": "imou", "mac_address": ""})
+        sid1 = add_station(
+            {
+                "name": "Comp1",
+                "ip_camera_1": "10.0.0.10",
+                "ip_camera_2": "",
+                "safety_code": "X",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
         rid = create_record(sid1, "COMP-WB", "SINGLE")
         update_record_status(rid, "READY")
         comparison = get_stations_comparison()

@@ -1,0 +1,7 @@
+# Ruff configuration — shared between pre-commit hooks and CI
+
+line-length = 120
+
+[lint]
+select = ["E", "F", "W"]
+ignore = ["E501", "E402", "F811", "F541", "W291", "E741"]

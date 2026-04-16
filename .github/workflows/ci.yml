@@ -24,12 +24,10 @@ jobs:
           restore-keys: ${{ runner.os }}-pip-
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pytest httpx
+        run: pip install -r requirements-dev.txt
 
       - name: Run tests
-        run: python -m pytest tests/ --ignore=tests/test_video_worker.py --ignore=tests/test_network.py --ignore=tests/test_cloud_sync.py -v --tb=short
+        run: python -m pytest tests/ -v --tb=short
         env:
           VPACK_SECRET: test-secret-key-for-ci
 
@@ -66,4 +64,4 @@ jobs:
         run: pip install ruff
 
       - name: Lint
-        run: ruff check . --ignore=E501,F401,F841,E402,F811,F541,W291,E741 --select=E,F,W
+        run: ruff check .

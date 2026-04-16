@@ -2,6 +2,159 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v3.0.0] - 2026-04-16 (Architecture Overhaul & Major Security Hardening) 🎉 MAJOR RELEASE
+
+### 🏗️ Kiến Trúc Lớn
+- **Route Module Decomposition:** Tách `api.py` monolith (~1500 dòng) thành 4 route modules chuyên trách, mỗi module export `register_routes(app)`:
+  - `routes_auth.py` (235 dòng) — Auth + User CRUD + Session management
+  - `routes_records.py` (436 dòng) — Scan, records, download, SSE, live preview
+  - `routes_stations.py` (321 dòng) — Station CRUD + discovery + sessions
+  - `routes_system.py` (915 dòng) — Settings, analytics, health, auto-update, CSV export
+- **CI/CD Pipeline:** GitHub Actions tự chạy pytest + frontend build + ruff lint trên mỗi push/PR nhắm vào `master`/`dev`.
+- **Development Workflow:** Thêm `AGENTS.md` (AI agent rules), `CONTRIBUTING.md` (quy trình phát triển), PR template.
+- **Unit Test Suite:** 305 tests covering auth, API routes, database, encryption, FTS5 search, video worker, network, cloud sync, security regression, edge cases.
+
+### 🔒 Security Hardening — 111 Issues Resolved (from v2.4.2 → v3.0.0)
+
+#### database.py (34 issues)
+- **Fernet Encryption:** Thay XOR + base64 bằng `cryptography.fernet.Fernet` cho sensitive settings. Auto-migration v1→v2 trong `init_db()`.
+- **Foreign Key Enforcement:** `PRAGMA foreign_keys=ON` trên mỗi connection. Orphan cleanup chạy khi startup.
+- **6 New Indexes:** Tối ưu query performance cho `records`, `stations`, `sessions`, `audit_log`.
+- **WAL Mode:** Write-Ahead Logging cho concurrent read/write.
+- **`get_connection()` Factory:** Centralized connection creation với PRAGMA enforcement.
+- **CHECK Constraints:** Validate data tại DB level.
+- **Bounded Inputs:** Tên station, username, waybill code có max length.
+- **Deprecation Docstrings:** Cảnh báo cho các hàm legacy.
+
+#### api.py (32 issues)
+- **Per-Concern Thread Locks:** `_recorders_lock`, `_streams_lock`, `_station_locks_lock`, `_cache_lock`, `_login_attempts_lock` — thay thế single giant lock.
+- **Path Traversal Prevention:** Validate semua file paths chống zip slip.
+- **HTTP Status Codes:** 401/403/422/429/413/503 thay vì generic 400/500.
+- **Pydantic Field Validation:** Tất cả API payloads có type + constraint validation.
+- **Admin Self-Lock Prevention:** Admin không thể tự lock/khoá tài khoản mình.
+- **Upload Size Limit:** Credentials upload giới hạn 1MB.
+- **SSRF Prevention:** `/api/ping` chỉ chấp nhận private IP.
+- **SSE Max 50 Clients:** Chống resource exhaustion.
+- **Failed Login Audit Trail:** Log mọi login thất bại vào audit log.
+- **Background Recovery Thread:** Crash recovery chạy độc lập, không block startup.
+- **`sys.exit(0)`:** Thay `os._exit(0)` cho graceful shutdown.
+- **Tempfile for Restart Scripts:** Tạo restart script trong temp directory, tự cleanup.
+
+#### recorder.py (3 issues)
+- **Waybill Code Sanitization:** `re.sub(r'[^\w\-.]', '_', ...)` chống path injection.
+- **`_stopped` Flag Reset:** Fix reuse bug khi recorder stop/start lại.
+- **Transcode Error Logging:** Log chi tiết khi HEVC→H.264 transcode thất bại.
+
+#### video_worker.py (3 issues)
+- **Bounded Queue:** `_MAX_PENDING=10` — giới hạn tasks chờ xử lý.
+- **Callback Pattern:** `_decrement_callback` tránh circular import với api.py.
+- **Submit/Shutdown Race:** Fix race condition khi submit task đúng lúc shutdown.
+
+#### auth.py (3 issues)
+- **`int(user_id)` ValueError Handling:** Tránh crash khi JWT payload bị corrupt.
+- **Revocation Error Logging:** Log lỗi khi token revocation thất bại.
+- **Expiry Comment:** Document token expiry behaviour.
+
+#### cloud_sync.py (4 issues)
+- **Path Validation in Zip:** Kiểm tra mỗi entry trong zip file chống zip slip.
+- **GDrive Credentials Caching:** Cache parsed credentials, không parse mỗi lần.
+- **Concurrency Lock:** Thread lock cho cloud sync operations.
+- **Direct sqlite3.connect TODO:** Document cần refactor sang database.py.
+
+#### telegram_bot.py (3 issues)
+- **Bot Token Caching:** Cache bot instance với 5 phút TTL.
+- **Exponential Backoff Polling:** Tránh spam khi Telegram API down.
+- **Direct sqlite3.connect TODO:** Document cần refactor sang database.py.
+
+#### network.py (3 issues)
+- **ThreadPoolExecutor for LAN Scan:** Thay sequential ping bằng parallel scanning.
+- **Private IP Validation:** Validate IP trước khi scan.
+- **Fallback Comment:** Document fallback behaviour.
+
+#### Frontend (27 issues)
+- **AbortController:** Cancel pending fetch khi component unmount.
+- **Fetch+Blob for Downloads:** Thay `window.open()` bằng authenticated download.
+- **Custom Confirm Dialog:** Thay `window.confirm()` bằng styled modal.
+- **Toast Replacing alert():** Tất cả `alert()` thay bằng toast notification.
+- **Station Switch Lock Flag:** Ngăn double-click khi chuyển trạm.
+- **`doChangePassword()` Extraction:** Tách logic đổi mật khẩu ra function riêng.
+- **SSE Stable Dependencies:** `useCallback`/`useMemo` cho SSE handler, tránh reconnect loop.
+- **`config.js`:** Shared `API_BASE` constant, không hardcode URL.
+- **Named Constants:** Magic numbers → named constants (`MAX_LOGIN_ATTEMPTS`, etc.).
+- **useMemo Optimisation:** Memo expensive computations.
+- **Version Cleanup:** Remove dead version-related code.
+- **ErrorBoundary Component:** Catch React render errors gracefully.
+- **Search Debounce 300ms:** Tránh spam API khi typing.
+- **Axios Timeout 15s:** Default timeout cho tất cả API calls.
+
+### 📁 Files Thay Đổi
+- `api.py`: Giảm từ ~1500 → ~553 dòng (routes tách ra). Thread locks, status codes, validation.
+- `routes_auth.py` (mới): Auth + User CRUD routes.
+- `routes_records.py` (mới): Scan, records, download, SSE routes.
+- `routes_stations.py` (mới): Station CRUD + sessions + discovery routes.
+- `routes_system.py` (mới): Settings, analytics, health, update routes.
+- `database.py`: Fernet encryption, FK enforcement, indexes, WAL, `get_connection()`.
+- `recorder.py`: Path sanitization, `_stopped` flag fix.
+- `video_worker.py`: Bounded queue, callback pattern, shutdown race fix.
+- `auth.py`: ValueError handling, revocation logging.
+- `cloud_sync.py`: Zip path validation, credentials caching, concurrency lock.
+- `telegram_bot.py`: Token caching, exponential backoff.
+- `network.py`: ThreadPoolExecutor, IP validation.
+- `web-ui/src/App.jsx`: 27 frontend hardening issues.
+- `web-ui/src/config.js` (mới): Shared API_BASE constant.
+- `tests/`: 305 tests (108 new).
+- `AGENTS.md` (mới): AI agent rules.
+- `CONTRIBUTING.md` (mới): Development workflow.
+- `.github/workflows/ci.yml` (mới): CI/CD pipeline.
+- `.github/pull_request_template.md` (mới): PR template.
+
+### ⚠️ Breaking Changes
+- **Encryption Migration:** XOR v1 → Fernet v2. Auto-migration chạy trong `init_db()`. Không rollback được.
+- **API Status Codes:** Nhiều endpoint trả về status codes mới (401/403/422/429 thay vì 400). Frontend cần handle đúng.
+
+---
+
+## [v2.4.2] - 2026-04-15 (Security & Stability Audit — 22 Issues)
+
+### 🔒 CRITICAL Fixes
+- **FTS5 MATCH Crash Guard:** FTS5 `MATCH` query với ký tự đặc biệt → crash. Thêm try/except fallback sang `LIKE` query.
+- **SSE Stale Closure Fix:** SSE handler dùng ref (`searchTermRef.current`) thay vì closure capture — filter đúng khi search term thay đổi.
+- **Timezone Store UTC:** `recorded_at` lưu UTC trong DB, convert sang localtime khi query. Fix analytics sai 7 giờ (UTC+7).
+
+### 🛡️ HIGH Fixes
+- **Zip Slip Prevention:** Validate extract path trong auto-update zip.
+- **Login Cleanup Threshold:** Giảm từ 1000 → 100 entries dọn login attempts.
+- **Production Update Zip Integrity:** Check zip file size trước khi extract.
+- **`_parse_semver` Pre-release Tags:** Version comparison handle `v3.0.0-beta` đúng.
+- **SSE Queue Bounded:** `maxsize=100` cho SSE queue, chống memory leak.
+
+### 🔧 MEDIUM Fixes
+- **CORS Explicit Methods/Headers:** Thu hẹp CORS cho phép methods/headers cụ thể.
+- **`activeStationId` Init Null:** Fix undefined state khi chưa chọn trạm.
+- **ErrorBoundary Component:** Catch React render errors.
+- **Search Debounce 300ms:** Tránh spam API.
+- **Axios Timeout 15s:** Default timeout cho API calls.
+
+### 📁 Files Thay Đổi
+- `api.py`: FTS5 crash guard, SSE stale fix, timezone UTC, zip slip, login cleanup, CORS, SSE bounded.
+- `database.py`: UTC storage, `localtime` conversion in queries.
+- `web-ui/src/App.jsx`: ErrorBoundary, search debounce, axios timeout, CORS.
+- `tests/`: 8 tests updated cho new validation/status codes.
+
+---
+
+## [v2.4.1] - 2026-04-14 (Semver Fix)
+
+### 🐛 Bug Fix
+- **Semver Version Comparison:** `_parse_semver()` so sánh version đúng — `v2.4.0` > `v2.3.0` (trước đó compare string `v2.4.0` < `v2.3.0` sai).
+- **Bump VERSION:** `v2.4.0` → `v2.4.1`.
+
+### 📁 Files Thay Đổi
+- `api.py`: `_parse_semver()` function.
+- `VERSION`: `v2.4.1`.
+
+---
+
 ## [v2.3.0] - 2026-04-13 (Auto-Update System)
 
 ### 🔄 Tính Năng Lớn

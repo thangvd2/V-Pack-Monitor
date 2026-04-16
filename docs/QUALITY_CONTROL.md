@@ -65,9 +65,14 @@ Document không tự enforce. 3 tầng sau đảm bảo tuân thủ **cơ học*
 
 ```
 Layer 1 — Pre-commit hooks (LOCAL, block commit)
-  ├── ruff lint → fail = không commit được
-  └── (sẽ thêm: pytest fast subset, secret scan)
-  ⚠️ STATUS: CHƯA SETUP — hiện chỉ ghi trong document, chưa implement
+  ├── ruff lint + format → fail = không commit được
+  ├── detect-secrets → block nếu thêm secret mới
+  └── (sẽ thêm: pytest fast subset)
+  ✅ STATUS: ĐANG CHẠY — pre-commit install, ruff.toml config
+
+Layer 1.5 — Pre-push hook (LOCAL, block push)
+  └── pytest → 305 tests, fail = không push được
+  ✅ STATUS: ĐANG CHẠY — pre-push install
 
 Layer 2 — CI Pipeline (REMOTE, block merge)
   ├── python-test  → pytest
@@ -76,9 +81,9 @@ Layer 2 — CI Pipeline (REMOTE, block merge)
   ✅ STATUS: ĐANG CHẠY — mọi PR phải pass 3 jobs
 
 Layer 3 — Branch Protection (GITHUB, block push)
-  ├── master: cần PR + 1 review + CI pass
-  └── dev: CI pass
-  ✅ STATUS: ĐANG CHẠY — master protected, dev semi-protected
+  ├── master: cần PR + 1 review + CI pass + enforce admins + no force push
+  └── dev: cần PR + CI pass (không cần review)
+  ✅ STATUS: ĐANG CHẠY — master + dev đều protected trên GitHub
 ```
 
 **Nguyên tắc**: Nếu có thể automate, KHÔNG ghi vào document.

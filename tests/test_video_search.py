@@ -2,9 +2,10 @@
 
 Covers FTS5 search, pagination, date range, status filter, sorting, and API response format.
 """
+
 import os
 import sys
-from datetime import date, datetime, timezone
+from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -64,16 +65,28 @@ class TestFTS5Search:
         assert result["total"] >= 3
 
     def test_fts5_search_with_station_filter(self):
-        sid1 = database.add_station({
-            "name": "Station-A", "ip_camera_1": "10.0.0.10", "ip_camera_2": "",
-            "safety_code": "SA", "camera_mode": "SINGLE", "camera_brand": "imou",
-            "mac_address": "",
-        })
-        sid2 = database.add_station({
-            "name": "Station-B", "ip_camera_1": "10.0.0.11", "ip_camera_2": "",
-            "safety_code": "SB", "camera_mode": "SINGLE", "camera_brand": "imou",
-            "mac_address": "",
-        })
+        sid1 = database.add_station(
+            {
+                "name": "Station-A",
+                "ip_camera_1": "10.0.0.10",
+                "ip_camera_2": "",
+                "safety_code": "SA",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
+        sid2 = database.add_station(
+            {
+                "name": "Station-B",
+                "ip_camera_1": "10.0.0.11",
+                "ip_camera_2": "",
+                "safety_code": "SB",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
         rid1 = database.create_record(sid1, "SPXVN-AAA", "SINGLE")
         database.update_record_status(rid1, "READY")
         rid2 = database.create_record(sid2, "SPXVN-BBB", "SINGLE")

@@ -1,13 +1,11 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.1.0
+# V-Pack Monitor - CamDongHang v3.0.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
-import threading
 
 from fastapi import HTTPException
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import database
 import network
@@ -48,11 +46,7 @@ def register_routes(app):
     ):
         stations = database.get_stations()
         warnings = []
-        mac_clean = (
-            mac.replace(":", "").replace("-", "").replace(".", "").upper()
-            if mac
-            else ""
-        )
+        mac_clean = mac.replace(":", "").replace("-", "").replace(".", "").upper() if mac else ""
         for s in stations:
             if s["id"] == exclude_id:
                 continue
@@ -61,13 +55,7 @@ def register_routes(app):
             if ip2 and (s.get("ip_camera_1") == ip2 or s.get("ip_camera_2") == ip2):
                 warnings.append(f'IP {ip2} đã được dùng ở trạm "{s["name"]}"')
             if mac_clean:
-                s_mac = (
-                    s.get("mac_address", "")
-                    .replace(":", "")
-                    .replace("-", "")
-                    .replace(".", "")
-                    .upper()
-                )
+                s_mac = s.get("mac_address", "").replace(":", "").replace("-", "").replace(".", "").upper()
                 if s_mac and s_mac == mac_clean:
                     warnings.append(f'MAC {mac} đã được gán cho trạm "{s["name"]}"')
             if name and s.get("name", "").lower() == name.lower():
@@ -108,9 +96,7 @@ def register_routes(app):
             sm = api.stream_managers.get(station_id)
         if sm:
             live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
-            url_fn = (
-                api.get_rtsp_url if live_quality == "main" else api.get_rtsp_sub_url
-            )
+            url_fn = api.get_rtsp_url if live_quality == "main" else api.get_rtsp_sub_url
             url = url_fn(
                 payload.ip_camera_1,
                 payload.safety_code,
@@ -282,9 +268,7 @@ def register_routes(app):
                 "message": "Session không tồn tại hoặc đã kết thúc.",
             }
         database.end_session_by_id(session_id)
-        database.log_audit(
-            admin["id"], "FORCE_END_SESSION", f"Kicked session {session_id}"
-        )
+        database.log_audit(admin["id"], "FORCE_END_SESSION", f"Kicked session {session_id}")
         return {"status": "success"}
 
     @app.get("/api/sessions/station-status")
@@ -315,7 +299,5 @@ def register_routes(app):
     ):
         limit = min(max(limit, 1), 500)
         offset = max(offset, 0)
-        logs = database.get_audit_logs(
-            user_id=user_id, action=action, limit=limit, offset=offset
-        )
+        logs = database.get_audit_logs(user_id=user_id, action=action, limit=limit, offset=offset)
         return {"data": logs}
