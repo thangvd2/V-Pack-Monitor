@@ -244,7 +244,7 @@ class TestSettings:
 
     def test_update_settings_preserve_masked(self, client, admin_headers):
         database.set_setting("S3_SECRET_KEY", "original_secret")
-        r = client.post(
+        client.post(
             "/api/settings",
             headers=admin_headers,
             json={"RECORD_KEEP_DAYS": 7, "S3_SECRET_KEY": "****"},

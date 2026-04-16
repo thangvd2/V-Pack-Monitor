@@ -20,7 +20,7 @@ os.chdir("..")
 # 2. Check if PyInstaller is installed
 print("\n[2/3] Checking PyInstaller...")
 try:
-    import PyInstaller
+    import PyInstaller  # noqa: F401
 except ImportError:
     print("Installing PyInstaller...")
     subprocess.run([sys.executable, "-m", "pip", "install", "pyinstaller"], check=True)

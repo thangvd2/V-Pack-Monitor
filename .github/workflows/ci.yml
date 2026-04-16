@@ -24,9 +24,7 @@ jobs:
           restore-keys: ${{ runner.os }}-pip-
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pytest httpx
+        run: pip install -r requirements-dev.txt
 
       - name: Run tests
         run: python -m pytest tests/ -v --tb=short

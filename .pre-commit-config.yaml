@@ -1,5 +1,5 @@
 # Pre-commit hooks for V-Pack Monitor
-# Install: pip install pre-commit && pre-commit install
+# Install: pip install -r requirements-dev.txt && pre-commit install
 # Pre-push hooks: pre-commit install --hook-type pre-push
 # Run manually: pre-commit run --all-files
 

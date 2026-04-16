@@ -20,7 +20,7 @@ master          ← production-ready, LUÔN deployable
 
 ### Trước khi tạo PR
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 pytest tests/ -v
 cd web-ui && npm run build
 ```
@@ -31,6 +31,7 @@ Xem `.github/pull_request_template.md`. Yêu cầu bắt buộc:
 - Không hardcode secret/credential
 - Error path có logging, không silent `except: pass`
 - File mới > 300 dòng → giải thích lý do trong PR description
+- Mỗi commit chỉ nên chứa 1 loại thay đổi (formatting / feature / fix / docs). Không mix formatting với logic changes trong cùng commit
 
 ### Review
 - Mỗi PR cần ít nhất 1 review trước khi merge
@@ -90,7 +91,8 @@ CI fail → **không merge**.
 ├── network.py              # LAN scanner
 ├── tests/                  # Pytest test suite
 ├── web-ui/                 # React frontend
-├── requirements.txt        # Python dependencies
+├── requirements.txt        # Python dependencies (production)
+├── requirements-dev.txt    # Python dependencies (development only)
 ├── Dockerfile              # Docker deployment
 ├── install_windows.bat     # Windows installer
 ├── install_macos.sh        # macOS installer

@@ -467,7 +467,7 @@ class TestUsers:
 
 class TestSessions:
     def test_create_get_active_session(self, admin_user_id, sample_station_id):
-        sid = create_session(admin_user_id, sample_station_id)
+        create_session(admin_user_id, sample_station_id)
         session = get_active_session(sample_station_id)
         assert session is not None
         assert session["user_id"] == admin_user_id
@@ -493,7 +493,7 @@ class TestSessions:
         assert get_active_session(sample_station_id) is None
 
     def test_expire_does_not_affect_recent_sessions(self, admin_user_id, sample_station_id):
-        sid = create_session(admin_user_id, sample_station_id)
+        create_session(admin_user_id, sample_station_id)
         count = expire_stale_sessions(timeout_seconds=600)
         assert count == 0
         assert get_active_session(sample_station_id) is not None
