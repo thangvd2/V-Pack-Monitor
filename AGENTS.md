@@ -1,12 +1,13 @@
 # AGENTS.md — Auto-loaded rules for AI sessions
 
 ## BRANCH RULES (MANDATORY)
-- NEVER commit directly to `master`. It is protected.
+- NEVER commit directly to `master` or `dev`. Both are protected.
 - ALWAYS create a feature branch from `dev`: `git checkout -b {type}/{description} dev`
 - Branch naming: `feature/`, `fix/`, `security/`, `refactor/`
 - After work is done: `gh pr create --base dev`
 - Feature PR → dev: use `--squash` (keep dev history clean: 1 feature = 1 commit)
 - Release PR → master: use `--merge` (keep shared history, prevent future conflicts)
+- NEVER merge any PR without explicit user confirmation. Always ask first.
 
 ## RELEASE RULES (MANDATORY)
 - Release PR is ALWAYS `dev` → `master`, merged with `gh pr merge <N> --merge` (NOT --squash)
