@@ -2,6 +2,47 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v3.1.0] - 2026-04-17 (Auto-Stop Recording, Notification Sounds, Quality Enforcement) 🚀 MINOR RELEASE
+
+### ⏱️ Auto-Stop Recording (10 min max)
+- **Timer auto-stop**: Recording tự động dừng và lưu sau 10 phút nếu operator không scan STOP — tránh file video khổng lồ khi operator bỏ quên.
+- **9-minute warning**: SSE event `recording_warning` emit ở phút thứ 9, frontend hiển thị toast đếm ngược + âm thanh cảnh báo.
+- **FFmpeg hard cap**: `-t 600` trên tất cả recording modes (SINGLE, DUAL_FILE, PIP) — belt-and-suspenders safety.
+- **Race condition safe**: Timer verify `record_id` trước khi stop — không bao giờ stop nhầm recording khác.
+- **Clean cleanup**: Timer cancel trên STOP/EXIT/shutdown, warning timer cancel đúng cách, `_recording_start_times` cleanup đầy đủ.
+- **11 regression tests**: Coverage cho race conditions, timer leaks, warning guards, cleanup paths.
+
+### 🔔 Notification Sounds
+- **Web Audio API synthesized sounds** — không cần file MP3 bên ngoài, zero dependencies.
+  - Ascending beep (440→880Hz): barcode scan → recording bắt đầu
+  - Descending beep (880→440Hz): STOP scan / auto-stop → recording kết thúc
+  - Two-tone chime (C5→G5): video processing hoàn tất
+  - Double-beep (660Hz square): cảnh báo 60 giây trước auto-stop
+- **600ms debounce** per sound type — không overlap khi nhiều SSE events đến cùng lúc.
+- **Async AudioContext** với user gesture warmup — hoạt động trên Chrome, Firefox, Safari.
+
+### 🛡️ Quality Enforcement
+- **Pre-commit hooks**: ruff lint + format, detect-secrets, ESLint (frontend), pytest pre-push.
+- **ruff.toml**: Line-length 120, F401/F841 strict — catch unused imports/variables mới.
+- **ESLint 0 errors, 0 warnings**: Fix tất cả `react-hooks/exhaustive-deps` violations, `no-unused-vars` args pattern.
+- **`requirements-dev.txt`**: Tách dev deps (pre-commit, ruff, pytest, httpx) khỏi production deps.
+- **AGENTS.md**: Thêm mandatory pre-push review rule (self-review, test coverage, thread safety audit).
+- **CONTRIBUTING.md**: Thêm commit hygiene rule — không mix formatting với logic changes.
+
+### 🐛 Bug Fixes
+- **showToast race condition**: Timeout ref cleanup đúng cách — không để toast cũ ghi đè toast mới.
+- **Warning timer leak**: Warning timer được store và cancel đúng cách trên STOP/EXIT.
+- **`_emit_recording_warning` guard**: Kiểm tra recording active trước khi emit SSE.
+- **Shutdown timer cleanup**: Cancel tất cả recording timers trước khi dừng worker.
+- **SetupModal `checkConflicts` hoisting**: Di chuyển lên trước `validate()` để giải quyết TDZ issue.
+- **Regex escape**: `[\s:\-\.]` → `[\s:.-]` trong MAC address processing.
+
+### 📊 Stats
+- **43 files changed**, +1939/-711 lines
+- **11 new tests** (`test_auto_stop_timer.py`)
+- **1 new file** (`web-ui/src/utils/notificationSounds.js`, 179 lines)
+- **Total tests**: 306 (was 305)
+
 ## [v3.0.0] - 2026-04-16 (Architecture Overhaul & Major Security Hardening) 🎉 MAJOR RELEASE
 
 ### 🏗️ Kiến Trúc Lớn
