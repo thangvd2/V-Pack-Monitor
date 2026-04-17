@@ -30,6 +30,30 @@
 - `.pre-commit-config.yaml` — ai-sync-check hook added
 - `.github/workflows/ci.yml` — ai-sync-check job added
 
+## [v3.1.1] - 2026-04-17 (Security Fix, Test Coverage, Code Quality Tooling) 🔒 PATCH RELEASE
+
+### 🔒 Security
+- **Download endpoint station access check**: OPERATOR phải có active session trên trạm sở hữu record mới được download. ADMIN bypass (toàn quyền). Trước đó bất kỳ user xác thực nào cũng có thể download bất kỳ record nào bằng cách đoán record_id.
+
+### 🧪 Test Coverage
+- **Test `test_timer_cancelled_on_exit` fixed**: Dùng spy pattern (`MagicMock(wraps=timer.cancel)`) thay vì pre-cancel — verify đúng EXIT path cancel timers.
+- **Test `test_timers_cancelled_on_shutdown`**: Verify tất cả timers cancelled và dicts cleared trên shutdown.
+- **Test `test_auto_stop_sets_failed_when_queue_full`**: Verify FAILED status + SSE notification khi `submit_stop_and_save` return False (queue full).
+- **4 download authorization tests**: Operator own station, operator other station, admin bypass, operator no session.
+
+### 🛡️ Code Quality
+- **Prettier setup**: Formatting enforcement cho toàn bộ web-ui (indent, quotes, commas, spacing). `npm run lint` now includes Prettier check. Pre-commit hook auto-formats on commit.
+- **ESLint + Prettier integration**: `eslint-config-prettier` tắt conflicting rules.
+- **Branch protection enforcement**: 3 layers — GitHub branch protection (enforce_admins), pre-push hook (`.git-hooks/check-protected-branch.sh`), AGENTS.md checklist.
+- **Anti-false-positive review rules**: Dependency chain tracing, FOR/AGAINST evidence, 2-pass review process in AGENTS.md.
+- **Mandatory user confirmation**: AI agents must ask before merging any PR.
+- **SetupModal cleanup**: `conflictTimerRef` cleared on unmount.
+
+### 📊 Stats
+- **6 new tests** (total: 312)
+- **8 source files formatted** by Prettier
+- **5 PRs merged**: #10, #11, #12, #13
+
 ## [v3.1.0] - 2026-04-17 (Auto-Stop Recording, Notification Sounds, Quality Enforcement) 🚀 MINOR RELEASE
 
 ### ⏱️ Auto-Stop Recording (10 min max)
