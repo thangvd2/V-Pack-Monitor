@@ -7,7 +7,53 @@ on:
     branches: [master, dev]
 
 jobs:
+  # Detect which files changed — used by all other jobs
+  # Detect which files changed — used by all other jobs
+  changes:
+    name: "Detect changed files"
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      docs-only: ${{ steps.filter.outputs.docs-only }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            python:
+              - '**/*.py'
+              - 'requirements*.txt'
+              - 'ruff.toml'
+              - '.pre-commit-config.yaml'
+            frontend:
+              - 'web-ui/**'
+            docs-only:
+              - '**/*.md'
+              - 'VERSION'
+              - 'AGENTS.md'
+              - '.github/pull_request_template.md'
+              - 'RELEASE_NOTES.md'
+              - 'docs/**'
+
+  release-check:
+    name: "⚠️ Release PR — MUST use --merge (NOT --squash)"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'master' && github.head_ref == 'dev'
+    steps:
+      - name: Validate release PR
+        run: |
+          echo "Release PR detected: dev → master"
+          echo "IMPORTANT: This PR MUST be merged with --merge (NOT --squash)"
+          echo "See CONTRIBUTING.md → Release Process"
+          echo ""
+          echo "If you squash this PR, shared history between dev and master will break"
+          echo "and all future release PRs will have 12-file conflicts."
+
   python-test:
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +78,8 @@ jobs:
           VPACK_SECRET: test-secret-key-for-ci
 
   frontend-build:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -55,6 +103,8 @@ jobs:
         run: npm run build
 
   python-lint:
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
