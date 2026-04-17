@@ -129,7 +129,7 @@ gh api repos/thangvd2/V-Pack-Monitor/branches/master/protection -X PUT --input -
   "required_pull_request_reviews": {
     "dismiss_stale_reviews": true,
     "require_code_owner_reviews": false,
-    "required_approving_review_count": 1
+    "required_approving_review_count": 0
   },
   "restrictions": null,
   "required_linear_history": false,
