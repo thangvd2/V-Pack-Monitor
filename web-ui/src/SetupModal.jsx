@@ -111,7 +111,7 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
     }
     const handler = (e) => { if (e.key === 'Escape') handleCancel(); };
     window.addEventListener('keydown', handler);
-  return () => {
+    return () => {
       window.removeEventListener('keydown', handler);
       if (conflictTimerRef.current) {
         clearTimeout(conflictTimerRef.current);
