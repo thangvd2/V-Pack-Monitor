@@ -56,6 +56,11 @@ def register_routes(app):
         record = database.get_record_by_id(record_id)
         if not record:
             raise HTTPException(status_code=404, detail="Record not found")
+        # Station access authorization: OPERATOR must have active session on record's station
+        if user["role"] != "ADMIN":
+            session = database.get_active_session(record["station_id"])
+            if not session or session["user_id"] != user["id"]:
+                raise HTTPException(status_code=403, detail="No access to this station's records")
         paths_str = record.get("video_paths") or ""
         paths = [p.strip() for p in paths_str.split(",") if p.strip()]
         if file_index < 0 or file_index >= len(paths):
