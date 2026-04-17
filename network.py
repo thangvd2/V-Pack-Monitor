@@ -11,7 +11,6 @@ import platform
 import re
 import socket
 import subprocess
-import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional
 

@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.1.0
+# V-Pack Monitor - CamDongHang v3.0.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -28,7 +28,6 @@ import database
 import cloud_sync
 import video_worker
 import psutil
-import auth
 from auth import CurrentUser, AdminUser
 
 import api
@@ -150,9 +149,7 @@ def _update_dev():
         )
         had_stash = "No local changes" not in (stash_result.stdout or "")
 
-        _notify_update_progress(
-            "downloading", "Đang tải bản cập nhật (git pull)...", 30
-        )
+        _notify_update_progress("downloading", "Đang tải bản cập nhật (git pull)...", 30)
         r = _sp.run(
             ["git", "pull", "origin", branch],
             capture_output=True,
@@ -169,14 +166,10 @@ def _update_dev():
             }
 
         if had_stash:
-            pop_result = _sp.run(
-                ["git", "stash", "pop"], capture_output=True, text=True, timeout=30
-            )
+            pop_result = _sp.run(["git", "stash", "pop"], capture_output=True, text=True, timeout=30)
             if pop_result.returncode != 0:
-                print(
-                    f"[UPDATE] WARNING: git stash pop failed. Changes preserved in stash."
-                )
-                print(f"[UPDATE] Run 'git stash list' and 'git stash pop' manually.")
+                print("[UPDATE] WARNING: git stash pop failed. Changes preserved in stash.")
+                print("[UPDATE] Run 'git stash list' and 'git stash pop' manually.")
                 return {
                     "status": "error",
                     "message": "Cập nhật thành công nhưng có xung đột. Xem log.",
@@ -242,9 +235,7 @@ def _update_production():
             return {"status": "error", "message": "Không tìm thấy bản release."}
 
         _notify_update_progress("downloading", f"Đang tải {tag}...", 20)
-        zip_url = (
-            f"https://github.com/thangvd2/V-Pack-Monitor/archive/refs/tags/{tag}.zip"
-        )
+        zip_url = f"https://github.com/thangvd2/V-Pack-Monitor/archive/refs/tags/{tag}.zip"
         zip_resp = urllib.request.urlopen(zip_url, timeout=120)
         tmp_dir = tempfile.mkdtemp()
         zip_path = os.path.join(tmp_dir, f"{tag}.zip")
@@ -276,9 +267,9 @@ def _update_production():
             for member in zf.infolist():
                 # Prevent Zip Slip (path traversal)
                 member_path = os.path.realpath(os.path.join(tmp_dir, member.filename))
-                if not member_path.startswith(
-                    os.path.realpath(tmp_dir) + os.sep
-                ) and member_path != os.path.realpath(tmp_dir):
+                if not member_path.startswith(os.path.realpath(tmp_dir) + os.sep) and member_path != os.path.realpath(
+                    tmp_dir
+                ):
                     print(f"[UPDATE] Zip Slip detected: skipping {member.filename}")
                     continue
                 zf.extract(member, tmp_dir)
@@ -489,9 +480,7 @@ def register_routes(app):
                 if quality == "main":
                     new_cam2 = api.get_rtsp_url(cam2_ip, code, channel=2, brand=brand)
                 else:
-                    new_cam2 = api.get_rtsp_sub_url(
-                        cam2_ip, code, channel=2, brand=brand
-                    )
+                    new_cam2 = api.get_rtsp_sub_url(cam2_ip, code, channel=2, brand=brand)
                 sm.update_cam2_url(new_cam2)
         label = "1080p (main)" if quality == "main" else "480p (sub)"
         return {"status": "success", "message": f"Live view: {label}"}
@@ -557,9 +546,7 @@ def register_routes(app):
             )
             station_today = cursor.fetchone()[0]
 
-            return {
-                "data": {"total_today": total_today, "station_today": station_today}
-            }
+            return {"data": {"total_today": total_today, "station_today": station_today}}
 
     # --- ANALYTICS PRO API ---
 
@@ -593,9 +580,7 @@ def register_routes(app):
 
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(
-            ["Mã vận đơn", "Trạm", "Thời gian ghi", "Trạng thái", "File video"]
-        )
+        writer.writerow(["Mã vận đơn", "Trạm", "Thời gian ghi", "Trạng thái", "File video"])
         for r in records:
             video_files = (
                 "; ".join(r.get("video_paths", []))
@@ -640,11 +625,7 @@ def register_routes(app):
         days, remainder = divmod(uptime_seconds, 86400)
         hours, remainder = divmod(remainder, 3600)
         minutes, seconds = divmod(remainder, 60)
-        uptime_str = (
-            f"{days}d {hours}h {minutes}m {seconds}s"
-            if days > 0
-            else f"{hours}h {minutes}m {seconds}s"
-        )
+        uptime_str = f"{days}d {hours}h {minutes}m {seconds}s" if days > 0 else f"{hours}h {minutes}m {seconds}s"
 
         return {
             "cpu": {
@@ -673,9 +654,7 @@ def register_routes(app):
         import re as _re
 
         ffmpeg_procs = []
-        for proc in psutil.process_iter(
-            ["pid", "name", "cmdline", "cpu_percent", "memory_percent", "create_time"]
-        ):
+        for proc in psutil.process_iter(["pid", "name", "cmdline", "cpu_percent", "memory_percent", "create_time"]):
             try:
                 name = proc.info["name"] or ""
                 if "ffmpeg" in name.lower():
@@ -688,9 +667,7 @@ def register_routes(app):
                             "name": name,
                             "cmdline_short": cmdline_str,
                             "cpu_percent": proc.info.get("cpu_percent") or 0,
-                            "memory_percent": round(
-                                proc.info.get("memory_percent") or 0, 1
-                            ),
+                            "memory_percent": round(proc.info.get("memory_percent") or 0, 1),
                         }
                     )
             except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -784,10 +761,7 @@ def register_routes(app):
     def check_update(admin: AdminUser):
         now = time.time()
         with api._cache_lock:
-            if (
-                _update_check_cache["result"]
-                and (now - _update_check_cache["timestamp"]) < _UPDATE_CHECK_TTL
-            ):
+            if _update_check_cache["result"] and (now - _update_check_cache["timestamp"]) < _UPDATE_CHECK_TTL:
                 return _update_check_cache["result"]
 
         import subprocess as _sp
@@ -854,10 +828,7 @@ def register_routes(app):
                 if tag:
                     latest = tag
                     changelog = release.get("body", "")
-                update_available = (
-                    api._parse_semver(latest) > api._parse_semver(current)
-                    and latest != "unknown"
-                )
+                update_available = api._parse_semver(latest) > api._parse_semver(current) and latest != "unknown"
         except Exception as e:
             print(f"[UPDATE] check failed: {e}")
 

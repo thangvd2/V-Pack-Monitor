@@ -1,19 +1,19 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.1.0
+# V-Pack Monitor - CamDongHang v3.0.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
 import os
-import time
 import json
 import asyncio
 import queue
 import threading
+import time
 import urllib.request
 
 from fastapi import Request, HTTPException
-from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 import jwt as _jwt
 import database
@@ -36,9 +36,7 @@ def register_routes(app):
 
     @app.get("/api/records/{record_id}/download/{file_index}")
     def download_record_file(request: Request, record_id: int, file_index: int):
-        token = request.query_params.get("token") or request.headers.get(
-            "Authorization", ""
-        ).replace("Bearer ", "")
+        token = request.query_params.get("token") or request.headers.get("Authorization", "").replace("Bearer ", "")
         if not token:
             raise HTTPException(status_code=401, detail="Not authenticated")
         try:
@@ -66,10 +64,7 @@ def register_routes(app):
         # Prevent path traversal — only serve files from recordings directory
         filepath_abs = os.path.abspath(filepath)
         recordings_dir = os.path.abspath("recordings")
-        if (
-            not filepath_abs.startswith(recordings_dir + os.sep)
-            and filepath_abs != recordings_dir
-        ):
+        if not filepath_abs.startswith(recordings_dir + os.sep) and filepath_abs != recordings_dir:
             raise HTTPException(status_code=403, detail="Access denied")
         if not os.path.exists(filepath_abs):
             raise HTTPException(status_code=404, detail="File deleted")
@@ -120,6 +115,9 @@ def register_routes(app):
 
         if barcode == "EXIT":
             if current_recorder:
+                api._cancel_recording_timer(sid)
+                with api._recording_timers_lock:
+                    api._recording_start_times.pop(sid, None)
                 database.update_record_status(current_record_id, "PROCESSING")
                 api.notify_sse(
                     "video_status",
@@ -133,6 +131,8 @@ def register_routes(app):
                     api._processing_count[sid] = api._processing_count.get(sid, 0) + 1
                 with api._recorders_lock:
                     api.active_recorders.pop(sid, None)
+                    api.active_waybills.pop(sid, None)
+                    api.active_record_ids.pop(sid, None)
                 video_worker.submit_stop_and_save(
                     current_record_id,
                     current_recorder,
@@ -148,6 +148,9 @@ def register_routes(app):
 
         if barcode == "STOP":
             if current_recorder:
+                api._cancel_recording_timer(sid)
+                with api._recording_timers_lock:
+                    api._recording_start_times.pop(sid, None)
                 database.update_record_status(current_record_id, "PROCESSING")
                 api.notify_sse(
                     "video_status",
@@ -161,6 +164,8 @@ def register_routes(app):
                     api._processing_count[sid] = api._processing_count.get(sid, 0) + 1
                 with api._recorders_lock:
                     api.active_recorders.pop(sid, None)
+                    api.active_waybills.pop(sid, None)
+                    api.active_record_ids.pop(sid, None)
                 database.log_audit(
                     current_user["id"],
                     "STOP_RECORD",
@@ -229,11 +234,7 @@ def register_routes(app):
                     sm = api.stream_managers.get(sid)
                 if sm:
                     live_quality = database.get_setting("LIVE_VIEW_STREAM") or "sub"
-                    url_fn = (
-                        api.get_rtsp_url
-                        if live_quality == "main"
-                        else api.get_rtsp_sub_url
-                    )
+                    url_fn = api.get_rtsp_url if live_quality == "main" else api.get_rtsp_sub_url
                     live_url = url_fn(ip1, code, channel=1, brand=brand)
                     sm.update_url(live_url)
 
@@ -259,6 +260,26 @@ def register_routes(app):
             api.active_record_ids[sid] = record_id
             api.active_recorders[sid] = new_recorder
         new_recorder.start_recording(barcode)
+
+        api._cancel_recording_timer(sid)
+        with api._recording_timers_lock:
+            api._recording_start_times[sid] = time.time()
+            warning_timer = threading.Timer(
+                api._RECORDING_WARNING_SECONDS,
+                api._emit_recording_warning,
+                args=[sid],
+            )
+            warning_timer.daemon = True
+            warning_timer.start()
+            api._recording_warning_timers[sid] = warning_timer
+            stop_timer = threading.Timer(
+                api._MAX_RECORDING_SECONDS,
+                api._auto_stop_recording,
+                args=[sid, record_id],
+            )
+            stop_timer.daemon = True
+            stop_timer.start()
+            api._recording_timers[sid] = stop_timer
 
         database.log_audit(
             current_user["id"],
@@ -371,10 +392,7 @@ def register_routes(app):
     def live_preview_cam2(station_id: int, current_user: CurrentUser):
         mtx_host = os.environ.get("MTX_HOST", "127.0.0.1")
         with api._streams_lock:
-            has_cam2 = (
-                station_id in api.stream_managers
-                and api.stream_managers[station_id].cam2_url is not None
-            )
+            has_cam2 = station_id in api.stream_managers and api.stream_managers[station_id].cam2_url is not None
         return {
             "status": "ok",
             "webrtc_url": f"http://{mtx_host}:8889/station_{station_id}_cam2",
@@ -392,9 +410,7 @@ def register_routes(app):
 
     @app.get("/api/events")
     async def sse_events(request: Request, stations: str = ""):
-        token = request.query_params.get("token") or request.headers.get(
-            "Authorization", ""
-        ).replace("Bearer ", "")
+        token = request.query_params.get("token") or request.headers.get("Authorization", "").replace("Bearer ", "")
         if not token:
             raise HTTPException(status_code=401, detail="Not authenticated")
         try:

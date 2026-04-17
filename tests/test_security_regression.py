@@ -68,10 +68,14 @@ class TestSecurityRegression:
     # --- Test 8: Password shorter than 6 chars rejected (VULN-13) ---
     def test_password_change_too_short_rejected(self, client, admin_headers, admin_user_id):
         database.update_user_password(admin_user_id, "OldPass1!")
-        r = client.put("/api/auth/change-password", headers=admin_headers, json={
-            "old_password": "OldPass1!",
-            "new_password": "abc",
-        })
+        r = client.put(
+            "/api/auth/change-password",
+            headers=admin_headers,
+            json={
+                "old_password": "OldPass1!",
+                "new_password": "abc",
+            },
+        )
         assert r.status_code == 422
 
     # --- Test 9: Session heartbeat by different user returns 403 (VULN-14) ---
@@ -109,10 +113,14 @@ class TestSecurityRegression:
     # --- Test 11: Sending masked value "****" does not overwrite (VULN-10) ---
     def test_settings_masked_value_preserves_original(self, client, admin_headers):
         database.set_setting("TELEGRAM_BOT_TOKEN", "original-bot-token-value")
-        r = client.post("/api/settings", headers=admin_headers, json={
-            "RECORD_KEEP_DAYS": 7,
-            "TELEGRAM_BOT_TOKEN": "****",
-        })
+        r = client.post(
+            "/api/settings",
+            headers=admin_headers,
+            json={
+                "RECORD_KEEP_DAYS": 7,
+                "TELEGRAM_BOT_TOKEN": "****",
+            },
+        )
         assert r.json()["status"] == "success"
         actual = database.get_setting("TELEGRAM_BOT_TOKEN")
         assert actual == "original-bot-token-value"
@@ -120,18 +128,20 @@ class TestSecurityRegression:
     # --- Test 12: SQL injection in station name is prevented ---
     def test_sql_injection_station_name_parameterized(self, client, admin_headers):
         injection_name = "Station'; DROP TABLE stations; --"
-        r = client.post("/api/stations", headers=admin_headers, json={
-            "name": injection_name,
-            "ip_camera_1": "10.0.0.1",
-            "ip_camera_2": "",
-            "safety_code": "SAFE123",
-            "camera_mode": "SINGLE",
-        })
+        r = client.post(
+            "/api/stations",
+            headers=admin_headers,
+            json={
+                "name": injection_name,
+                "ip_camera_1": "10.0.0.1",
+                "ip_camera_2": "",
+                "safety_code": "SAFE123",
+                "camera_mode": "SINGLE",
+            },
+        )
         assert r.status_code == 200
         stations = database.get_stations()
-        assert any(s["name"] == injection_name for s in stations), (
-            "SQL injection may have altered query behavior"
-        )
+        assert any(s["name"] == injection_name for s in stations), "SQL injection may have altered query behavior"
         # Verify stations table still exists and is queryable
         assert len(stations) >= 1
 
@@ -141,9 +151,7 @@ class TestSecurityRegression:
         original_name = station_before["name"]
         database.update_station_ip(sample_station_id, "name", "Hacked Name")
         station_after = database.get_station(sample_station_id)
-        assert station_after["name"] == original_name, (
-            "update_station_ip accepted a non-whitelisted field"
-        )
+        assert station_after["name"] == original_name, "update_station_ip accepted a non-whitelisted field"
 
     # --- Test 14: API error responses do not leak stack traces ---
     def test_error_response_no_stack_trace_leak(self, client, admin_headers):
@@ -166,16 +174,26 @@ class TestSecurityRegression:
             params={"station_id": sample_station_id},
         )
         long_barcode = "A" * 250
-        r = client.post("/api/scan", headers=operator_headers, json={
-            "barcode": long_barcode,
-            "station_id": sample_station_id,
-        })
+        r = client.post(
+            "/api/scan",
+            headers=operator_headers,
+            json={
+                "barcode": long_barcode,
+                "station_id": sample_station_id,
+            },
+        )
         assert r.status_code == 422
 
     # --- Test 17: JWT token with wrong secret fails to decode (Bug #1) ---
     def test_jwt_wrong_secret_decode_fails(self, client):
         import jwt as _jwt
-        fake_payload = {"sub": "1", "role": "ADMIN", "jti": "fake123", "exp": time.time() + 3600}
+
+        fake_payload = {
+            "sub": "1",
+            "role": "ADMIN",
+            "jti": "fake123",
+            "exp": time.time() + 3600,
+        }
         fake_token = _jwt.encode(fake_payload, "wrong-secret-key-12345", algorithm="HS256")
         headers = {"Authorization": f"Bearer {fake_token}"}
         r = client.get("/api/auth/me", headers=headers)
@@ -194,8 +212,7 @@ class TestSecurityRegression:
         assert len(recorded_at) > 0
         # Parse the timestamp as UTC (matching storage format) and verify it falls within the time window
         from datetime import datetime, timezone
+
         ts = datetime.fromisoformat(recorded_at).replace(tzinfo=timezone.utc)
         ts_epoch = ts.timestamp()
-        assert before - 1 <= ts_epoch <= after + 1, (
-            f"Timestamp {recorded_at} outside expected window"
-        )
+        assert before - 1 <= ts_epoch <= after + 1, f"Timestamp {recorded_at} outside expected window"

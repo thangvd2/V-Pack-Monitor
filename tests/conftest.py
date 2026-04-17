@@ -1,8 +1,7 @@
 import os
 import sys
 import pytest
-import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -80,6 +79,9 @@ def client(isolate_db, monkeypatch):
     monkeypatch.setattr(api, "_processing_count", {})
     monkeypatch.setattr(api, "_station_locks", {})
     monkeypatch.setattr(api, "reconnect_status", {})
+    monkeypatch.setattr(api, "_recording_timers", {})
+    monkeypatch.setattr(api, "_recording_start_times", {})
+    monkeypatch.setattr(api, "_recording_warning_timers", {})
     monkeypatch.setattr(routes_auth, "_login_attempts", {})
     with (
         patch.object(api.CameraStreamManager, "start"),

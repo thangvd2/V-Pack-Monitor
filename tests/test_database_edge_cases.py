@@ -17,7 +17,6 @@ from database import (
     get_station,
     create_user,
     get_user_by_username,
-    update_user,
     set_settings,
     get_setting,
     get_hourly_stats,
@@ -45,15 +44,17 @@ class TestSQLInjectionGuards:
     def test_update_station_ip_rejects_disallowed_field(self):
         """Allow-list filtering prevents column injection — rejected fields ignored,
         valid fields still update correctly."""
-        sid = add_station({
-            "name": "Original Name",
-            "ip_camera_1": "192.168.1.1",
-            "ip_camera_2": "",
-            "safety_code": "ABC",
-            "camera_mode": "SINGLE",
-            "camera_brand": "imou",
-            "mac_address": "",
-        })
+        sid = add_station(
+            {
+                "name": "Original Name",
+                "ip_camera_1": "192.168.1.1",
+                "ip_camera_2": "",
+                "safety_code": "ABC",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
 
         # Try to inject via a real column name not in allow-list {"ip_camera_1", "ip_camera_2"}
         update_station_ip(sid, "name", "Hacked Name")
@@ -74,24 +75,28 @@ class TestBoundaryConditions:
     def test_get_records_search_overrides_station_filter(self):
         """When search is provided, station_id filter is intentionally ignored
         (by design — global search supersedes station filter)."""
-        sid_a = add_station({
-            "name": "Station A",
-            "ip_camera_1": "10.0.0.1",
-            "ip_camera_2": "",
-            "safety_code": "X",
-            "camera_mode": "SINGLE",
-            "camera_brand": "imou",
-            "mac_address": "",
-        })
-        sid_b = add_station({
-            "name": "Station B",
-            "ip_camera_1": "10.0.0.2",
-            "ip_camera_2": "",
-            "safety_code": "Y",
-            "camera_mode": "SINGLE",
-            "camera_brand": "imou",
-            "mac_address": "",
-        })
+        sid_a = add_station(
+            {
+                "name": "Station A",
+                "ip_camera_1": "10.0.0.1",
+                "ip_camera_2": "",
+                "safety_code": "X",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
+        sid_b = add_station(
+            {
+                "name": "Station B",
+                "ip_camera_1": "10.0.0.2",
+                "ip_camera_2": "",
+                "safety_code": "Y",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
 
         create_record(sid_a, "COMMON-ALPHA", "SINGLE")
         create_record(sid_b, "COMMON-BETA", "SINGLE")
@@ -102,7 +107,7 @@ class TestBoundaryConditions:
         waybills = [r[1] for r in results]
 
         assert "COMMON-ALPHA" in waybills  # from station A
-        assert "COMMON-BETA" in waybills   # from station B — station filter skipped
+        assert "COMMON-BETA" in waybills  # from station B — station filter skipped
 
     def test_cleanup_exactly_N_days_old_deleted(self, sample_station_id, tmp_path):
         """Record exactly at the N-day boundary IS deleted (<= comparison)."""
@@ -146,7 +151,8 @@ class TestBoundaryConditions:
         """cleanup_old_records should not crash when video files don't exist on disk."""
         nonexistent_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
-            "_nonexistent_", "fake_video_xyz.mp4",
+            "_nonexistent_",
+            "fake_video_xyz.mp4",
         )
         rid = create_record(sample_station_id, "MISSING-FILE-WB", "SINGLE")
         update_record_status(rid, "READY", video_paths=nonexistent_path)

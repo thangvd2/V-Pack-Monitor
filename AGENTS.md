@@ -5,14 +5,22 @@
 - ALWAYS create a feature branch from `dev`: `git checkout -b {type}/{description} dev`
 - Branch naming: `feature/`, `fix/`, `security/`, `refactor/`
 - After work is done: `gh pr create --base dev`
-- When dev is stable: create PR `dev` → `master` for release
+- Feature PR → dev: use `--squash` (keep dev history clean: 1 feature = 1 commit)
+- Release PR → master: use `--merge` (keep shared history, prevent future conflicts)
+
+## RELEASE RULES (MANDATORY)
+- Release PR is ALWAYS `dev` → `master`, merged with `gh pr merge <N> --merge` (NOT --squash)
+- ALWAYS update `VERSION`, `api.py` header, and `RELEASE_NOTES.md` ON `dev` BEFORE creating release PR
+- NEVER squash or rebase dev → master — this destroys shared history and causes permanent conflicts
+- Full process: see `CONTRIBUTING.md` → "Release Process (dev → master)"
 
 ## BEFORE EVERY COMMIT
 1. `pytest tests/ -v` — must pass
 2. `npm run build` in `web-ui/` — must pass (if frontend changed)
-3. `lsp_diagnostics` on changed Python files — no new errors
-4. No hardcode secrets/credentials
-5. No silent `except: pass` — must log the error
+3. `npm run lint` in `web-ui/` — must pass (if frontend changed)
+4. `lsp_diagnostics` on changed Python files — no new errors
+5. No hardcode secrets/credentials
+6. No silent `except: pass` — must log the error
 
 ## CODE RULES
 - Match existing patterns in the codebase
@@ -20,8 +28,60 @@
 - No `as any`, `@ts-ignore`, `@ts-expect-error`
 - No deleting tests to make them pass
 - Bug fixes: fix minimally, never refactor while fixing
-- New Python dependencies: add to `requirements.txt` AND explain why
+- New Python dependencies: add to `requirements-dev.txt` (dev) or `requirements.txt` (prod) AND explain why
 - New npm dependencies: add via `npm install` AND explain why
+- **Frontend-Backend sync**: When adding SSE event or API response field in backend, MUST add frontend handler in the SAME commit
+- **React stale closures**: Variables used inside useEffect/useState callbacks must be in deps array or accessed via ref (enforced by `eslint-plugin-react-hooks`)
+
+## MANDATORY PRE-PUSH REVIEW (EVERY FEATURE)
+Before pushing ANY new feature or significant change:
+1. **Self-review**: Fire 2+ explore agents in parallel to audit the code for edge cases, race conditions, thread safety, and error handling
+2. **Test coverage**: New backend logic MUST have corresponding tests. No exceptions.
+3. **No tests = not done**: If you can't write tests for it, explain why in the PR and flag it as untested
+4. **Thread safety audit**: Any code using threading, locks, timers, or shared state MUST be reviewed for:
+   - Lock ordering (deadlock risk)
+   - Race conditions (concurrent access without locks)
+   - Resource leaks (timers, threads, connections not cleaned up)
+   - Stale references (captured variables in callbacks that may be outdated)
+
+## MANDATORY SELF-VERIFICATION CHECKLIST (BEFORE SAYING "DONE")
+You MUST NOT report a task as complete until EVERY item below passes.
+No exceptions. If you skip any item, the user WILL find the bug on double-check.
+
+### For EVERY code change (Python, JS, JSX, YAML):
+- [ ] `ruff check .` passes on changed files (or `npm run lint` for frontend)
+- [ ] `lsp_diagnostics` shows no NEW errors on changed files
+- [ ] No duplicate lines, duplicate comments, or copy-paste artifacts
+- [ ] No unused imports, unused variables, or dead code left behind
+- [ ] Every new shared state variable has cleanup path on shutdown/exit
+- [ ] Git diff reviewed line-by-line — no accidental inclusions (log files, .playwright-mcp, screenshots)
+
+### For backend Python changes:
+- [ ] `pytest tests/ -q` passes (or specific test file if targeted)
+- [ ] New functions with threading/locks/timers: verify lock ordering, cancel paths, cleanup on error
+- [ ] New SSE events: frontend handler exists in the SAME commit
+- [ ] New API fields: check all consumers (frontend, tests, docs)
+
+### For frontend changes:
+- [ ] `npm run build` passes
+- [ ] `npm run lint` passes
+- [ ] useEffect deps arrays correct (no stale closures)
+- [ ] catch blocks have error handling (alert/toast/setError + console.warn, not bare `catch {}`)
+
+### For CI/YAML changes:
+- [ ] YAML syntax valid (no duplicate keys, correct indentation)
+- [ ] New jobs added to branch protection required checks
+- [ ] Path filters cover all relevant file patterns
+- [ ] If adding `if:` conditions — verified that skipped jobs still satisfy branch protection
+
+### For docs/config changes (AGENTS.md, CONTRIBUTING.md, VERSION):
+- [ ] VERSION file matches api.py header
+- [ ] Cross-references between docs are accurate (section names, file paths)
+- [ ] No contradictory rules between AGENTS.md and CONTRIBUTING.md
+
+### For release PRs:
+- [ ] `gh pr merge <N> --merge` (NOT --squash)
+- [ ] VERSION, api.py header, RELEASE_NOTES.md all updated on dev BEFORE creating PR
 
 ## PROJECT STRUCTURE
 - `api.py` — FastAPI app, shared state, lifespan, helpers (DO NOT add routes here)

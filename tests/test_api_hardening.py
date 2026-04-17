@@ -1,10 +1,7 @@
 import os
 import sys
-import pytest
 import time
 import threading
-import json
-from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -338,9 +335,7 @@ class TestRBACEdgeCases:
         # Confirm the admin still exists
         assert database.get_user_by_id(admin_user_id) is not None
 
-    def test_release_session_other_user_noop(
-        self, client, operator_headers, sample_station_id
-    ):
+    def test_release_session_other_user_noop(self, client, operator_headers, sample_station_id):
         """Releasing another operator's session silently succeeds without
         actually ending the session (api.py line 1060-1065)."""
         # Operator 1 acquires the station

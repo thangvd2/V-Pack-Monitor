@@ -161,9 +161,7 @@ def submit_stop_and_save(record_id, rec, waybill, station_id, save=True):
 
     with _pending_lock:
         if _pending_count >= _MAX_PENDING:
-            print(
-                f"[WORKER] WARNING: Too many pending tasks ({_pending_count}), dropping record {record_id}"
-            )
+            print(f"[WORKER] WARNING: Too many pending tasks ({_pending_count}), dropping record {record_id}")
             _decrement_processing(station_id)
             return False
         _pending_count += 1
@@ -192,7 +190,6 @@ def shutdown():
     with _lock:
         if _executor:
             _executor.shutdown(wait=False)
-            import concurrent.futures
 
             deadline = time.time() + _SHUTDOWN_TIMEOUT
             while time.time() < deadline:
@@ -202,9 +199,7 @@ def shutdown():
                         if remaining > 0:
                             time.sleep(min(1.0, remaining))
                         else:
-                            print(
-                                "[WORKER] WARNING: Shutdown timed out after 60s — forcing exit"
-                            )
+                            print("[WORKER] WARNING: Shutdown timed out after 60s — forcing exit")
                             break
                     else:
                         break

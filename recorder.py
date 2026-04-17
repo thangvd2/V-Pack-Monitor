@@ -11,6 +11,8 @@ import threading
 from datetime import datetime
 import platform
 
+_MAX_RECORDING_SECONDS = 600
+
 
 def _ffmpeg_bin(name):
     base = os.path.dirname(os.path.abspath(__file__))
@@ -120,9 +122,7 @@ def _is_hevc(filepath):
 
 
 class CameraRecorder:
-    def __init__(
-        self, rtsp_url_1, rtsp_url_2=None, output_dir="recordings", record_mode="SINGLE"
-    ):
+    def __init__(self, rtsp_url_1, rtsp_url_2=None, output_dir="recordings", record_mode="SINGLE"):
         self.rtsp_url_1 = rtsp_url_1
         self.rtsp_url_2 = rtsp_url_2 if rtsp_url_2 else rtsp_url_1
 
@@ -139,7 +139,8 @@ class CameraRecorder:
     def start_recording(self, waybill_code):
         # Sanitize waybill_code to prevent path traversal
         import re
-        safe_code = re.sub(r'[^\w\-.]', '_', waybill_code)
+
+        safe_code = re.sub(r"[^\w\-.]", "_", waybill_code)
         if not safe_code:
             safe_code = "unknown"
         waybill_code = safe_code
@@ -172,6 +173,8 @@ class CameraRecorder:
                     "copy",
                     "-f",
                     "mpegts",
+                    "-t",
+                    str(_MAX_RECORDING_SECONDS),
                     tmpfile,
                 ],
                 final_path=filepath,
@@ -179,9 +182,7 @@ class CameraRecorder:
             self.current_files.append(filepath)
 
         elif self.record_mode == "DUAL_FILE":
-            file1 = os.path.join(
-                self.output_dir, f"{waybill_code}_{timestamp}_Cam1.mp4"
-            )
+            file1 = os.path.join(self.output_dir, f"{waybill_code}_{timestamp}_Cam1.mp4")
             tmp1 = file1 + ".tmp.ts"
             self._launch_ffmpeg(
                 [
@@ -197,15 +198,15 @@ class CameraRecorder:
                     "copy",
                     "-f",
                     "mpegts",
+                    "-t",
+                    str(_MAX_RECORDING_SECONDS),
                     tmp1,
                 ],
                 final_path=file1,
             )
             self.current_files.append(file1)
 
-            file2 = os.path.join(
-                self.output_dir, f"{waybill_code}_{timestamp}_Cam2.mp4"
-            )
+            file2 = os.path.join(self.output_dir, f"{waybill_code}_{timestamp}_Cam2.mp4")
             tmp2 = file2 + ".tmp.ts"
             self._launch_ffmpeg(
                 [
@@ -221,6 +222,8 @@ class CameraRecorder:
                     "copy",
                     "-f",
                     "mpegts",
+                    "-t",
+                    str(_MAX_RECORDING_SECONDS),
                     tmp2,
                 ],
                 final_path=file2,
@@ -257,6 +260,8 @@ class CameraRecorder:
                     "aac",
                     "-f",
                     "mpegts",
+                    "-t",
+                    str(_MAX_RECORDING_SECONDS),
                     tmpfile,
                 ]
             else:
@@ -287,6 +292,8 @@ class CameraRecorder:
                     "aac",
                     "-f",
                     "mpegts",
+                    "-t",
+                    str(_MAX_RECORDING_SECONDS),
                     tmpfile,
                 ]
             self._launch_ffmpeg(command, final_path=filepath)

@@ -1,12 +1,10 @@
 import os
 import sys
-import pytest
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import telegram_bot
-import database
 
 
 class TestSendMessage:
@@ -75,10 +73,7 @@ class TestSendMessage:
 
         telegram_bot._bot = None
 
-        formatted_msg = (
-            "✅ <b>Cloud Sync Hoàn Tất</b>\n"
-            "Đã sao lưu 5 video đơn hàng lên S3 thành công!"
-        )
+        formatted_msg = "✅ <b>Cloud Sync Hoàn Tất</b>\nĐã sao lưu 5 video đơn hàng lên S3 thành công!"
 
         success, _ = telegram_bot.send_telegram_message(formatted_msg)
 

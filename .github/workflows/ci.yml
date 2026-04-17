@@ -7,7 +7,60 @@ on:
     branches: [master, dev]
 
 jobs:
+  # Detect which files changed — used by all other jobs
+  changes:
+    name: "Detect changed files"
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      docs-only: ${{ steps.filter.outputs.docs-only }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            python:
+              - '**/*.py'
+              - 'requirements*.txt'
+              - 'ruff.toml'
+              - '.pre-commit-config.yaml'
+            frontend:
+              - 'web-ui/**'
+            docs-only:
+              - '**/*.md'
+              - 'VERSION'
+              - 'AGENTS.md'
+              - '.github/pull_request_template.md'
+              - 'RELEASE_NOTES.md'
+              - 'docs/**'
+
+  release-check:
+    name: "⚠️ Release PR — MUST use --merge (NOT --squash)"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'master' && github.head_ref == 'dev'
+    steps:
+      - name: Validate release PR
+        run: |
+          echo "Release PR detected: dev → master"
+          echo "IMPORTANT: This PR MUST be merged with --merge (NOT --squash)"
+          echo "See CONTRIBUTING.md → Release Process"
+          echo ""
+          echo "If you squash this PR, shared history between dev and master will break"
+          echo "and all future release PRs will have 12-file conflicts."
+
+  docs-only-bypass:
+    name: "Docs-only change — CI skipped"
+    needs: changes
+    if: needs.changes.outputs.python != 'true' && needs.changes.outputs.frontend != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Only docs/config files changed. Skipping python-test, python-lint, frontend-build."
+
   python-test:
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,16 +77,16 @@ jobs:
           restore-keys: ${{ runner.os }}-pip-
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pytest httpx
+        run: pip install -r requirements-dev.txt
 
       - name: Run tests
-        run: python -m pytest tests/ --ignore=tests/test_video_worker.py --ignore=tests/test_network.py --ignore=tests/test_cloud_sync.py -v --tb=short
+        run: python -m pytest tests/ -v --tb=short
         env:
           VPACK_SECRET: test-secret-key-for-ci
 
   frontend-build:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -50,10 +103,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         run: npm run build
 
   python-lint:
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,4 +124,4 @@ jobs:
         run: pip install ruff
 
       - name: Lint
-        run: ruff check . --ignore=E501,F401,F841,E402,F811,F541,W291,E741 --select=E,F,W
+        run: ruff check .

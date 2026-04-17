@@ -164,7 +164,7 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
       try {
         await axios.delete(`${API_BASE}/api/users/${user.id}`);
         fetchUsers();
-      } catch (err) {
+      } catch {
         alert('Lỗi khi xoá user.');
       }
     }
@@ -174,7 +174,7 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
     try {
       await axios.put(`${API_BASE}/api/users/${user.id}`, { is_active: user.is_active ? 0 : 1 });
       fetchUsers();
-    } catch (err) {
+    } catch {
       alert('Lỗi khi cập nhật trạng thái.');
     }
   };
@@ -189,7 +189,7 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
       await axios.put(`${API_BASE}/api/users/${userId}`, editForm);
       setEditingId(null);
       fetchUsers();
-    } catch (err) {
+    } catch {
       alert('Lỗi khi cập nhật user.');
     }
   };
@@ -207,7 +207,7 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
       setPasswordModalId(null);
       setNewPassword('');
       alert('Đổi mật khẩu thành công!');
-    } catch (err) {
+    } catch {
       setPasswordMsg('Lỗi khi đổi mật khẩu.');
     }
   };
@@ -218,7 +218,7 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
       try {
         await axios.delete(`${API_BASE}/api/sessions/${sessionId}`);
         fetchSessions();
-      } catch (err) {
+      } catch {
         alert('Lỗi khi kết thúc phiên.');
       }
     }
