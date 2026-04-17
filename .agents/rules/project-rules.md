@@ -3,7 +3,12 @@
 
 
 
-# AGENTS.md — Auto-loaded rules for AI sessions
+# Project Rules
+
+
+> **Project Constitution for AI Agents**
+> This file governs all AI agent behavior in this repository.
+> Agents MUST read this file before any code generation.
 
 
 ## Project: V-Pack Monitor (CamDongHang)
@@ -212,33 +217,3 @@ No exceptions. If you skip any item, the user WILL find the bug on double-check.
 - `video_worker.py` — Video processing queue (bounded, max 10 pending)
 - `recorder.py` — FFmpeg recording
 - `tests/` — Pytest suite with tmp_path isolation
-
-## AGENT SYSTEM (OpenCode Only)
-
-### Subagent Delegation
-- `explore` — Contextual codebase grep (FREE, always background)
-- `librarian` — External docs/reference search (CHEAP, always background)
-- `oracle` — High-IQ read-only consultant (EXPENSIVE, use sparingly)
-- `metis` — Pre-planning ambiguity analysis (EXPENSIVE)
-- `momus` — Plan quality reviewer (EXPENSIVE)
-
-### Background Task Rules
-- Explore/Librarian → ALWAYS `run_in_background=true`, ALWAYS parallel
-- NEVER poll `background_output` before receiving system notification
-- NEVER cancel Oracle tasks — wait for completion
-- Collect ALL background results before delivering final answer
-
-### Review Tools
-- `lsp_diagnostics` — Check for errors on changed files
-- `lsp_find_references` — Trace full dependency chain
-- `ast_grep_search` — Pattern-based code search
-
-### Pre-Push Self-Review (OpenCode Pattern)
-1. Fire 2+ `explore` agents in parallel to audit code
-2. Use `lsp_diagnostics` on ALL changed files
-3. Run `pytest tests/ -q` for backend changes
-4. Run `npm run build && npm run lint` for frontend changes
-
-## BEFORE EVERY COMMIT (OpenCode-Specific)
-
-- `lsp_diagnostics` shows no NEW errors on changed Python files

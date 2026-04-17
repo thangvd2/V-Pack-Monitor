@@ -25,6 +25,16 @@ repos:
         args: ['--baseline', '.secrets.baseline']
         exclude: ^(web-ui/package-lock\.json|%TEMP%|venv/|\.venv/|bin/|\.secrets\.baseline)
 
+  # ── .ai-sync/ sync enforcement ────────────────────────
+  - repo: local
+    hooks:
+      - id: ai-sync-check
+        name: .ai-sync/ sync check (auto-regenerates platform configs)
+        entry: python .ai-sync/sync.py
+        language: system
+        files: ^\.ai-sync/
+        pass_filenames: false
+
   # ── Pre-push: branch protection ────────────────────────
   - repo: local
     hooks:
