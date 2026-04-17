@@ -44,6 +44,45 @@ Before pushing ANY new feature or significant change:
    - Resource leaks (timers, threads, connections not cleaned up)
    - Stale references (captured variables in callbacks that may be outdated)
 
+## MANDATORY SELF-VERIFICATION CHECKLIST (BEFORE SAYING "DONE")
+You MUST NOT report a task as complete until EVERY item below passes.
+No exceptions. If you skip any item, the user WILL find the bug on double-check.
+
+### For EVERY code change (Python, JS, JSX, YAML):
+- [ ] `ruff check .` passes on changed files (or `npm run lint` for frontend)
+- [ ] `lsp_diagnostics` shows no NEW errors on changed files
+- [ ] No duplicate lines, duplicate comments, or copy-paste artifacts
+- [ ] No unused imports, unused variables, or dead code left behind
+- [ ] Every new shared state variable has cleanup path on shutdown/exit
+- [ ] Git diff reviewed line-by-line — no accidental inclusions (log files, .playwright-mcp, screenshots)
+
+### For backend Python changes:
+- [ ] `pytest tests/ -q` passes (or specific test file if targeted)
+- [ ] New functions with threading/locks/timers: verify lock ordering, cancel paths, cleanup on error
+- [ ] New SSE events: frontend handler exists in the SAME commit
+- [ ] New API fields: check all consumers (frontend, tests, docs)
+
+### For frontend changes:
+- [ ] `npm run build` passes
+- [ ] `npm run lint` passes
+- [ ] useEffect deps arrays correct (no stale closures)
+- [ ] catch blocks have error handling (alert/toast/setError + console.warn, not bare `catch {}`)
+
+### For CI/YAML changes:
+- [ ] YAML syntax valid (no duplicate keys, correct indentation)
+- [ ] New jobs added to branch protection required checks
+- [ ] Path filters cover all relevant file patterns
+- [ ] If adding `if:` conditions — verified that skipped jobs still satisfy branch protection
+
+### For docs/config changes (AGENTS.md, CONTRIBUTING.md, VERSION):
+- [ ] VERSION file matches api.py header
+- [ ] Cross-references between docs are accurate (section names, file paths)
+- [ ] No contradictory rules between AGENTS.md and CONTRIBUTING.md
+
+### For release PRs:
+- [ ] `gh pr merge <N> --merge` (NOT --squash)
+- [ ] VERSION, api.py header, RELEASE_NOTES.md all updated on dev BEFORE creating PR
+
 ## PROJECT STRUCTURE
 - `api.py` — FastAPI app, shared state, lifespan, helpers (DO NOT add routes here)
 - `routes_*.py` — Route modules, each exports `register_routes(app)`
