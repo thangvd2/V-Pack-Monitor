@@ -97,7 +97,18 @@ Release PR → master: gh pr merge <N> --merge    ← giữ shared history, khô
    gh pr merge <N> --merge    # ← QUAN TRỌNG: --merge, KHÔNG --squash
    ```
 
-6. **Xong.** Dev và master share history. Release sau sẽ không conflict.
+6. **Tạo git tag + GitHub release**:
+   ```bash
+   git checkout master && git pull origin master
+   VERSION=$(cat VERSION | tr -d 'v')
+   git tag -a "v${VERSION}" -m "Release v${VERSION}"
+   git push origin "v${VERSION}"
+   gh release create "v${VERSION}" \
+     --title "v${VERSION} — $(head -1 RELEASE_NOTES.md | sed 's/^# //')" \
+     --notes-file RELEASE_NOTES.md
+   ```
+
+7. **Xong.** Dev và master share history. Release sau sẽ không conflict.
 
 ### Sole-Developer Merge Workaround
 

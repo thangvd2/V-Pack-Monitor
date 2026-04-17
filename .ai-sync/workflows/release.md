@@ -49,12 +49,31 @@ git push origin release/vX.Y.Z
 gh pr merge <N> --merge    # ← MUST be --merge, NEVER --squash
 ```
 
-## Step 6: Verify
+## Step 6: Create Git Tag + GitHub Release
+
+```bash
+# Read version from VERSION file
+VERSION=$(cat VERSION | tr -d 'v')
+
+# Create annotated tag on master
+git checkout master && git pull origin master
+git tag -a "v${VERSION}" -m "Release v${VERSION}"
+git push origin "v${VERSION}"
+
+# Create GitHub release from tag
+gh release create "v${VERSION}" \
+  --title "v${VERSION} — $(head -1 RELEASE_NOTES.md | sed 's/^# //')" \
+  --notes-file RELEASE_NOTES.md
+```
+
+## Step 7: Verify
 
 ```bash
 git checkout dev && git pull origin dev
 git checkout master && git pull origin master
 git log --oneline -5 master  # Should show merge commit
+git tag -l 'v*' | sort -V | tail -3  # Should show new tag
+gh release list --limit 3   # Should show new release
 ```
 
 ## ⚠️ ABSOLUTELY NEVER
@@ -62,3 +81,4 @@ git log --oneline -5 master  # Should show merge commit
 - ❌ `--squash` for release PR → breaks shared history → permanent conflicts
 - ❌ `git rebase` dev onto master → rewrites history
 - ❌ `git push --force` master → loses release history
+- ❌ Forget to create git tag + GitHub release → no version tracking in GitHub
