@@ -6,10 +6,30 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { BarChart3, HardDrive, Download, TrendingUp, Clock, PieChart as PieChartIcon, Calendar, Activity } from 'lucide-react';
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  BarChart3,
+  HardDrive,
+  Download,
+  TrendingUp,
+  Clock,
+  PieChart as PieChartIcon,
+  Calendar,
+  Activity,
+} from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
 } from 'recharts';
 
 import SystemHealth from './SystemHealth';
@@ -76,7 +96,7 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
   const todayAnalytics = analytics || { total_today: 0, station_today: 0 };
 
   const fetchHourly = useCallback(async () => {
-    setLoading(prev => ({ ...prev, hourly: true }));
+    setLoading((prev) => ({ ...prev, hourly: true }));
     try {
       const stationParam = selectedStation === 'all' ? '' : `&station_id=${selectedStation}`;
       const res = await axios.get(`${API_BASE}/api/analytics/hourly?date=${selectedDate}${stationParam}`);
@@ -84,40 +104,48 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
     } catch {
       setHourlyData([]);
     } finally {
-      setLoading(prev => ({ ...prev, hourly: false }));
+      setLoading((prev) => ({ ...prev, hourly: false }));
     }
   }, [selectedDate, selectedStation]);
 
   const fetchTrend = useCallback(async () => {
-    setLoading(prev => ({ ...prev, trend: true }));
+    setLoading((prev) => ({ ...prev, trend: true }));
     try {
       const res = await axios.get(`${API_BASE}/api/analytics/trend?days=7`);
-      setTrendData((res.data?.data || []).map(d => ({
-        ...d,
-        date: d.date ? d.date.slice(5) : d.date,
-      })));
+      setTrendData(
+        (res.data?.data || []).map((d) => ({
+          ...d,
+          date: d.date ? d.date.slice(5) : d.date,
+        })),
+      );
     } catch {
       setTrendData([]);
     } finally {
-      setLoading(prev => ({ ...prev, trend: false }));
+      setLoading((prev) => ({ ...prev, trend: false }));
     }
   }, []);
 
   const fetchStationsComparison = useCallback(async () => {
-    setLoading(prev => ({ ...prev, comparison: true }));
+    setLoading((prev) => ({ ...prev, comparison: true }));
     try {
       const res = await axios.get(`${API_BASE}/api/analytics/stations-comparison`);
       setStationsComparison(res.data?.data || []);
     } catch {
       setStationsComparison([]);
     } finally {
-      setLoading(prev => ({ ...prev, comparison: false }));
+      setLoading((prev) => ({ ...prev, comparison: false }));
     }
   }, []);
 
-  useEffect(() => { fetchHourly(); }, [fetchHourly]);
-  useEffect(() => { fetchTrend(); }, [fetchTrend]);
-  useEffect(() => { fetchStationsComparison(); }, [fetchStationsComparison]);
+  useEffect(() => {
+    fetchHourly();
+  }, [fetchHourly]);
+  useEffect(() => {
+    fetchTrend();
+  }, [fetchTrend]);
+  useEffect(() => {
+    fetchStationsComparison();
+  }, [fetchStationsComparison]);
 
   const handleExportCSV = async () => {
     try {
@@ -144,28 +172,31 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
     <div className="flex items-center gap-2">
       <select
         value={selectedStation}
-        onChange={e => setSelectedStation(e.target.value)}
+        onChange={(e) => setSelectedStation(e.target.value)}
         className="bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500/50 appearance-none cursor-pointer"
       >
-        <option value="all" className="bg-slate-800">Tất cả trạm</option>
-        {stations.map(s => (
-          <option key={s.id} value={s.id} className="bg-slate-800">{s.name}</option>
+        <option value="all" className="bg-slate-800">
+          Tất cả trạm
+        </option>
+        {stations.map((s) => (
+          <option key={s.id} value={s.id} className="bg-slate-800">
+            {s.name}
+          </option>
         ))}
       </select>
       <input
         type="date"
         value={selectedDate}
-        onChange={e => setSelectedDate(e.target.value)}
+        onChange={(e) => setSelectedDate(e.target.value)}
         className="bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500/50"
       />
     </div>
   );
 
-  const activeStationName = stations.find(s => s.id === activeStationId)?.name || 'Trạm hiện tại';
+  const activeStationName = stations.find((s) => s.id === activeStationId)?.name || 'Trạm hiện tại';
 
   return (
     <div className="space-y-6">
-
       <div className="flex gap-2">
         <button
           onClick={() => setDashTab('analytics')}
@@ -175,184 +206,162 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
           Thống kê
         </button>
         {currentUser?.role === 'ADMIN' && (
-        <button
-          onClick={() => setDashTab('health')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${dashTab === 'health' ? 'bg-amber-500/20 border border-amber-500/50 text-amber-300' : 'bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10'}`}
-        >
-          <Activity className="w-4 h-4" />
-          Sức khỏe hệ thống
-        </button>
+          <button
+            onClick={() => setDashTab('health')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${dashTab === 'health' ? 'bg-amber-500/20 border border-amber-500/50 text-amber-300' : 'bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10'}`}
+          >
+            <Activity className="w-4 h-4" />
+            Sức khỏe hệ thống
+          </button>
         )}
       </div>
 
       {dashTab === 'health' ? (
         <SystemHealth currentUser={currentUser} />
       ) : (
-      <>
-
-      <div className="flex flex-col lg:flex-row gap-4 items-stretch">
-        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <StatCard
-            label="Tổng Đơn Hôm Nay"
-            value={`${todayAnalytics.total_today}`}
-            subValue={`${todayAnalytics.station_today}`}
-            subLabel={activeStationName}
-            icon={BarChart3}
-            gradient="bg-gradient-to-br from-blue-600/20 to-emerald-600/20"
-          />
-          <StatCard
-            label="Lưu Trữ"
-            value={storageInfo?.size_str || '0 MB'}
-            subValue={`${storageInfo?.file_count || 0}`}
-            subLabel="tệp tin"
-            icon={HardDrive}
-            gradient="bg-gradient-to-br from-slate-700/40 to-slate-600/20"
-          />
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-emerald-500/30 rounded-2xl p-5 transition-all group"
-          >
-            <Download className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
-            <div className="flex flex-col items-start">
-              <span className="text-sm font-medium text-slate-200">Xuất CSV</span>
-              <span className="text-xs text-slate-400">Tải dữ liệu {selectedDate}</span>
-            </div>
-          </button>
-        </div>
-      </div>
-
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-
-        <ChartCard title="Sản Xuất Theo Giờ" icon={Clock} controls={stationSelect}>
-          {loading.hourly ? (
-            <div className="h-[280px] flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500" />
-            </div>
-          ) : hourlyData.length === 0 ? (
-            <div className="h-[280px] flex items-center justify-center text-slate-500 text-sm">
-              Không có dữ liệu
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={hourlyData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis
-                  dataKey="hour"
-                  tick={{ fill: '#94a3b8', fontSize: 12 }}
-                  axisLine={{ stroke: '#334155' }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: '#94a3b8', fontSize: 12 }}
-                  axisLine={{ stroke: '#334155' }}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={CustomTooltipStyle}
-                  formatter={(value) => [`${value} đơn`, 'Số lượng']}
-                  labelFormatter={(label) => `Giờ ${label}:00`}
-                  cursor={{ fill: 'rgba(96, 165, 250, 0.08)' }}
-                />
-                <Bar
-                  dataKey="count"
-                  fill="#60a5fa"
-                  radius={[6, 6, 0, 0]}
-                  maxBarSize={40}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-
-
-        <ChartCard title="Xu Hướng 7 Ngày" icon={TrendingUp}>
-          {loading.trend ? (
-            <div className="h-[280px] flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-emerald-500" />
-            </div>
-          ) : trendData.length === 0 ? (
-            <div className="h-[280px] flex items-center justify-center text-slate-500 text-sm">
-              Không có dữ liệu
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={trendData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fill: '#94a3b8', fontSize: 12 }}
-                  axisLine={{ stroke: '#334155' }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: '#94a3b8', fontSize: 12 }}
-                  axisLine={{ stroke: '#334155' }}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={CustomTooltipStyle}
-                  formatter={(value) => [`${value} đơn`, 'Số lượng']}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="count"
-                  stroke="#34d399"
-                  strokeWidth={2.5}
-                  dot={{ fill: '#34d399', r: 4, strokeWidth: 0 }}
-                  activeDot={{ r: 6, fill: '#34d399', stroke: '#fff', strokeWidth: 2 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-      </div>
-
-
-      <ChartCard title="So Sánh Trạm" icon={PieChartIcon}>
-        {loading.comparison ? (
-          <div className="h-[300px] flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500" />
-          </div>
-        ) : stationsComparison.length === 0 ? (
-          <div className="h-[300px] flex items-center justify-center text-slate-500 text-sm">
-            Không có dữ liệu
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={stationsComparison}
-                dataKey="count"
-                nameKey="station_name"
-                cx="50%"
-                cy="50%"
-                outerRadius={110}
-                innerRadius={55}
-                paddingAngle={3}
-                label={({ station_name, count }) => `${station_name}: ${count}`}
-                labelLine={{ stroke: '#475569', strokeWidth: 1 }}
+        <>
+          <div className="flex flex-col lg:flex-row gap-4 items-stretch">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <StatCard
+                label="Tổng Đơn Hôm Nay"
+                value={`${todayAnalytics.total_today}`}
+                subValue={`${todayAnalytics.station_today}`}
+                subLabel={activeStationName}
+                icon={BarChart3}
+                gradient="bg-gradient-to-br from-blue-600/20 to-emerald-600/20"
+              />
+              <StatCard
+                label="Lưu Trữ"
+                value={storageInfo?.size_str || '0 MB'}
+                subValue={`${storageInfo?.file_count || 0}`}
+                subLabel="tệp tin"
+                icon={HardDrive}
+                gradient="bg-gradient-to-br from-slate-700/40 to-slate-600/20"
+              />
+              <button
+                onClick={handleExportCSV}
+                className="flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-emerald-500/30 rounded-2xl p-5 transition-all group"
               >
-                {stationsComparison.map((_, idx) => (
-                  <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={CustomTooltipStyle}
-                formatter={(value, name) => [`${value} đơn`, name]}
-              />
-              <Legend
-                formatter={(value) => <span style={{ color: '#94a3b8', fontSize: '13px' }}>{value}</span>}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        )}
-       </ChartCard>
-      </>
+                <Download className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-medium text-slate-200">Xuất CSV</span>
+                  <span className="text-xs text-slate-400">Tải dữ liệu {selectedDate}</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ChartCard title="Sản Xuất Theo Giờ" icon={Clock} controls={stationSelect}>
+              {loading.hourly ? (
+                <div className="h-[280px] flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500" />
+                </div>
+              ) : hourlyData.length === 0 ? (
+                <div className="h-[280px] flex items-center justify-center text-slate-500 text-sm">
+                  Không có dữ liệu
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={hourlyData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis
+                      dataKey="hour"
+                      tick={{ fill: '#94a3b8', fontSize: 12 }}
+                      axisLine={{ stroke: '#334155' }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: '#94a3b8', fontSize: 12 }}
+                      axisLine={{ stroke: '#334155' }}
+                      tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      contentStyle={CustomTooltipStyle}
+                      formatter={(value) => [`${value} đơn`, 'Số lượng']}
+                      labelFormatter={(label) => `Giờ ${label}:00`}
+                      cursor={{ fill: 'rgba(96, 165, 250, 0.08)' }}
+                    />
+                    <Bar dataKey="count" fill="#60a5fa" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
+
+            <ChartCard title="Xu Hướng 7 Ngày" icon={TrendingUp}>
+              {loading.trend ? (
+                <div className="h-[280px] flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-emerald-500" />
+                </div>
+              ) : trendData.length === 0 ? (
+                <div className="h-[280px] flex items-center justify-center text-slate-500 text-sm">
+                  Không có dữ liệu
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={trendData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fill: '#94a3b8', fontSize: 12 }}
+                      axisLine={{ stroke: '#334155' }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: '#94a3b8', fontSize: 12 }}
+                      axisLine={{ stroke: '#334155' }}
+                      tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <Tooltip contentStyle={CustomTooltipStyle} formatter={(value) => [`${value} đơn`, 'Số lượng']} />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#34d399"
+                      strokeWidth={2.5}
+                      dot={{ fill: '#34d399', r: 4, strokeWidth: 0 }}
+                      activeDot={{ r: 6, fill: '#34d399', stroke: '#fff', strokeWidth: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
+          </div>
+
+          <ChartCard title="So Sánh Trạm" icon={PieChartIcon}>
+            {loading.comparison ? (
+              <div className="h-[300px] flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500" />
+              </div>
+            ) : stationsComparison.length === 0 ? (
+              <div className="h-[300px] flex items-center justify-center text-slate-500 text-sm">Không có dữ liệu</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={stationsComparison}
+                    dataKey="count"
+                    nameKey="station_name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={110}
+                    innerRadius={55}
+                    paddingAngle={3}
+                    label={({ station_name, count }) => `${station_name}: ${count}`}
+                    labelLine={{ stroke: '#475569', strokeWidth: 1 }}
+                  >
+                    {stationsComparison.map((_, idx) => (
+                      <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={CustomTooltipStyle} formatter={(value, name) => [`${value} đơn`, name]} />
+                  <Legend formatter={(value) => <span style={{ color: '#94a3b8', fontSize: '13px' }}>{value}</span>} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+        </>
       )}
     </div>
   );

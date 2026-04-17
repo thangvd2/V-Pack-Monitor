@@ -145,7 +145,10 @@ export async function playRecordingWarning() {
     osc1.frequency.setValueAtTime(660, ctx.currentTime);
     gain1.gain.setValueAtTime(0.25, ctx.currentTime);
     gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-    osc1.onended = () => { gain1.disconnect(); osc1.disconnect(); };
+    osc1.onended = () => {
+      gain1.disconnect();
+      osc1.disconnect();
+    };
     osc1.start(ctx.currentTime);
     osc1.stop(ctx.currentTime + 0.15);
 
@@ -158,7 +161,10 @@ export async function playRecordingWarning() {
     osc2.frequency.setValueAtTime(660, ctx.currentTime + 0.2);
     gain2.gain.setValueAtTime(0.25, ctx.currentTime + 0.2);
     gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-    osc2.onended = () => { gain2.disconnect(); osc2.disconnect(); };
+    osc2.onended = () => {
+      gain2.disconnect();
+      osc2.disconnect();
+    };
     osc2.start(ctx.currentTime + 0.2);
     osc2.stop(ctx.currentTime + 0.35);
   } catch (err) {
