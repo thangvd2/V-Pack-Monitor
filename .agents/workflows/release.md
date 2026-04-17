@@ -66,7 +66,19 @@ gh release create "v${VERSION}" \
   --notes-file RELEASE_NOTES.md
 ```
 
-## Step 7: Verify
+## Step 7: Sync dev from master (CRITICAL)
+
+After release merge, dev must receive the merge commit + version bump from master. Without this, dev falls behind master on VERSION/api.py/RELEASE_NOTES → next release will conflict.
+
+```bash
+git checkout dev && git pull origin dev
+git merge origin/master --no-edit
+git push origin dev
+```
+
+**Why**: The `--merge` release PR creates a merge commit on master that dev doesn't have. If dev isn't synced, the next release branch (created from dev) will conflict on VERSION/api.py/RELEASE_NOTES when Step 4 merges master into it.
+
+## Step 8: Verify
 
 ```bash
 git checkout dev && git pull origin dev
@@ -74,6 +86,9 @@ git checkout master && git pull origin master
 git log --oneline -5 master  # Should show merge commit
 git tag -l 'v*' | sort -V | tail -3  # Should show new tag
 gh release list --limit 3   # Should show new release
+
+# Verify dev ≤ master (no conflicts next release)
+git log --oneline dev..master  # Should be empty or only merge commit
 ```
 
 ## ⚠️ ABSOLUTELY NEVER
@@ -82,3 +97,4 @@ gh release list --limit 3   # Should show new release
 - ❌ `git rebase` dev onto master → rewrites history
 - ❌ `git push --force` master → loses release history
 - ❌ Forget to create git tag + GitHub release → no version tracking in GitHub
+- ❌ Skip Step 7 (sync dev from master) → next release WILL conflict on VERSION/api.py/RELEASE_NOTES
