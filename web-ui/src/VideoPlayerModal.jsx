@@ -129,30 +129,49 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
       a.download = `Snapshot_${waybillCode}_${timestamp}.jpg`;
       a.click();
     } catch (err) {
-      console.error("Snapshot error:", err);
+      console.error('Snapshot error:', err);
     }
   };
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden relative" onClick={e => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className={`flex items-center justify-between p-4 bg-black/40 border-b border-white/10 absolute top-0 left-0 right-0 z-10 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-          <h3 className="text-white font-bold tracking-wider">Ma van don: <span className="text-blue-400">{waybillCode}</span></h3>
+        <div
+          className={`flex items-center justify-between p-4 bg-black/40 border-b border-white/10 absolute top-0 left-0 right-0 z-10 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}
+        >
+          <h3 className="text-white font-bold tracking-wider">
+            Ma van don: <span className="text-blue-400">{waybillCode}</span>
+          </h3>
           <div className="flex items-center gap-2">
-            <span className="text-white/60 text-xs font-mono">{formatTime(currentTime)} / {formatTime(duration)}</span>
-            <button onClick={onClose} className="p-2 bg-white/10 hover:bg-rose-500/80 rounded-lg text-white transition-colors">
+            <span className="text-white/60 text-xs font-mono">
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+            <button
+              onClick={onClose}
+              className="p-2 bg-white/10 hover:bg-rose-500/80 rounded-lg text-white transition-colors"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
         {/* Video */}
-        <div className="relative aspect-video w-full flex items-center justify-center bg-black group"
-             onMouseMove={scheduleHide}
-             onMouseLeave={() => { if (isPlaying) setShowControls(false); }}>
+        <div
+          className="relative aspect-video w-full flex items-center justify-center bg-black group"
+          onMouseMove={scheduleHide}
+          onMouseLeave={() => {
+            if (isPlaying) setShowControls(false);
+          }}
+        >
           <video
             ref={videoRef}
             src={videoUrl}
@@ -176,19 +195,37 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
           )}
 
           {/* Controls */}
-          <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/60 to-transparent px-4 pb-4 pt-20 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-
+          <div
+            className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/60 to-transparent px-4 pb-4 pt-20 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          >
             {/* Progress bar */}
-            <div ref={progressRef} onClick={handleProgressClick} className="w-full h-2 bg-white/10 rounded-full cursor-pointer mb-3 group/progress relative">
-              <div className="absolute inset-y-0 left-0 bg-white/20 rounded-full" style={{ width: `${(buffered / (duration || 1)) * 100}%` }} />
+            <div
+              ref={progressRef}
+              onClick={handleProgressClick}
+              className="w-full h-2 bg-white/10 rounded-full cursor-pointer mb-3 group/progress relative"
+            >
+              <div
+                className="absolute inset-y-0 left-0 bg-white/20 rounded-full"
+                style={{ width: `${(buffered / (duration || 1)) * 100}%` }}
+              />
               <div className="absolute inset-y-0 left-0 bg-blue-500 rounded-full" style={{ width: `${progress}%` }} />
-              <div className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-blue-400 rounded-full shadow-lg opacity-0 group-hover/progress:opacity-100 transition-opacity" style={{ left: `calc(${progress}% - 8px)` }} />
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-blue-400 rounded-full shadow-lg opacity-0 group-hover/progress:opacity-100 transition-opacity"
+                style={{ left: `calc(${progress}% - 8px)` }}
+              />
             </div>
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <button onClick={togglePlay} className="p-2 bg-blue-600 hover:bg-blue-500 rounded-full text-white transition-transform hover:scale-110 shadow-lg shadow-blue-500/30">
-                  {isPlaying ? <Pause className="w-5 h-5" fill="currentColor" /> : <Play className="w-5 h-5 ml-0.5" fill="currentColor" />}
+                <button
+                  onClick={togglePlay}
+                  className="p-2 bg-blue-600 hover:bg-blue-500 rounded-full text-white transition-transform hover:scale-110 shadow-lg shadow-blue-500/30"
+                >
+                  {isPlaying ? (
+                    <Pause className="w-5 h-5" fill="currentColor" />
+                  ) : (
+                    <Play className="w-5 h-5 ml-0.5" fill="currentColor" />
+                  )}
                 </button>
 
                 <div className="flex items-center gap-1">
@@ -196,17 +233,22 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
                     {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
                   </button>
                   <input
-                    type="range" min="0" max="1" step="0.05"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
                     className="w-20 h-1 accent-blue-500 cursor-pointer"
                   />
                 </div>
 
-                <span className="text-white/80 text-sm font-mono">{formatTime(currentTime)} / {formatTime(duration)}</span>
+                <span className="text-white/80 text-sm font-mono">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
 
                 <div className="flex bg-white/10 rounded-lg p-0.5 border border-white/5">
-                  {[0.5, 1, 1.5, 2].map(speed => (
+                  {[0.5, 1, 1.5, 2].map((speed) => (
                     <button
                       key={speed}
                       onClick={() => setPlaybackRate(speed)}
@@ -236,7 +278,7 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
                       const match = videoUrl.match(/\/records\/(\d+)\/download\/(\d+)/);
                       if (!match) throw new Error('Invalid URL');
                       const response = await fetch(`${API_BASE}/api/records/${match[1]}/download/${match[2]}`, {
-                        headers: { Authorization: `Bearer ${token}` }
+                        headers: { Authorization: `Bearer ${token}` },
                       });
                       if (!response.ok) throw new Error('Download failed');
                       const blob = await response.blob();
