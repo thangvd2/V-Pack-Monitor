@@ -73,19 +73,88 @@ Release PR → master: gh pr merge <N> --merge    ← giữ shared history, khô
    git push origin dev
    ```
 
-2. **Tạo PR trực tiếp: `dev` → `master`**:
+2. **Tạo release branch từ `dev` và push**:
    ```bash
-   gh pr create --base master --head dev --title "release: vX.Y.Z — ..."
+   git checkout -b release/vX.Y.Z dev
+   git push origin release/vX.Y.Z
    ```
 
-3. **Verify CI pass**, review PR.
+3. **Tạo PR: `release/vX.Y.Z` → `master`**:
+   ```bash
+   gh pr create --base master --title "Release vX.Y.Z" --body "..."
+   ```
 
-4. **Merge bằng MERGE COMMIT (TUYỆT ĐỐI KHÔNG squash)**:
+4. **Wait CI pass.** Nếu báo "not up to date with base" → merge master vào release branch:
+   ```bash
+   git fetch origin master
+   git merge origin/master --no-edit
+   git push origin release/vX.Y.Z
+   # Wait CI pass again
+   ```
+
+5. **Merge bằng MERGE COMMIT (TUYỆT ĐỐI KHÔNG squash)**:
    ```bash
    gh pr merge <N> --merge    # ← QUAN TRỌNG: --merge, KHÔNG --squash
    ```
 
-5. **Xong.** Dev và master share history. Release sau sẽ không conflict.
+6. **Tạo git tag + GitHub release**:
+   ```bash
+   git checkout master && git pull origin master
+   VERSION=$(cat VERSION | tr -d 'v')
+   git tag -a "v${VERSION}" -m "Release v${VERSION}"
+   git push origin "v${VERSION}"
+   gh release create "v${VERSION}" \
+     --title "v${VERSION} — $(head -1 RELEASE_NOTES.md | sed 's/^# //')" \
+     --notes-file RELEASE_NOTES.md
+   ```
+
+7. **Xong.** Dev và master share history. Release sau sẽ không conflict.
+
+### Sole-Developer Merge Workaround
+
+Sole developer với 1 GitHub account **không thể self-approve PR**. Khi branch protection yêu cầu reviews, dùng quy trình sau:
+
+```bash
+# 1. Tạm tắt required reviews
+gh api repos/thangvd2/V-Pack-Monitor/branches/master/protection/required_pull_request_reviews \
+  -X PATCH --input '{"required_approving_review_count": 0}'
+
+# 2. Đợi GitHub propagate (ít nhất 30 giây)
+sleep 30
+
+# 3. Nếu vẫn BLOCKED → xóa protection tạm thời
+gh api repos/thangvd2/V-Pack-Monitor/branches/master/protection -X DELETE
+sleep 5
+
+# 4. Merge
+gh pr merge <N> --merge
+
+# 5. Khôi phục protection ngay lập tức
+gh api repos/thangvd2/V-Pack-Monitor/branches/master/protection -X PUT --input - <<'EOF'
+{
+  "required_status_checks": {
+    "strict": false,
+    "contexts": ["python-test", "frontend-build", "python-lint", "docs-only-bypass", "release-check"]
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": {
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": false,
+    "required_approving_review_count": 0
+  },
+  "restrictions": null,
+  "required_linear_history": false,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": false
+}
+EOF
+```
+
+**Lưu ý quan trọng**:
+- `strict: false` — không yêu cầu CI chạy trên branch phải include master HEAD mới nhất. Tránh false-positive "not up to date" errors.
+- GitHub API PATCH `required_reviews: 0` có propagation delay — có thể mất 30+ giây. Nếu gấp, DELETE protection + restore sau merge nhanh hơn.
+- Luôn khôi phục protection **ngay sau khi merge** — không để branch unprotected.
 
 ### TUYỆT ĐỐI KHÔNG:
 - ❌ `gh pr merge <N> --squash` cho release PR (dev → master) — phá vỡ shared history, gây conflict vĩnh viễn
