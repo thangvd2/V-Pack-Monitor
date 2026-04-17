@@ -40,6 +40,12 @@
 - **Fix**: Setup Prettier + eslint-config-prettier + pre-commit hook.
 - **Rule**: Formatting issues should NEVER reach code review. Automated tooling catches them.
 
+### 7. Release Conflict Root Cause: dev Not Synced from master After Release
+- **What happened**: v3.2.0 release PR conflicted on VERSION/api.py/RELEASE_NOTES when merging master into release branch (Step 4).
+- **Root cause**: After v3.1.1 release (merge to master), dev was never synced back from master. Dev stayed at VERSION v3.1.0 while master had v3.1.1. Next release branch (from dev) conflicted when merged with master's newer VERSION.
+- **Fix**: Added Step 7 to release workflow — after tag+release creation, merge master back into dev (`git merge origin/master --no-edit`). This ensures dev ≤ master at all times.
+- **Prevention**: ALWAYS sync dev from master after every release. Never skip this step.
+
 ---
 
 ## Project-Specific Gotchas
@@ -78,7 +84,9 @@
 3. Push + create PR to master
 4. Wait CI pass (if "not up to date", merge master into release branch)
 5. Merge with `--merge` (NOT --squash)
-6. Verify dev and master share history
+6. Create git tag + GitHub release
+7. Sync dev from master (CRITICAL — prevents next release conflict)
+8. Verify dev ≤ master
 
 ### Thread Safety Debugging
 1. Map all lock acquisitions (file:line)

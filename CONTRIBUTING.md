@@ -108,7 +108,21 @@ Release PR → master: gh pr merge <N> --merge    ← giữ shared history, khô
      --notes-file RELEASE_NOTES.md
    ```
 
-7. **Xong.** Dev và master share history. Release sau sẽ không conflict.
+7. **Sync dev từ master (QUAN TRỌNG)**:
+    ```bash
+    git checkout dev && git pull origin dev
+    git merge origin/master --no-edit
+    git push origin dev
+    ```
+    Sau release, dev PHẢI nhận merge commit + version bump từ master. Nếu bỏ qua bước này, dev sẽ tụt hậu so master trên VERSION/api.py/RELEASE_NOTES → release sau chắc chắn conflict.
+
+8. **Xong.** Verify:
+    ```bash
+    git log --oneline -5 master  # Should show merge commit
+    git tag -l 'v*' | sort -V | tail -3  # Should show new tag
+    gh release list --limit 3   # Should show new release
+    git log --oneline dev..master  # Should be empty or only merge commit
+    ```
 
 ### Sole-Developer Merge Workaround
 
@@ -162,6 +176,7 @@ EOF
 - ❌ `git cherry-pick` commits từ dev sang master — mất merge history
 - ❌ `git push --force` master — mất release history
 - ❌ Tạo release branch từ master rồi merge dev vào — ngược hướng, gây 12-file conflict
+- ❌ Bỏ bước 7 (sync dev từ master) — release sau WILL conflict trên VERSION/api.py/RELEASE_NOTES
 
 ## CI Pipeline
 

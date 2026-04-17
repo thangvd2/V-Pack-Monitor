@@ -2,6 +2,34 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v3.2.0] - 2026-04-18 (.ai-sync Protocol, Release Workflow, Enforcement Layers) 🚀 MINOR RELEASE
+
+### 🤝 .ai-sync/ — Universal AI Tool Coordination Protocol
+- **Single source of truth** for coordinating OpenCode (GLM-5.1) and Antigravity (Gemini) on the same project
+- `sync.py` auto-generates `AGENTS.md` (OpenCode) and `.agents/rules/` (Antigravity) from shared `.ai-sync/` source files
+- Validates 12,000 char Antigravity rule file limit, `--check` mode for CI
+- **3 enforcement layers**: pre-commit hook, CI job, RULES.md #7
+
+### 📋 Memory Architecture (Based on Z.AI Official Docs)
+- **5 memory types**: Session, Project, Semantic, Episodic, Procedural — mapped to `.ai-sync/` file structure
+- **10 best practices** from Z.AI analyzed and mapped to `.ai-sync/` implementation
+- **Platform Feature Matrix**: verified which features belong to OpenCode, Antigravity, and Claude Code
+- **Episodic memory format**: structured `Problem → Root Cause → Solution → Prevention` entries
+
+### 🔧 Release Workflow Improvements
+- Added **git tag + GitHub release** steps to release workflow — prevents forgetting after merge
+- Updated both `.ai-sync/workflows/release.md` and `CONTRIBUTING.md`
+
+### 🛡️ Other Fixes
+- Fix `required_approving_review_count` in branch protection restore command (#16)
+- Document release process lessons (sole-developer workaround, strict:false) (#15)
+
+### Files Added
+- `.ai-sync/` — 11 source files (CONTEXT, RULES, MEMORY, TASKS, HANDOFF, README, sync.py, extensions/, workflows/)
+- `.agents/` — 4 generated files (rules/, workflows/)
+- `.pre-commit-config.yaml` — ai-sync-check hook added
+- `.github/workflows/ci.yml` — ai-sync-check job added
+
 ## [v3.1.0] - 2026-04-17 (Auto-Stop Recording, Notification Sounds, Quality Enforcement) 🚀 MINOR RELEASE
 
 ### ⏱️ Auto-Stop Recording (10 min max)
