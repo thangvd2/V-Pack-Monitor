@@ -5,7 +5,14 @@
 - ALWAYS create a feature branch from `dev`: `git checkout -b {type}/{description} dev`
 - Branch naming: `feature/`, `fix/`, `security/`, `refactor/`
 - After work is done: `gh pr create --base dev`
-- When dev is stable: create PR `dev` → `master` for release
+- Feature PR → dev: use `--squash` (keep dev history clean: 1 feature = 1 commit)
+- Release PR → master: use `--merge` (keep shared history, prevent future conflicts)
+
+## RELEASE RULES (MANDATORY)
+- Release PR is ALWAYS `dev` → `master`, merged with `gh pr merge <N> --merge` (NOT --squash)
+- ALWAYS update `VERSION`, `api.py` header, and `RELEASE_NOTES.md` ON `dev` BEFORE creating release PR
+- NEVER squash or rebase dev → master — this destroys shared history and causes permanent conflicts
+- Full process: see `CONTRIBUTING.md` → "Release Process (dev → master)"
 
 ## BEFORE EVERY COMMIT
 1. `pytest tests/ -v` — must pass

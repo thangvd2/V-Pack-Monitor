@@ -50,6 +50,50 @@ Format: `vMAJOR.MINOR.PATCH`
 
 Mỗi release phải có entry trong `RELEASE_NOTES.md`.
 
+## Release Process (dev → master)
+
+### Nguyên tắc cốt lõi: MERGE COMMIT, KHÔNG SQUASH
+
+```
+Feature PR → dev:   gh pr merge <N> --squash   ← 1 feature = 1 commit trên dev
+Release PR → master: gh pr merge <N> --merge    ← giữ shared history, không conflict lần sau
+```
+
+**Tại sao phải --merge?** Squash merge tạo 1 commit mới trên master mà dev không share → phá vỡ shared history → mọi release sau đều conflict. Merge commit tạo 1 commit với 2 parents → git biết dev ≤ master → release sau clean.
+
+### Quy trình chuẩn:
+
+1. **Update version trên `dev`**:
+   ```bash
+   git checkout dev && git pull origin dev
+   # Update VERSION file: v3.0.0 → v3.1.0
+   # Update api.py header: v3.0.0 → v3.1.0
+   # Add RELEASE_NOTES.md entry cho version mới
+   git commit -m "release: vX.Y.Z — update VERSION, release notes"
+   git push origin dev
+   ```
+
+2. **Tạo PR trực tiếp: `dev` → `master`**:
+   ```bash
+   gh pr create --base master --head dev --title "release: vX.Y.Z — ..."
+   ```
+
+3. **Verify CI pass**, review PR.
+
+4. **Merge bằng MERGE COMMIT (TUYỆT ĐỐI KHÔNG squash)**:
+   ```bash
+   gh pr merge <N> --merge    # ← QUAN TRỌNG: --merge, KHÔNG --squash
+   ```
+
+5. **Xong.** Dev và master share history. Release sau sẽ không conflict.
+
+### TUYỆT ĐỐI KHÔNG:
+- ❌ `gh pr merge <N> --squash` cho release PR (dev → master) — phá vỡ shared history, gây conflict vĩnh viễn
+- ❌ `git rebase` dev lên master — viết lại history, cùng vấn đề với squash
+- ❌ `git cherry-pick` commits từ dev sang master — mất merge history
+- ❌ `git push --force` master — mất release history
+- ❌ Tạo release branch từ master rồi merge dev vào — ngược hướng, gây 12-file conflict
+
 ## CI Pipeline
 
 Tự chạy trên mỗi push/PR nhắm vào `master` hoặc `dev`:
