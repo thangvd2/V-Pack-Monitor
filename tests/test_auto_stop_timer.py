@@ -109,7 +109,17 @@ class TestAutoStopTimer:
         _start_recording(client, operator_headers, sample_station_id)
         sid = sample_station_id
 
-        _cancel_real_timers(sid)
+        # Grab refs before EXIT (so we can verify cancel was called)
+        stop_timer = api._recording_timers.get(sid)
+        warn_timer = api._recording_warning_timers.get(sid)
+        assert stop_timer is not None
+        assert warn_timer is not None
+
+        # Spy on cancel()
+        stop_cancel_spy = MagicMock(wraps=stop_timer.cancel)
+        warn_cancel_spy = MagicMock(wraps=warn_timer.cancel)
+        stop_timer.cancel = stop_cancel_spy
+        warn_timer.cancel = warn_cancel_spy
 
         with patch.object(video_worker, "submit_stop_and_save", return_value=True):
             r = client.post(
@@ -121,6 +131,8 @@ class TestAutoStopTimer:
         assert r.json()["status"] == "processing"
         assert api._recording_timers.get(sid) is None
         assert api._recording_warning_timers.get(sid) is None
+        stop_cancel_spy.assert_called()
+        warn_cancel_spy.assert_called()
 
     # ------------------------------------------------------------------
     # 4. CRITICAL-1 regression: wrong record_id must NOT stop recording
@@ -281,3 +293,65 @@ class TestAutoStopTimer:
         mock_warn.cancel.assert_called_once()
         assert api._recording_timers.get(sid) is None
         assert api._recording_warning_timers.get(sid) is None
+
+    # ------------------------------------------------------------------
+    # 12. Lifespan shutdown cancels all timers
+    # ------------------------------------------------------------------
+    def test_timers_cancelled_on_shutdown(self, client, operator_headers, sample_station_id):
+        _start_recording(client, operator_headers, sample_station_id)
+        sid = sample_station_id
+
+        stop_timer = api._recording_timers.get(sid)
+        warn_timer = api._recording_warning_timers.get(sid)
+        assert stop_timer is not None
+        assert warn_timer is not None
+
+        stop_cancel_spy = MagicMock(wraps=stop_timer.cancel)
+        warn_cancel_spy = MagicMock(wraps=warn_timer.cancel)
+        stop_timer.cancel = stop_cancel_spy
+        warn_timer.cancel = warn_cancel_spy
+
+        with api._recording_timers_lock:
+            for timer in api._recording_timers.values():
+                timer.cancel()
+            api._recording_timers.clear()
+            for timer in api._recording_warning_timers.values():
+                timer.cancel()
+            api._recording_warning_timers.clear()
+            api._recording_start_times.clear()
+
+        stop_cancel_spy.assert_called()
+        warn_cancel_spy.assert_called()
+        assert len(api._recording_timers) == 0
+        assert len(api._recording_warning_timers) == 0
+        assert len(api._recording_start_times) == 0
+
+    # ------------------------------------------------------------------
+    # 13. Auto-stop sets FAILED when submit_stop_and_save returns False
+    # ------------------------------------------------------------------
+    def test_auto_stop_sets_failed_when_queue_full(self, client, operator_headers, sample_station_id):
+        _start_recording(client, operator_headers, sample_station_id)
+        sid = sample_station_id
+        actual_rid = api.active_record_ids.get(sid)
+        assert actual_rid is not None
+
+        _cancel_real_timers(sid)
+
+        with patch.object(video_worker, "submit_stop_and_save", return_value=False):
+            with patch.object(api, "notify_sse") as mock_sse:
+                api._auto_stop_recording(sid, actual_rid)
+
+        rec = database.get_record_by_id(actual_rid)
+        assert rec is not None
+        assert rec["status"] == "FAILED"
+
+        sse_calls = mock_sse.call_args_list
+        video_status_calls = [c for c in sse_calls if c[0][0] == "video_status"]
+        assert len(video_status_calls) >= 2
+        failed_data = video_status_calls[-1][0][1]
+        assert failed_data["status"] == "FAILED"
+        assert failed_data["record_id"] == actual_rid
+
+        assert sid not in api._processing_count
+        assert sid not in api.active_recorders
+        assert sid not in api.active_record_ids

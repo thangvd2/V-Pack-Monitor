@@ -111,7 +111,13 @@ export default function SetupModal({ isOpen, onSaved, onCancel, currentStation =
     }
     const handler = (e) => { if (e.key === 'Escape') handleCancel(); };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+  return () => {
+      window.removeEventListener('keydown', handler);
+      if (conflictTimerRef.current) {
+        clearTimeout(conflictTimerRef.current);
+        conflictTimerRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, dirty]);
 

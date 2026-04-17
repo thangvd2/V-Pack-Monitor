@@ -454,3 +454,49 @@ class TestExportCSV:
         r = client.get("/api/export/csv", headers=admin_headers)
         raw = r.content
         assert raw[:3] == b"\xef\xbb\xbf"
+
+
+class TestDownloadAuthorization:
+    def test_download_operator_own_station_allowed(self, client, operator_headers, operator_user_id, sample_station_id):
+        client.post(
+            "/api/sessions/acquire",
+            headers=operator_headers,
+            params={"station_id": sample_station_id},
+        )
+        rid = database.create_record(sample_station_id, "DL-OWN", "SINGLE")
+        database.update_record_status(rid, "READY", video_paths="recordings/dl_own.mp4")
+        token = operator_headers["Authorization"].replace("Bearer ", "")
+        r = client.get(f"/api/records/{rid}/download/0", params={"token": token})
+        assert r.status_code != 403
+
+    def test_download_operator_other_station_forbidden(
+        self, client, operator_headers, operator_user_id, sample_station_id
+    ):
+        station_b = database.add_station(
+            {
+                "name": "Station B",
+                "ip_camera_1": "10.0.0.2",
+                "ip_camera_2": "",
+                "safety_code": "CODEB",
+                "camera_mode": "SINGLE",
+            }
+        )
+        rid = database.create_record(station_b, "DL-OTHER", "SINGLE")
+        database.update_record_status(rid, "READY", video_paths="recordings/dl_other.mp4")
+        token = operator_headers["Authorization"].replace("Bearer ", "")
+        r = client.get(f"/api/records/{rid}/download/0", params={"token": token})
+        assert r.status_code == 403
+
+    def test_download_admin_any_station(self, client, admin_headers, sample_station_id):
+        rid = database.create_record(sample_station_id, "DL-ADMIN", "SINGLE")
+        database.update_record_status(rid, "READY", video_paths="recordings/dl_admin.mp4")
+        token = admin_headers["Authorization"].replace("Bearer ", "")
+        r = client.get(f"/api/records/{rid}/download/0", params={"token": token})
+        assert r.status_code != 403
+
+    def test_download_operator_no_session_forbidden(self, client, operator_headers, sample_station_id):
+        rid = database.create_record(sample_station_id, "DL-NOSESSION", "SINGLE")
+        database.update_record_status(rid, "READY", video_paths="recordings/dl_nosession.mp4")
+        token = operator_headers["Authorization"].replace("Bearer ", "")
+        r = client.get(f"/api/records/{rid}/download/0", params={"token": token})
+        assert r.status_code == 403
