@@ -7,6 +7,14 @@
 - After work is done: `gh pr create --base dev`
 - When dev is stable: create PR `dev` → `master` for release
 
+## RELEASE RULES (MANDATORY)
+- Release branch MUST be created FROM `dev`, NOT from `master`
+- Release process: see `CONTRIBUTING.md` → "Release Process (dev → master)"
+- ALWAYS merge `master` INTO the release branch (not the reverse)
+- When resolving conflicts: take `dev` version (ours) — dev always supersedes master
+- NEVER cherry-pick or squash dev → master (loses commit history)
+- ALWAYS update `VERSION`, `api.py` header, and `RELEASE_NOTES.md` ON `dev` BEFORE creating release branch
+
 ## BEFORE EVERY COMMIT
 1. `pytest tests/ -v` — must pass
 2. `npm run build` in `web-ui/` — must pass (if frontend changed)

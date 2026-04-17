@@ -50,6 +50,56 @@ Format: `vMAJOR.MINOR.PATCH`
 
 Mỗi release phải có entry trong `RELEASE_NOTES.md`.
 
+## Release Process (dev → master)
+
+### Bước bắt buộc theo đúng thứ tự:
+
+1. **Update version trên `dev`**:
+   ```bash
+   git checkout dev
+   git pull origin dev
+   # Update VERSION file: v3.0.0 → v3.1.0
+   # Update api.py header: v3.0.0 → v3.1.0
+   # Add RELEASE_NOTES.md entry cho version mới
+   git commit -m "release: vX.Y.Z — update VERSION, release notes"
+   git push origin dev
+   ```
+
+2. **Tạo release branch TỪ `dev` (KHÔNG phải master)**:
+   ```bash
+   git checkout -b release/vX.Y.Z dev
+   ```
+
+3. **Merge `master` vào release branch** (để git nhận ra shared history):
+   ```bash
+   git merge origin/master --no-ff
+   ```
+
+4. **Nếu conflict** — resolve bằng cách giữ **dev version** (dev luôn mới hơn):
+   ```bash
+   # List conflicts
+   git diff --name-only --diff-filter=U
+   # Resolve each — take dev version (ours)
+   git diff --name-only --diff-filter=U | while IFS= read -r f; do
+     git checkout --ours "$f" && git add "$f"
+   done
+   git commit -m "merge: resolve master..dev conflicts"
+   ```
+
+5. **Push và tạo PR**:
+   ```bash
+   git push -u origin release/vX.Y.Z
+   gh pr create --base master --head release/vX.Y.Z --title "release: vX.Y.Z — ..."
+   ```
+
+6. **Verify CI pass** rồi merge PR.
+
+### TUYỆT ĐỐI KHÔNG:
+- ❌ Branch release từ `master` rồi merge dev vào — sẽ gây 12-file conflict do diverged history
+- ❌ Cherry-pick commits từ dev sang master — mất merge history
+- ❌ Force push master — mất release history
+- ❌ Squash merge dev → master — mất individual commit history cho git blame
+
 ## CI Pipeline
 
 Tự chạy trên mỗi push/PR nhắm vào `master` hoặc `dev`:
