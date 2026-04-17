@@ -44,6 +44,63 @@ Before pushing ANY new feature or significant change:
    - Resource leaks (timers, threads, connections not cleaned up)
    - Stale references (captured variables in callbacks that may be outdated)
 
+## CODE REVIEW ANTI-FALSE-POSITIVE RULES (MANDATORY)
+When flagging a potential issue during code review, you MUST:
+1. **Read ALL files in the dependency chain** — not just the immediate file. If issue is in `api.py`, also read callers (`routes_*.py`), callees (`video_worker.py`, `database.py`), and config (`auth.py`).
+2. **Trace the FULL call path** — callers, callees, related modules. A lock in one function is only a deadlock risk if another code path acquires locks in reverse order.
+3. **Check mitigations FIRST** — before flagging, ask: "Is this already handled elsewhere?" (e.g., a random key fallback in `database.py` is mitigated by `auth.py` persisting SECRET_KEY in DB).
+4. **Provide FOR and AGAINST evidence** — every flagged issue MUST include:
+   - EVIDENCE FOR: why this seems like a real issue (with file:line)
+   - EVIDENCE AGAINST: why this might NOT be a real issue — check guards, related code, production config
+   - DEPENDENCY CHAIN: list ALL related files/modules that affect this issue
+5. **Classify before reporting** — every issue gets one of:
+   - `REAL`: Confirmed with full dependency trace. Has user impact.
+   - `SPECULATIVE`: Plausible but unverified. Needs deeper investigation.
+   - `FALSE POSITIVE`: Initially seemed real, but mitigated elsewhere.
+
+**Issue without full dependency trace = SPECULATIVE, not actionable.**
+**Issue without AGAINST evidence = incomplete review.**
+
+## REVIEW PROMPT TEMPLATE (USE WHEN DELEGATING REVIEW TASKS)
+When firing explore/librarian agents for code review, include this structure in the prompt:
+
+```
+For EACH potential issue found, you MUST provide:
+
+1. ISSUE: [one-line description]
+2. FILES READ: [list ALL files you actually read to verify this — not just where the issue appears]
+3. EVIDENCE FOR: [why this seems like a real issue, with file:line references]
+4. EVIDENCE AGAINST: [why this might NOT be a real issue — check mitigations, guards,
+   fallbacks, related modules, production config. If you cannot find any against-evidence,
+   state "No against-evidence found after checking [files checked]"]
+5. DEPENDENCY CHAIN: [list all related files/modules that could affect whether this is real]
+6. VERDICT: REAL / SPECULATIVE / FALSE POSITIVE
+
+DO NOT flag issues without reading the full dependency chain.
+DO NOT skip AGAINST evidence — it is MANDATORY.
+```
+
+## 2-PASS REVIEW PROCESS (FOR RELEASE REVIEWS & SECURITY AUDITS)
+For release PRs, security audits, and critical code changes — use this two-pass process:
+
+**Pass 1 — Flag issues (broad scan):**
+- Fire 2-3 explore agents in parallel to review different areas (backend, frontend, tests)
+- Each agent flags potential issues using the prompt template above
+- Collect ALL flagged issues — do not filter yet
+
+**Pass 2 — Verify issues (deep investigation):**
+- For EACH flagged issue, fire 1 dedicated explore agent to verify
+- The verify agent MUST:
+  - Read the FULL dependency chain (not just the file where the issue was found)
+  - Trace every lock acquisition, every fallback path, every related module
+  - Provide FOR and AGAINST evidence
+  - Give final verdict: REAL, SPECULATIVE, or FALSE POSITIVE
+- Only REAL issues are reported to the user
+- SPECULATIVE issues are reported with clear caveat
+- FALSE POSITIVE issues are documented with explanation of why they're safe
+
+**Why 2 passes?** A single pass creates confirmation bias — agents find "evidence" to support their initial concern without checking if it's already mitigated. Two passes separate "detection" (Pass 1) from "verification" (Pass 2), dramatically reducing false positives.
+
 ## MANDATORY SELF-VERIFICATION CHECKLIST (BEFORE SAYING "DONE")
 You MUST NOT report a task as complete until EVERY item below passes.
 No exceptions. If you skip any item, the user WILL find the bug on double-check.
