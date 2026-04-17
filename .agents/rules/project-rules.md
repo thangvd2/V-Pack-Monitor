@@ -85,6 +85,7 @@ Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa 
 4. Linter/diagnostics on changed files — no new errors
 5. No hardcode secrets/credentials
 6. No silent `except: pass` — must log the error
+7. If ANY file in `.ai-sync/` was edited — run `python .ai-sync/sync.py` to regenerate platform configs, then commit the generated files in the SAME commit
 
 ## CODE RULES
 
