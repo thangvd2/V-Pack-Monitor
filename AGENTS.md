@@ -106,6 +106,7 @@ You MUST NOT report a task as complete until EVERY item below passes.
 No exceptions. If you skip any item, the user WILL find the bug on double-check.
 
 ### For EVERY code change (Python, JS, JSX, YAML):
+- [ ] NOT on `master` or `dev` — must be on a feature branch (`feature/`, `fix/`, `security/`, `refactor/`)
 - [ ] `ruff check .` passes on changed files (or `npm run lint` for frontend)
 - [ ] `lsp_diagnostics` shows no NEW errors on changed files
 - [ ] No duplicate lines, duplicate comments, or copy-paste artifacts

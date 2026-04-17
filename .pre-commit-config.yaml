@@ -25,6 +25,17 @@ repos:
         args: ['--baseline', '.secrets.baseline']
         exclude: ^(web-ui/package-lock\.json|%TEMP%|venv/|\.venv/|bin/|\.secrets\.baseline)
 
+  # ── Pre-push: branch protection ────────────────────────
+  - repo: local
+    hooks:
+      - id: check-protected-branch
+        name: check protected branch (master/dev)
+        entry: bash .git-hooks/check-protected-branch.sh
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
+
   # ── Pre-push: run tests ───────────────────────────────
   - repo: local
     hooks:
