@@ -24,13 +24,18 @@ function StatusCard({ title, icon: Icon, value, subtitle, status, percent }) {
           <Icon className="w-5 h-5 text-slate-400" />
           <span className="text-sm font-medium text-slate-300">{title}</span>
         </div>
-        <span className="text-xs">{cfg.dot} <span style={{ color: cfg.color }}>{cfg.label}</span></span>
+        <span className="text-xs">
+          {cfg.dot} <span style={{ color: cfg.color }}>{cfg.label}</span>
+        </span>
       </div>
       <div className="text-3xl font-bold text-white tracking-tight">{value}</div>
       {subtitle && <div className="text-sm text-slate-400 mt-1">{subtitle}</div>}
       {percent !== undefined && (
         <div className="w-full bg-black/30 rounded-full h-2 mt-3">
-          <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(percent, 100)}%`, background: cfg.color }} />
+          <div
+            className="h-2 rounded-full transition-all duration-500"
+            style={{ width: `${Math.min(percent, 100)}%`, background: cfg.color }}
+          />
         </div>
       )}
     </div>
@@ -86,7 +91,10 @@ export default function SystemHealth({ currentUser: _currentUser }) {
         <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
           <Activity className="w-12 h-12 text-red-400 mx-auto mb-3" />
           <p className="text-slate-300 font-medium">{error}</p>
-          <button onClick={fetchData} className="mt-4 px-4 py-2 bg-amber-500/20 text-amber-400 rounded-xl text-sm hover:bg-amber-500/30 transition-colors">
+          <button
+            onClick={fetchData}
+            className="mt-4 px-4 py-2 bg-amber-500/20 text-amber-400 rounded-xl text-sm hover:bg-amber-500/30 transition-colors"
+          >
             Thử lại
           </button>
         </div>
@@ -194,9 +202,13 @@ export default function SystemHealth({ currentUser: _currentUser }) {
                 {processes.ffmpeg_processes.map((proc, idx) => (
                   <tr key={proc.pid || idx} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-2.5 px-3 text-slate-300 font-mono text-xs">{proc.pid}</td>
-                    <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate" title={proc.cmdline_short}>{proc.cmdline_short || '—'}</td>
+                    <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate" title={proc.cmdline_short}>
+                      {proc.cmdline_short || '—'}
+                    </td>
                     <td className="py-2.5 px-3 text-right text-slate-300">{proc.cpu_percent?.toFixed(1) || '0.0'}%</td>
-                    <td className="py-2.5 px-3 text-right text-slate-300">{proc.memory_percent?.toFixed(1) || '0.0'}%</td>
+                    <td className="py-2.5 px-3 text-right text-slate-300">
+                      {proc.memory_percent?.toFixed(1) || '0.0'}%
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -227,12 +239,17 @@ export default function SystemHealth({ currentUser: _currentUser }) {
               </thead>
               <tbody>
                 {network.cameras.map((cam, idx) => (
-                  <tr key={cam.station_id || idx} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                  <tr
+                    key={cam.station_id || idx}
+                    className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                  >
                     <td className="py-2.5 px-3 text-slate-300">{cam.station_name || `Trạm ${cam.station_id}`}</td>
                     <td className="py-2.5 px-3 text-slate-300 font-mono text-xs">{cam.ip || '—'}</td>
                     <td className="py-2.5 px-3">
                       <span className="flex items-center gap-1.5">
-                        <span className={`inline-block w-2 h-2 rounded-full ${cam.reachable ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                        <span
+                          className={`inline-block w-2 h-2 rounded-full ${cam.reachable ? 'bg-emerald-400' : 'bg-red-400'}`}
+                        />
                         <span className={cam.reachable ? 'text-emerald-400' : 'text-red-400'}>
                           {cam.reachable ? 'Kết nối' : 'Mất kết nối'}
                         </span>

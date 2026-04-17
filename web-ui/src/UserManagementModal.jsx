@@ -6,7 +6,24 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { X, Users, Activity, FileText, Key, Shield, Clock, Filter, UserPlus, Trash2, Lock, Unlock, Edit3, AlertCircle, Search, ChevronDown } from 'lucide-react';
+import {
+  X,
+  Users,
+  Activity,
+  FileText,
+  Key,
+  Shield,
+  Clock,
+  Filter,
+  UserPlus,
+  Trash2,
+  Lock,
+  Unlock,
+  Edit3,
+  AlertCircle,
+  Search,
+  ChevronDown,
+} from 'lucide-react';
 import API_BASE from './config';
 
 const ACTION_LABELS = {
@@ -77,26 +94,29 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
     }
   }, []);
 
-  const fetchLogs = useCallback(async (offset = 0, append = false) => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({ limit: '200', offset: String(offset) });
-      if (logFilterUser) params.set('user_id', logFilterUser);
-      if (logFilterAction) params.set('action', logFilterAction);
-      const res = await axios.get(`${API_BASE}/api/audit-logs?${params}`);
-      const data = res.data.data || [];
-      if (append) {
-        setLogs(prev => [...prev, ...data]);
-      } else {
-        setLogs(data);
+  const fetchLogs = useCallback(
+    async (offset = 0, append = false) => {
+      try {
+        setLoading(true);
+        const params = new URLSearchParams({ limit: '200', offset: String(offset) });
+        if (logFilterUser) params.set('user_id', logFilterUser);
+        if (logFilterAction) params.set('action', logFilterAction);
+        const res = await axios.get(`${API_BASE}/api/audit-logs?${params}`);
+        const data = res.data.data || [];
+        if (append) {
+          setLogs((prev) => [...prev, ...data]);
+        } else {
+          setLogs(data);
+        }
+        setLogHasMore(data.length >= 200);
+      } catch (err) {
+        console.error('Fetch logs error', err);
+      } finally {
+        setLoading(false);
       }
-      setLogHasMore(data.length >= 200);
-    } catch (err) {
-      console.error('Fetch logs error', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [logFilterUser, logFilterAction]);
+    },
+    [logFilterUser, logFilterAction],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -201,7 +221,7 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
     }
     try {
       await axios.put(`${API_BASE}/api/users/${passwordModalId}/password`, {
-        password: newPassword
+        password: newPassword,
       });
       setPasswordMsg('');
       setPasswordModalId(null);
@@ -240,8 +260,14 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-4xl max-h-[85vh] overflow-hidden shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-4xl max-h-[85vh] overflow-hidden shadow-2xl flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 bg-emerald-500/10 blur-3xl opacity-50 rounded-full pointer-events-none"></div>
 
@@ -256,14 +282,17 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
               <p className="text-xs text-slate-400">Phân quyền & giám sát hệ thống</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tabs */}
         <div className="relative z-10 flex gap-1 px-6 pt-3 shrink-0">
-          {tabs.map(tab => {
+          {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
             return (
@@ -285,7 +314,6 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
 
         {/* Content */}
         <div className="relative z-10 overflow-y-auto p-6 flex-1">
-
           {error && (
             <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl flex items-center gap-2 text-sm text-red-200">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -299,7 +327,10 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-400">{users.length} người dùng</span>
                 <button
-                  onClick={() => { setShowAddForm(!showAddForm); setError(''); }}
+                  onClick={() => {
+                    setShowAddForm(!showAddForm);
+                    setError('');
+                  }}
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-semibold text-white transition-colors"
                 >
                   <UserPlus className="w-4 h-4" />
@@ -316,26 +347,26 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
                       type="text"
                       placeholder="Tên đăng nhập"
                       value={addForm.username}
-                      onChange={e => setAddForm(f => ({ ...f, username: e.target.value }))}
+                      onChange={(e) => setAddForm((f) => ({ ...f, username: e.target.value }))}
                       className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
                     />
                     <input
                       type="password"
                       placeholder="Mật khẩu (≥ 6 ký tự)"
                       value={addForm.password}
-                      onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))}
+                      onChange={(e) => setAddForm((f) => ({ ...f, password: e.target.value }))}
                       className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
                     />
                     <input
                       type="text"
                       placeholder="Họ tên"
                       value={addForm.full_name}
-                      onChange={e => setAddForm(f => ({ ...f, full_name: e.target.value }))}
+                      onChange={(e) => setAddForm((f) => ({ ...f, full_name: e.target.value }))}
                       className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
                     />
                     <select
                       value={addForm.role}
-                      onChange={e => setAddForm(f => ({ ...f, role: e.target.value }))}
+                      onChange={(e) => setAddForm((f) => ({ ...f, role: e.target.value }))}
                       className="bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500/50 appearance-none"
                     >
                       <option value="OPERATOR">OPERATOR</option>
@@ -343,10 +374,19 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
                     </select>
                   </div>
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => { setShowAddForm(false); setError(''); }} className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-sm text-slate-300 transition-colors">
+                    <button
+                      onClick={() => {
+                        setShowAddForm(false);
+                        setError('');
+                      }}
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-sm text-slate-300 transition-colors"
+                    >
                       Hủy
                     </button>
-                    <button onClick={handleAddUser} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-semibold text-white transition-colors">
+                    <button
+                      onClick={handleAddUser}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-semibold text-white transition-colors"
+                    >
                       Tạo User
                     </button>
                   </div>
@@ -366,7 +406,7 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {users.map(user => (
+                    {users.map((user) => (
                       <tr key={user.id} className="hover:bg-white/5 transition-colors">
                         <td className="py-3 text-slate-200 font-mono">{user.username}</td>
                         <td className="py-3">
@@ -374,7 +414,7 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
                             <input
                               type="text"
                               value={editForm.full_name}
-                              onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))}
+                              onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))}
                               className="bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-white text-sm focus:outline-none focus:border-blue-500/50 w-full"
                             />
                           ) : (
@@ -385,25 +425,29 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
                           {editingId === user.id ? (
                             <select
                               value={editForm.role}
-                              onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}
+                              onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}
                               className="bg-[#1e293b] border border-white/10 rounded-lg px-2 py-1 text-white text-sm focus:outline-none appearance-none"
                             >
                               <option value="OPERATOR">OPERATOR</option>
                               <option value="ADMIN">ADMIN</option>
                             </select>
                           ) : (
-                            <span className={`px-2 py-0.5 rounded text-xs font-bold tracking-wider ${
-                              user.role === 'ADMIN'
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                            }`}>
+                            <span
+                              className={`px-2 py-0.5 rounded text-xs font-bold tracking-wider ${
+                                user.role === 'ADMIN'
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                              }`}
+                            >
                               {user.role}
                             </span>
                           )}
                         </td>
                         <td className="py-3">
                           <span className="flex items-center gap-1.5">
-                            <span className={`w-2.5 h-2.5 rounded-full ${user.is_active ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50' : 'bg-red-500'}`}></span>
+                            <span
+                              className={`w-2.5 h-2.5 rounded-full ${user.is_active ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50' : 'bg-red-500'}`}
+                            ></span>
                             <span className={`text-xs ${user.is_active ? 'text-emerald-400' : 'text-red-400'}`}>
                               {user.is_active ? 'Hoạt động' : 'Bị khoá'}
                             </span>
@@ -413,25 +457,51 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
                           <div className="flex items-center justify-end gap-1">
                             {editingId === user.id ? (
                               <>
-                                <button onClick={() => handleSaveEdit(user.id)} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs font-semibold text-white transition-colors">
+                                <button
+                                  onClick={() => handleSaveEdit(user.id)}
+                                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs font-semibold text-white transition-colors"
+                                >
                                   Lưu
                                 </button>
-                                <button onClick={() => setEditingId(null)} className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-slate-300 transition-colors">
+                                <button
+                                  onClick={() => setEditingId(null)}
+                                  className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-slate-300 transition-colors"
+                                >
                                   Hủy
                                 </button>
                               </>
                             ) : (
                               <>
-                                <button onClick={() => handleStartEdit(user)} className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-blue-400 transition" title="Sửa">
+                                <button
+                                  onClick={() => handleStartEdit(user)}
+                                  className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-blue-400 transition"
+                                  title="Sửa"
+                                >
                                   <Edit3 className="w-4 h-4" />
                                 </button>
-                                <button onClick={() => { setPasswordModalId(user.id); setNewPassword(''); setPasswordMsg(''); }} className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-amber-400 transition" title="Đổi mật khẩu">
+                                <button
+                                  onClick={() => {
+                                    setPasswordModalId(user.id);
+                                    setNewPassword('');
+                                    setPasswordMsg('');
+                                  }}
+                                  className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-amber-400 transition"
+                                  title="Đổi mật khẩu"
+                                >
                                   <Key className="w-4 h-4" />
                                 </button>
-                                <button onClick={() => handleToggleActive(user)} className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-orange-400 transition" title={user.is_active ? 'Khoá' : 'Mở khoá'}>
+                                <button
+                                  onClick={() => handleToggleActive(user)}
+                                  className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-orange-400 transition"
+                                  title={user.is_active ? 'Khoá' : 'Mở khoá'}
+                                >
                                   {user.is_active ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                                 </button>
-                                <button onClick={() => handleDeleteUser(user)} className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-red-400 transition" title="Xoá">
+                                <button
+                                  onClick={() => handleDeleteUser(user)}
+                                  className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-red-400 transition"
+                                  title="Xoá"
+                                >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </>
@@ -442,7 +512,9 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
                     ))}
                     {users.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-slate-500">Chưa có user nào</td>
+                        <td colSpan={5} className="py-8 text-center text-slate-500">
+                          Chưa có user nào
+                        </td>
                       </tr>
                     )}
                   </tbody>
@@ -451,8 +523,14 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
 
               {/* Change Password Mini-Modal */}
               {passwordModalId && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setPasswordModalId(null)}>
-                  <div className="bg-slate-900 border border-white/10 rounded-2xl p-5 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div
+                  className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+                  onClick={() => setPasswordModalId(null)}
+                >
+                  <div
+                    className="bg-slate-900 border border-white/10 rounded-2xl p-5 w-full max-w-sm shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                       <Key className="w-4 h-4 text-amber-400" />
                       Đổi Mật Khẩu
@@ -461,17 +539,28 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
                       type="password"
                       placeholder="Mật khẩu mới (≥ 6 ký tự)"
                       value={newPassword}
-                      onChange={e => { setNewPassword(e.target.value); setPasswordMsg(''); }}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value);
+                        setPasswordMsg('');
+                      }}
                       className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-amber-500/50 mb-2"
                       autoFocus
-                      onKeyDown={e => { if (e.key === 'Enter') handleChangePassword(); }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleChangePassword();
+                      }}
                     />
                     {passwordMsg && <p className="text-xs text-red-300 mb-2">{passwordMsg}</p>}
                     <div className="flex justify-end gap-2 mt-3">
-                      <button onClick={() => setPasswordModalId(null)} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-slate-300 transition-colors">
+                      <button
+                        onClick={() => setPasswordModalId(null)}
+                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-slate-300 transition-colors"
+                      >
                         Hủy
                       </button>
-                      <button onClick={handleChangePassword} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-semibold text-white transition-colors">
+                      <button
+                        onClick={handleChangePassword}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-semibold text-white transition-colors"
+                      >
                         Đổi mật khẩu
                       </button>
                     </div>
@@ -504,7 +593,7 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {sessions.map(session => (
+                      {sessions.map((session) => (
                         <tr key={session.id} className="hover:bg-white/5 transition-colors">
                           <td className="py-3">
                             <span className="text-slate-200 font-medium">{session.full_name || session.username}</span>
@@ -548,22 +637,32 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
                 <Filter className="w-4 h-4 text-slate-400" />
                 <select
                   value={logFilterUser}
-                  onChange={e => { setLogFilterUser(e.target.value); setLogOffset(0); }}
+                  onChange={(e) => {
+                    setLogFilterUser(e.target.value);
+                    setLogOffset(0);
+                  }}
                   className="bg-[#1e293b] border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none appearance-none"
                 >
                   <option value="">Tất cả người dùng</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.full_name || u.username}</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.full_name || u.username}
+                    </option>
                   ))}
                 </select>
                 <select
                   value={logFilterAction}
-                  onChange={e => { setLogFilterAction(e.target.value); setLogOffset(0); }}
+                  onChange={(e) => {
+                    setLogFilterAction(e.target.value);
+                    setLogOffset(0);
+                  }}
                   className="bg-[#1e293b] border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none appearance-none"
                 >
                   <option value="">Tất cả hành động</option>
                   {Object.entries(ACTION_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>{label}</option>
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
                   ))}
                 </select>
                 <span className="text-xs text-slate-500">{logs.length} bản ghi</span>
@@ -582,30 +681,26 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {logs.map(log => (
+                    {logs.map((log) => (
                       <tr key={log.id} className="hover:bg-white/5 transition-colors">
                         <td className="py-2.5 text-slate-400 text-xs whitespace-nowrap">
                           {new Date(log.created_at).toLocaleString('vi-VN')}
                         </td>
-                        <td className="py-2.5 text-slate-200 text-xs">
-                          {log.username}
-                        </td>
+                        <td className="py-2.5 text-slate-200 text-xs">{log.username}</td>
                         <td className="py-2.5">
                           <span className="px-2 py-0.5 bg-blue-500/15 border border-blue-500/25 text-blue-300 rounded text-xs font-medium">
                             {ACTION_LABELS[log.action] || log.action}
                           </span>
                         </td>
-                        <td className="py-2.5 text-slate-400 text-xs max-w-[200px] truncate">
-                          {log.details || '—'}
-                        </td>
-                        <td className="py-2.5 text-slate-400 text-xs">
-                          {log.station_id || '—'}
-                        </td>
+                        <td className="py-2.5 text-slate-400 text-xs max-w-[200px] truncate">{log.details || '—'}</td>
+                        <td className="py-2.5 text-slate-400 text-xs">{log.station_id || '—'}</td>
                       </tr>
                     ))}
                     {logs.length === 0 && !loading && (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-slate-500">Không có nhật ký nào</td>
+                        <td colSpan={5} className="py-8 text-center text-slate-500">
+                          Không có nhật ký nào
+                        </td>
                       </tr>
                     )}
                   </tbody>

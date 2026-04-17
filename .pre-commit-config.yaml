@@ -51,3 +51,8 @@ repos:
         entry: bash -c 'files=(); for f in "$@"; do files+=("${f#web-ui/}"); done; cd web-ui && npx eslint "${files[@]}"' --
         language: system
         files: ^web-ui/src/.*\.(js|jsx)$
+      - id: prettier
+        name: prettier (frontend)
+        entry: bash -c 'files=(); for f in "$@"; do files+=("${f#web-ui/}"); done; cd web-ui && npx prettier --write "${files[@]}"' --
+        language: system
+        files: ^web-ui/src/.*\.(js|jsx)$
