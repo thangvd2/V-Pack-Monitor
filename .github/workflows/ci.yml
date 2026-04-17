@@ -8,7 +8,6 @@ on:
 
 jobs:
   # Detect which files changed — used by all other jobs
-  # Detect which files changed — used by all other jobs
   changes:
     name: "Detect changed files"
     runs-on: ubuntu-latest
@@ -50,6 +49,14 @@ jobs:
           echo ""
           echo "If you squash this PR, shared history between dev and master will break"
           echo "and all future release PRs will have 12-file conflicts."
+
+  docs-only-bypass:
+    name: "Docs-only change — CI skipped"
+    needs: changes
+    if: needs.changes.outputs.python != 'true' && needs.changes.outputs.frontend != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Only docs/config files changed. Skipping python-test, python-lint, frontend-build."
 
   python-test:
     needs: changes
