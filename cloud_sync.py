@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.1.0
+# V-Pack Monitor - CamDongHang v3.2.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -7,9 +7,9 @@
 import os
 import zipfile
 import datetime
-import sqlite3
 import threading
-from database import DB_FILE, get_setting
+import database
+from database import get_setting
 import telegram_bot
 
 # Google API
@@ -59,8 +59,7 @@ _sync_lock = threading.Lock()
 
 
 def get_unsynced_records():
-    # TODO: Use database.get_connection() once available
-    with sqlite3.connect(DB_FILE) as conn:
+    with database.get_connection() as conn:
         cursor = conn.cursor()
         # Lấy file chua sync từ ngày hqua trở về trước (tuỳ ý, hoặc lấy hết).
         # Tạm thời lấy hết.
@@ -71,7 +70,7 @@ def get_unsynced_records():
 def mark_as_synced(record_ids):
     if not record_ids:
         return
-    with sqlite3.connect(DB_FILE) as conn:
+    with database.get_connection() as conn:
         cursor = conn.cursor()
         placeholders = ",".join("?" for _ in record_ids)
         cursor.execute(
