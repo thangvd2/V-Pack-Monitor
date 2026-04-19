@@ -1,36 +1,39 @@
 # =============================================================================
 # V-Pack Monitor - CamDongHang v3.2.0
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
-import os
-import sys
-import time
-import shutil
+import csv
+import io
+import ipaddress
 import json
+import os
+import platform as _platform
+import shutil
 import socket
 import subprocess
+import sys
 import tempfile
-import ipaddress
-import io
-import csv
 import threading
-import urllib.request
+import time
 import urllib.error
-import platform as _platform
+import urllib.request
 
-from fastapi import UploadFile, File, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel
-import database
-import cloud_sync
-import video_worker
 import psutil
-from auth import CurrentUser, AdminUser
+from fastapi import File, HTTPException, UploadFile
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel
 
 import api
-
+import cloud_sync
+import database
+import video_worker
+from auth import AdminUser, CurrentUser
 
 _SENSITIVE_KEYS = {"S3_SECRET_KEY", "S3_ACCESS_KEY", "TELEGRAM_BOT_TOKEN"}
 
@@ -89,7 +92,7 @@ def _do_graceful_restart():
             try:
                 rec.stop_recording()
             except Exception as e:
-                print(f"[RESTART] stop recorder failed: {e}")
+                logger.error(f"[RESTART] stop recorder failed: {e}")
         video_worker.shutdown()
         _notify_update_progress("restarting", "Đang khởi động lại...", 100)
         time.sleep(1.5)
@@ -127,7 +130,7 @@ def _do_graceful_restart():
                 except Exception:
                     pass
     except Exception as e:
-        print(f"[RESTART] CRITICAL: graceful restart failed: {e}")
+        logger.error(f"[RESTART] CRITICAL: graceful restart failed: {e}")
         _is_updating = False
     finally:
         sys.exit(0)
@@ -158,7 +161,7 @@ def _update_dev():
         if r.returncode != 0:
             if had_stash:
                 _sp.run(["git", "stash", "pop"], capture_output=True, timeout=30)
-            print(f"[UPDATE] git pull failed: {r.stderr[:200]}")
+            logger.error(f"[UPDATE] git pull failed: {r.stderr[:200]}")
             return {
                 "status": "error",
                 "message": "Cập nhật thất bại.",
@@ -167,8 +170,8 @@ def _update_dev():
         if had_stash:
             pop_result = _sp.run(["git", "stash", "pop"], capture_output=True, text=True, timeout=30)
             if pop_result.returncode != 0:
-                print("[UPDATE] WARNING: git stash pop failed. Changes preserved in stash.")
-                print("[UPDATE] Run 'git stash list' and 'git stash pop' manually.")
+                logger.error("[UPDATE] WARNING: git stash pop failed. Changes preserved in stash.")
+                logger.info("[UPDATE] Run 'git stash list' and 'git stash pop' manually.")
                 return {
                     "status": "error",
                     "message": "Cập nhật thành công nhưng có xung đột. Xem log.",
@@ -212,7 +215,7 @@ def _update_dev():
             "message": "Cập nhật thành công. Đang khởi động lại...",
         }
     except Exception as e:
-        print(f"[UPDATE] Error: {e}")
+        logger.error(f"[UPDATE] Error: {e}")
         return {"status": "error", "message": "Lỗi cập nhật."}
 
 
@@ -269,7 +272,7 @@ def _update_production():
                 if not member_path.startswith(os.path.realpath(tmp_dir) + os.sep) and member_path != os.path.realpath(
                     tmp_dir
                 ):
-                    print(f"[UPDATE] Zip Slip detected: skipping {member.filename}")
+                    logger.info(f"[UPDATE] Zip Slip detected: skipping {member.filename}")
                     continue
                 zf.extract(member, tmp_dir)
         tag_ver = tag[1:] if tag.startswith("v") else tag
@@ -383,7 +386,7 @@ def _update_production():
         db_path = os.path.join("recordings", "packing_records.db")
         if os.path.exists(db_path + ".bak"):
             shutil.copy2(db_path + ".bak", db_path)
-        print(f"[UPDATE] Error: {e}")
+        logger.error(f"[UPDATE] Error: {e}")
         return {"status": "error", "message": "Lỗi cập nhật."}
 
 
@@ -515,7 +518,7 @@ def register_routes(app):
             msg = cloud_sync.process_cloud_sync()
             return {"status": "success", "message": msg}
         except Exception as e:
-            print(f"[CLOUD] sync failed: {e}")
+            logger.error(f"[CLOUD] sync failed: {e}")
             return JSONResponse(
                 status_code=500,
                 content={"status": "error", "message": "Lỗi đồng bộ cloud."},
@@ -826,7 +829,7 @@ def register_routes(app):
                     changelog = release.get("body", "")
                 update_available = api._parse_semver(latest) > api._parse_semver(current) and latest != "unknown"
         except Exception as e:
-            print(f"[UPDATE] check failed: {e}")
+            logger.error(f"[UPDATE] check failed: {e}")
 
         result = {
             "current_version": current,
@@ -875,7 +878,7 @@ def register_routes(app):
         except Exception as e:
             _is_updating = False
             _update_lock.release()
-            print(f"[UPDATE] Update failed: {e}")
+            logger.error(f"[UPDATE] Update failed: {e}")
             import traceback
 
             traceback.print_exc()

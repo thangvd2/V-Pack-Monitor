@@ -1,25 +1,26 @@
 import os
-import sys
-import pytest
 import sqlite3
+import sys
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import database
 from database import (
-    get_records,
-    get_record_by_id,
-    create_record,
-    update_record_status,
-    cleanup_old_records,
-    update_station_ip,
     add_station,
-    get_station,
+    cleanup_old_records,
+    create_record,
     create_user,
+    get_hourly_stats,
+    get_record_by_id,
+    get_records,
+    get_setting,
+    get_station,
     get_user_by_username,
     set_settings,
-    get_setting,
-    get_hourly_stats,
+    update_record_status,
+    update_station_ip,
 )
 
 

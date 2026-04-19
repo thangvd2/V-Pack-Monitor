@@ -1,29 +1,33 @@
 # =============================================================================
 # V-Pack Monitor - CamDongHang v3.2.0
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
-import os
-import json
 import asyncio
+import json
+import os
 import queue
 import threading
 import time
 import urllib.request
 
-from fastapi import Request, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel, Field
 import jwt as _jwt
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, Field
+
+import api
+import auth
 import database
 import network
 import video_worker
+from auth import AdminUser, CurrentUser
 from recorder import CameraRecorder
-import auth
-from auth import CurrentUser, AdminUser
-
-import api
 
 
 class ScanPayload(BaseModel):
@@ -358,7 +362,7 @@ def register_routes(app):
             database.delete_record(record_id)
             return {"status": "success"}
         except Exception as e:
-            print(f"[DB] delete record {record_id} failed: {e}")
+            logger.error(f"[DB] delete record {record_id} failed: {e}")
             return JSONResponse(
                 status_code=500,
                 content={"status": "error", "message": "Không thể xoá bản ghi."},

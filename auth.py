@@ -1,17 +1,23 @@
 # =============================================================================
 # V-Pack Monitor - CamDongHang v3.2.0
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
 import os
 import secrets
-import jwt
-import bcrypt
 from datetime import datetime, timedelta, timezone
+from typing import Annotated
+
+import bcrypt
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from typing import Annotated
+
 import database
 
 
@@ -44,7 +50,7 @@ def revoke_token(token: str):
         if jti and exp:
             database.revoke_jti(jti, exp)
     except Exception as e:
-        print(f"[AUTH] Token revocation failed: {e}")
+        logger.error(f"[AUTH] Token revocation failed: {e}")
 
 
 def is_token_revoked(jti: str) -> bool:

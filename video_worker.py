@@ -1,18 +1,22 @@
 # =============================================================================
 # V-Pack Monitor - CamDongHang v3.2.0
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
-import threading
 import os
-import time
 import subprocess
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
+
 import database
 import recorder
 import telegram_bot
-
 
 _executor = None
 _lock = threading.Lock()
@@ -117,7 +121,7 @@ def _process_stop_and_save(record_id, rec, waybill, station_id, save=True):
             _decrement_processing(station_id)
             _notify_sse_safe(station_id, "FAILED", record_id)
     except Exception as e:
-        print(f"VideoWorker error for record {record_id}: {e}")
+        logger.error(f"VideoWorker error for record {record_id}: {e}")
         try:
             database.update_record_status(record_id, "FAILED")
             _send_failed_alert(record_id, waybill, f"Lỗi xử lý video: {e}")
@@ -146,7 +150,7 @@ def submit_stop_and_save(record_id, rec, waybill, station_id, save=True):
 
     with _pending_lock:
         if _pending_count >= _MAX_PENDING:
-            print(f"[WORKER] WARNING: Too many pending tasks ({_pending_count}), dropping record {record_id}")
+            logger.warning(f"[WORKER] WARNING: Too many pending tasks ({_pending_count}), dropping record {record_id}")
             _decrement_processing(station_id)
             return False
         _pending_count += 1
@@ -184,7 +188,7 @@ def shutdown():
                         if remaining > 0:
                             time.sleep(min(1.0, remaining))
                         else:
-                            print("[WORKER] WARNING: Shutdown timed out after 60s — forcing exit")
+                            logger.warning("[WORKER] WARNING: Shutdown timed out after 60s — forcing exit")
                             break
                     else:
                         break

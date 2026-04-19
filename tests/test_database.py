@@ -1,57 +1,57 @@
 import os
-import sys
 import sqlite3
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import (
-    _encrypt_value,
-    _decrypt_value,
     _ENCRYPT_PREFIX,
     _SENSITIVE_KEYS,
-    init_db,
-    get_setting,
-    set_setting,
-    get_all_settings,
-    set_settings,
-    save_record,
-    create_record,
-    update_record_status,
-    get_pending_records,
-    get_records,
-    get_record_by_id,
+    _decrypt_value,
+    _encrypt_value,
+    add_station,
+    cleanup_audit_log,
     cleanup_old_records,
+    clear_must_change_password,
+    create_record,
+    create_session,
+    create_user,
     delete_record,
-    get_stations,
+    delete_station,
+    delete_user,
+    end_session,
+    end_session_by_id,
+    expire_stale_sessions,
+    get_active_session,
+    get_all_settings,
+    get_all_users,
+    get_audit_logs,
+    get_daily_trend,
+    get_hourly_stats,
+    get_pending_records,
+    get_record_by_id,
+    get_records,
+    get_records_for_export,
+    get_session_by_id,
+    get_setting,
     get_station,
+    get_stations,
+    get_stations_comparison,
+    get_user_by_id,
+    get_user_by_username,
+    init_db,
+    is_jti_revoked,
+    log_audit,
+    revoke_jti,
+    save_record,
+    set_setting,
+    set_settings,
+    update_record_status,
+    update_session_heartbeat,
     update_station,
     update_station_ip,
-    add_station,
-    delete_station,
-    get_user_by_username,
-    get_user_by_id,
-    get_all_users,
-    create_user,
     update_user,
     update_user_password,
-    delete_user,
-    clear_must_change_password,
-    create_session,
-    get_active_session,
-    update_session_heartbeat,
-    end_session,
-    expire_stale_sessions,
-    log_audit,
-    cleanup_audit_log,
-    get_audit_logs,
-    get_session_by_id,
-    end_session_by_id,
-    get_hourly_stats,
-    get_daily_trend,
-    get_stations_comparison,
-    get_records_for_export,
-    revoke_jti,
-    is_jti_revoked,
 )
 
 
@@ -116,7 +116,7 @@ class TestInitDb:
         admin = get_user_by_username("admin")
         import bcrypt
 
-        assert bcrypt.checkpw("08012011".encode(), admin["password_hash"].encode())
+        assert bcrypt.checkpw(b"08012011", admin["password_hash"].encode())
 
     def test_idempotent(self):
         init_db()
@@ -435,8 +435,8 @@ class TestUsers:
         import bcrypt
 
         user = get_user_by_username("pwchange")
-        assert bcrypt.checkpw("NewPassword!".encode(), user["password_hash"].encode())
-        assert not bcrypt.checkpw("OldPassword!".encode(), user["password_hash"].encode())
+        assert bcrypt.checkpw(b"NewPassword!", user["password_hash"].encode())
+        assert not bcrypt.checkpw(b"OldPassword!", user["password_hash"].encode())
 
     def test_delete_user(self):
         uid = create_user("deleteme", "Pass123!", "OPERATOR")
