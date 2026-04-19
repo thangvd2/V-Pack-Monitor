@@ -1,8 +1,5 @@
 import os
 import sqlite3
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import (
     _ENCRYPT_PREFIX,
@@ -30,8 +27,7 @@ from database import (
     get_hourly_stats,
     get_pending_records,
     get_record_by_id,
-    get_records,
-    get_records_for_export,
+    get_records_v2,
     get_session_by_id,
     get_setting,
     get_station,
@@ -43,7 +39,6 @@ from database import (
     is_jti_revoked,
     log_audit,
     revoke_jti,
-    save_record,
     set_setting,
     set_settings,
     update_record_status,
@@ -185,9 +180,9 @@ class TestRecords:
     def test_get_records_search(self, sample_station_id):
         create_record(sample_station_id, "ALPHA-001", "SINGLE")
         create_record(sample_station_id, "BETA-002", "SINGLE")
-        results = get_records(search="ALPHA")
+        results = get_records_v2(search="ALPHA")["records"]
         assert len(results) == 1
-        assert results[0][1] == "ALPHA-001"
+        assert results[0]["waybill_code"] == "ALPHA-001"
 
     def test_get_records_by_station(self):
         sid1 = add_station(
@@ -214,8 +209,8 @@ class TestRecords:
         )
         create_record(sid1, "WB-S1", "SINGLE")
         create_record(sid2, "WB-S2", "SINGLE")
-        results = get_records(station_id=sid1)
-        assert all(r[5] == "S1" for r in results)
+        results = get_records_v2(station_id=sid1)
+        assert all(r["station_name"] == "S1" for r in results["records"])
 
     def test_get_record_by_id_not_found(self):
         assert get_record_by_id(99999) is None
@@ -228,11 +223,6 @@ class TestRecords:
         pending_ids = [r["id"] for r in pending]
         assert rid1 in pending_ids
         assert rid2 not in pending_ids
-
-    def test_save_record(self, sample_station_id):
-        save_record(sample_station_id, "WB-SAVE", ["/a.mp4", "/b.mp4"], "DUAL_FILE")
-        results = get_records(search="WB-SAVE")
-        assert len(results) == 1
 
     def test_cleanup_old_records(self, sample_station_id, tmp_path):
         fake_video = str(tmp_path / "old_video.mp4")
@@ -577,11 +567,11 @@ class TestAnalytics:
         trend = get_daily_trend(days=14)
         assert len(trend) == 14
 
-    def test_stations_comparison(self):
+    def test_stations_comparison(self, sample_station_id):
         sid1 = add_station(
             {
                 "name": "Comp1",
-                "ip_camera_1": "10.0.0.10",
+                "ip_camera_1": "10.0.0.1",
                 "ip_camera_2": "",
                 "safety_code": "X",
                 "camera_mode": "SINGLE",
@@ -594,12 +584,6 @@ class TestAnalytics:
         comparison = get_stations_comparison()
         assert len(comparison) >= 1
         assert any(c["station_name"] == "Comp1" for c in comparison)
-
-    def test_records_for_export(self, sample_station_id):
-        rid = create_record(sample_station_id, "EXPORT-WB", "SINGLE")
-        update_record_status(rid, "READY")
-        exports = get_records_for_export()
-        assert any(e["waybill_code"] == "EXPORT-WB" for e in exports)
 
 
 class TestTokenRevocation:

@@ -1,37 +1,9 @@
-import os
-import sys
 import time
 
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import auth
 import database
-
-
-class TestPasswordHashing:
-    def test_hash_verify_roundtrip(self):
-        password = "MySecurePassword123!"
-        hashed = auth.hash_password(password)
-        assert hashed != password
-        assert auth.verify_password(password, hashed) is True
-
-    def test_wrong_password_fails(self):
-        hashed = auth.hash_password("correct_password")
-        assert auth.verify_password("wrong_password", hashed) is False
-
-    def test_empty_password(self):
-        hashed = auth.hash_password("")
-        assert auth.verify_password("", hashed) is True
-
-    def test_unique_hashes(self):
-        p = "same_password"
-        h1 = auth.hash_password(p)
-        h2 = auth.hash_password(p)
-        assert h1 != h2
-        assert auth.verify_password(p, h1)
-        assert auth.verify_password(p, h2)
 
 
 class TestJWT:
@@ -68,11 +40,13 @@ class TestJWT:
             auth.SECRET_KEY,
             algorithm=auth.ALGORITHM,
         )
-        with pytest.raises(Exception):
+        with pytest.raises(_jwt.ExpiredSignatureError):
             auth.decode_token(expired)
 
     def test_invalid_token_raises(self):
-        with pytest.raises(Exception):
+        import jwt as _jwt
+
+        with pytest.raises(_jwt.PyJWTError):
             auth.decode_token("invalid.token.string")
 
     def test_wrong_secret_raises(self):
@@ -83,7 +57,7 @@ class TestJWT:
             "wrong_secret_key",
             algorithm=auth.ALGORITHM,
         )
-        with pytest.raises(Exception):
+        with pytest.raises(_jwt.PyJWTError):
             auth.decode_token(token)
 
 

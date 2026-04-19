@@ -71,7 +71,7 @@ Layer 1 — Pre-commit hooks (LOCAL, block commit)
   ✅ STATUS: ĐANG CHẠY — pre-commit install, ruff.toml config
 
 Layer 1.5 — Pre-push hook (LOCAL, block push)
-  └── pytest → 305 tests, fail = không push được
+  └── pytest → 322 tests, fail = không push được
   ✅ STATUS: ĐANG CHẠY — pre-push install
 
 Layer 2 — CI Pipeline (REMOTE, block merge)

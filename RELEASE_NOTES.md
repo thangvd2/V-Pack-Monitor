@@ -2,6 +2,27 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v3.3.0] - 2026-04-19 (Phase 3 Infrastructure & Pydantic v2 Migration) 🚀 MINOR RELEASE
+
+### 🏗️ Infrastructure & Refactor
+- **Monolithic Function Refactor**: Tách hàm khổng lồ `_handle_scan_locked` (200+ dòng) trong `routes_records.py` thành 3 module-level helpers: `_handle_scan_start`, `_handle_scan_stop`, và `_handle_scan_exit`. Tăng cường khả năng đọc hiểu và bảo trì code.
+- **Pydantic v2 Migration**: 
+  - Hoàn tất chuyển đổi tất cả API payload calls từ `payload.dict()` (v1) sang `payload.model_dump(exclude_none=True)` (v2).
+  - Thay thế deprecated `__init__` constructor validation trong `routes_auth.py` bằng `@model_validator(mode="after")`.
+- **Circular Imports Handle**: Khắc phục circular dependency `_MAX_RECORDING_SECONDS` giữa `api.py` và `recorder.py` an toàn.
+
+### 🗑️ Dead Code & Cleanup
+- Xoá triệt để các dead code cũ: `database.save_record()` và `database.get_records()` (đã thay thế bởi version v2).
+- Xóa hàm dư thừa `auth.hash_password()` cùng các unit test liên đới (hiện đã dùng `bcrypt` trực tiếp).
+- **Test Suite Cleanup**: Loại bỏ 12 dòng lặp `sys.path.insert` trong thư mục `tests/` nhờ cơ chế import của `conftest.py`.
+
+### 🎨 Frontend UI
+- **Native Custom Dialog**: Tích hợp `showConfirmDialog` từ `App.jsx` xuống `UserManagementModal.jsx`. Xóa bỏ `window.confirm` kém thẩm mỹ.
+- **Vietnamese Localization**: Khắc phục lỗi hiển thị tiếng Việt (diacritics) trên tiêu đề Tooltips của `VideoPlayerModal.jsx`.
+
+### 📊 Stats
+- **Total tests**: 322 (removed outdated tests). All tests green.
+
 ## [v3.2.0] - 2026-04-18 (.ai-sync Protocol, Release Workflow, Enforcement Layers) 🚀 MINOR RELEASE
 
 ### 🤝 .ai-sync/ — Universal AI Tool Coordination Protocol

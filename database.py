@@ -462,33 +462,6 @@ def set_settings(settings_dict):
         conn.commit()
 
 
-def save_record(station_id, waybill_code, video_paths, record_mode):
-    """Legacy record save. Prefer create_record() for new code."""
-    # H5: Handle non-iterable video_paths (str, list, tuple, etc.)
-    if isinstance(video_paths, str):
-        paths_str = video_paths
-    elif isinstance(video_paths, (list, tuple)):
-        paths_str = ",".join(video_paths)
-    else:
-        paths_str = str(video_paths) if video_paths else ""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO packing_video (station_id, waybill_code, video_paths, record_mode, recorded_at)
-            VALUES (?, ?, ?, ?, ?)
-        """,
-            (
-                station_id,
-                waybill_code,
-                paths_str,
-                record_mode,
-                datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-            ),
-        )
-        conn.commit()
-
-
 # H2: Valid status values for packing_video
 _VALID_RECORD_STATUSES = {"READY", "RECORDING", "PROCESSING", "FAILED", "SYNCED"}
 
@@ -553,30 +526,6 @@ def get_pending_records():
             }
             for r in rows
         ]
-
-
-def get_records(search="", station_id=None):
-    """Legacy record fetch (no pagination, no FTS5).
-    Prefer get_records_v2() for all new code."""
-    # L3: Intentional 2-query pattern (search overrides station filter) for clarity
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        query = "SELECT p.id, p.waybill_code, p.video_paths, p.record_mode, datetime(p.recorded_at, 'localtime') AS recorded_at, s.name, p.status FROM packing_video p LEFT JOIN stations s ON p.station_id = s.id WHERE 1=1"
-        params = []
-
-        if search:
-            query += " AND p.waybill_code LIKE ?"
-            params.append(f"%{search}%")
-            # Nếu có nhập tên mã (Global Search) thì bỏ qua filter Trạm
-        else:
-            if station_id:
-                query += " AND p.station_id = ?"
-                params.append(station_id)
-
-        query += " ORDER BY p.id DESC LIMIT 100"
-        cursor.execute(query, params)
-        records = cursor.fetchall()
-    return records
 
 
 _SORT_COLUMNS = {
