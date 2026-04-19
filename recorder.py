@@ -1,15 +1,19 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.1.0
+# V-Pack Monitor - CamDongHang v3.2.0
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
-import subprocess
 import os
-import time
-import threading
-from datetime import datetime
 import platform
+import subprocess
+import threading
+import time
+from datetime import datetime
 
 _MAX_RECORDING_SECONDS = 600
 
@@ -61,12 +65,12 @@ def _detect_hw_encoder():
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             if r.returncode == 0:
                 _hw_encoder_cache = (enc, extra)
-                print(f"GPU encoder detected: {enc}")
+                logger.info(f"GPU encoder detected: {enc}")
                 return _hw_encoder_cache
         except Exception:
             pass
     _hw_encoder_cache = ("libx264", "")
-    print("No GPU encoder found, using libx264 ultrafast")
+    logger.info("No GPU encoder found, using libx264 ultrafast")
     return _hw_encoder_cache
 
 
@@ -299,9 +303,9 @@ class CameraRecorder:
             self._launch_ffmpeg(command, final_path=filepath)
             self.current_files.append(filepath)
 
-        print(f"Bat dau ghi hinh ({self.record_mode}) Don hang: {waybill_code}")
+        logger.info(f"Bat dau ghi hinh ({self.record_mode}) Don hang: {waybill_code}")
         for f in self.current_files:
-            print(f"Luu tai: {f}")
+            logger.info(f"Luu tai: {f}")
 
         return self.current_files
 
@@ -324,7 +328,7 @@ class CameraRecorder:
                 return []
             self._stopped = True
 
-        print("Dang dung ghi hinh va dong goi video...")
+        logger.info("Dang dung ghi hinh va dong goi video...")
 
         for pinfo in self.processes:
             p = pinfo["proc"]
@@ -386,7 +390,7 @@ class CameraRecorder:
                 )
                 transcode_ok = True
             except Exception as e:
-                print(f"[RECORDER] Transcode failed for {final_path}: {e}")
+                logger.error(f"[RECORDER] Transcode failed for {final_path}: {e}")
                 # Fall through to rename as .FAILED.ts
 
             if transcode_ok:
@@ -403,7 +407,7 @@ class CameraRecorder:
                 try:
                     if os.path.exists(ts_path) and not os.path.exists(failed_path):
                         os.rename(ts_path, failed_path)
-                        print(f"Transcode failed, kept raw TS: {failed_path}")
+                        logger.error(f"Transcode failed, kept raw TS: {failed_path}")
                 except Exception:
                     pass
 

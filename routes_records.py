@@ -1,34 +1,227 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v3.0.0
+# V-Pack Monitor - CamDongHang v3.2.0
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
-import os
-import json
 import asyncio
+import json
+import os
 import queue
 import threading
 import time
 import urllib.request
 
-from fastapi import Request, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel, Field
 import jwt as _jwt
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, Field
+
+import api
+import auth
 import database
 import network
 import video_worker
+from auth import AdminUser, CurrentUser
 from recorder import CameraRecorder
-import auth
-from auth import CurrentUser, AdminUser
-
-import api
 
 
 class ScanPayload(BaseModel):
     barcode: str = Field(..., max_length=200)
     station_id: int
+
+
+def _handle_scan_exit(sid, current_recorder, current_waybill, current_record_id):
+    if current_recorder:
+        api._cancel_recording_timer(sid)
+        with api._recording_timers_lock:
+            api._recording_start_times.pop(sid, None)
+        database.update_record_status(current_record_id, "PROCESSING")
+        api.notify_sse(
+            "video_status",
+            {
+                "station_id": sid,
+                "status": "PROCESSING",
+                "record_id": current_record_id,
+            },
+        )
+        with api._processing_lock:
+            api._processing_count[sid] = api._processing_count.get(sid, 0) + 1
+        with api._recorders_lock:
+            api.active_recorders.pop(sid, None)
+            api.active_waybills.pop(sid, None)
+            api.active_record_ids.pop(sid, None)
+        video_worker.submit_stop_and_save(
+            current_record_id,
+            current_recorder,
+            current_waybill,
+            sid,
+            save=False,
+        )
+        return {
+            "status": "processing",
+            "message": "Đang hủy ghi hình...",
+        }
+    return {"status": "idle", "message": "Trạm đang nhàn rỗi."}
+
+
+def _handle_scan_stop(sid, current_recorder, current_waybill, current_record_id, current_user):
+    if current_recorder:
+        api._cancel_recording_timer(sid)
+        with api._recording_timers_lock:
+            api._recording_start_times.pop(sid, None)
+        database.update_record_status(current_record_id, "PROCESSING")
+        api.notify_sse(
+            "video_status",
+            {
+                "station_id": sid,
+                "status": "PROCESSING",
+                "record_id": current_record_id,
+            },
+        )
+        with api._processing_lock:
+            api._processing_count[sid] = api._processing_count.get(sid, 0) + 1
+        with api._recorders_lock:
+            api.active_recorders.pop(sid, None)
+            api.active_waybills.pop(sid, None)
+            api.active_record_ids.pop(sid, None)
+        database.log_audit(
+            current_user["id"],
+            "STOP_RECORD",
+            f"waybill={current_waybill}",
+            station_id=sid,
+        )
+        submitted = video_worker.submit_stop_and_save(
+            current_record_id, current_recorder, current_waybill, sid, save=True
+        )
+        if not submitted:
+            database.update_record_status(current_record_id, "FAILED")
+            with api._processing_lock:
+                api._processing_count.pop(sid, None)
+            api.notify_sse(
+                "video_status",
+                {
+                    "station_id": sid,
+                    "status": "FAILED",
+                    "record_id": current_record_id,
+                },
+            )
+            return {
+                "status": "error",
+                "message": "Hệ thống đang quá tải xử lý video. Vui lòng thử lại.",
+            }
+        return {
+            "status": "processing",
+            "message": "Đang xử lý video. Vui lòng đợi...",
+        }
+    return {"status": "idle", "message": "Trạm đang nhàn rỗi."}
+
+
+def _handle_scan_start(sid, barcode, station, current_user):
+    ok, err_msg = api._preflight_checks(sid)
+    if not ok:
+        return {"status": "error", "message": err_msg}
+
+    with api._recorders_lock:
+        api.active_waybills[sid] = barcode
+
+    ip1 = station["ip_camera_1"]
+    ip2 = station["ip_camera_2"]
+    code = station["safety_code"]
+    c_mode = station["camera_mode"]
+    brand = station.get("camera_brand", "imou")
+
+    if not ip1 or not code:
+        return {
+            "status": "error",
+            "message": "Trạm chưa cấu hình IP Camera và Safety Code.",
+        }
+
+    mac = station.get("mac_address", "")
+    if mac and network.validate_mac(mac):
+        discovered_ip = network.scan_lan_for_mac(mac)
+        if discovered_ip and discovered_ip != ip1:
+            ip1 = discovered_ip
+            database.update_station_ip(sid, "ip_camera_1", ip1)
+            brand = station.get("camera_brand", "imou")
+            code = station.get("safety_code", "")
+            with api._streams_lock:
+                sm = api.stream_managers.get(sid)
+            if sm:
+                live_quality = database.get_setting("LIVE_VIEW_STREAM") or "sub"
+                url_fn = api.get_rtsp_url if live_quality == "main" else api.get_rtsp_sub_url
+                live_url = url_fn(ip1, code, channel=1, brand=brand)
+                sm.update_url(live_url)
+
+    url1 = api.get_rtsp_url(ip1, code, channel=1, brand=brand)
+    if c_mode in ["dual_file", "pip"]:
+        url2 = api.get_rtsp_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
+    elif c_mode in ["dual_file_sim", "pip_sim"]:
+        url2 = url1
+    else:
+        url2 = url1
+
+    if c_mode in ["dual_file", "dual_file_sim"]:
+        r_mode = "DUAL_FILE"
+    elif c_mode in ["pip", "pip_sim"]:
+        r_mode = "PIP"
+    else:
+        r_mode = "SINGLE"
+
+    record_id = database.create_record(sid, barcode, r_mode)
+
+    new_recorder = CameraRecorder(url1, rtsp_url_2=url2, record_mode=r_mode)
+    with api._recorders_lock:
+        api.active_record_ids[sid] = record_id
+        api.active_recorders[sid] = new_recorder
+    new_recorder.start_recording(barcode)
+
+    api._cancel_recording_timer(sid)
+    with api._recording_timers_lock:
+        api._recording_start_times[sid] = time.time()
+        warning_timer = threading.Timer(
+            api._RECORDING_WARNING_SECONDS,
+            api._emit_recording_warning,
+            args=[sid],
+        )
+        warning_timer.daemon = True
+        warning_timer.start()
+        api._recording_warning_timers[sid] = warning_timer
+        stop_timer = threading.Timer(
+            api._MAX_RECORDING_SECONDS,
+            api._auto_stop_recording,
+            args=[sid, record_id],
+        )
+        stop_timer.daemon = True
+        stop_timer.start()
+        api._recording_timers[sid] = stop_timer
+
+    database.log_audit(
+        current_user["id"],
+        "START_RECORD",
+        f"waybill={barcode}",
+        station_id=sid,
+    )
+
+    api.notify_sse(
+        "video_status",
+        {
+            "station_id": sid,
+            "status": "RECORDING",
+            "record_id": record_id,
+            "waybill": barcode,
+        },
+    )
+
+    return {
+        "status": "recording",
+        "record_id": record_id,
+        "message": f"Bắt đầu ghi hình đơn {barcode} tại Trạm {sid}...",
+    }
 
 
 def register_routes(app):
@@ -119,88 +312,10 @@ def register_routes(app):
             current_record_id = api.active_record_ids.get(sid)
 
         if barcode == "EXIT":
-            if current_recorder:
-                api._cancel_recording_timer(sid)
-                with api._recording_timers_lock:
-                    api._recording_start_times.pop(sid, None)
-                database.update_record_status(current_record_id, "PROCESSING")
-                api.notify_sse(
-                    "video_status",
-                    {
-                        "station_id": sid,
-                        "status": "PROCESSING",
-                        "record_id": current_record_id,
-                    },
-                )
-                with api._processing_lock:
-                    api._processing_count[sid] = api._processing_count.get(sid, 0) + 1
-                with api._recorders_lock:
-                    api.active_recorders.pop(sid, None)
-                    api.active_waybills.pop(sid, None)
-                    api.active_record_ids.pop(sid, None)
-                video_worker.submit_stop_and_save(
-                    current_record_id,
-                    current_recorder,
-                    current_waybill,
-                    sid,
-                    save=False,
-                )
-                return {
-                    "status": "processing",
-                    "message": "Đang hủy ghi hình...",
-                }
-            return {"status": "idle", "message": "Trạm đang nhàn rỗi."}
+            return _handle_scan_exit(sid, current_recorder, current_waybill, current_record_id)
 
         if barcode == "STOP":
-            if current_recorder:
-                api._cancel_recording_timer(sid)
-                with api._recording_timers_lock:
-                    api._recording_start_times.pop(sid, None)
-                database.update_record_status(current_record_id, "PROCESSING")
-                api.notify_sse(
-                    "video_status",
-                    {
-                        "station_id": sid,
-                        "status": "PROCESSING",
-                        "record_id": current_record_id,
-                    },
-                )
-                with api._processing_lock:
-                    api._processing_count[sid] = api._processing_count.get(sid, 0) + 1
-                with api._recorders_lock:
-                    api.active_recorders.pop(sid, None)
-                    api.active_waybills.pop(sid, None)
-                    api.active_record_ids.pop(sid, None)
-                database.log_audit(
-                    current_user["id"],
-                    "STOP_RECORD",
-                    f"waybill={current_waybill}",
-                    station_id=sid,
-                )
-                submitted = video_worker.submit_stop_and_save(
-                    current_record_id, current_recorder, current_waybill, sid, save=True
-                )
-                if not submitted:
-                    database.update_record_status(current_record_id, "FAILED")
-                    with api._processing_lock:
-                        api._processing_count.pop(sid, None)
-                    api.notify_sse(
-                        "video_status",
-                        {
-                            "station_id": sid,
-                            "status": "FAILED",
-                            "record_id": current_record_id,
-                        },
-                    )
-                    return {
-                        "status": "error",
-                        "message": "Hệ thống đang quá tải xử lý video. Vui lòng thử lại.",
-                    }
-                return {
-                    "status": "processing",
-                    "message": "Đang xử lý video. Vui lòng đợi...",
-                }
-            return {"status": "idle", "message": "Trạm đang nhàn rỗi."}
+            return _handle_scan_stop(sid, current_recorder, current_waybill, current_record_id, current_user)
 
         if current_recorder:
             return {
@@ -208,106 +323,7 @@ def register_routes(app):
                 "message": "Đang ghi đơn. Vui lòng quét STOP để kết thúc đơn hàng hiện tại.",
             }
 
-        ok, err_msg = api._preflight_checks(sid)
-        if not ok:
-            return {"status": "error", "message": err_msg}
-
-        with api._recorders_lock:
-            api.active_waybills[sid] = barcode
-
-        ip1 = station["ip_camera_1"]
-        ip2 = station["ip_camera_2"]
-        code = station["safety_code"]
-        c_mode = station["camera_mode"]
-        brand = station.get("camera_brand", "imou")
-
-        if not ip1 or not code:
-            return {
-                "status": "error",
-                "message": "Trạm chưa cấu hình IP Camera và Safety Code.",
-            }
-
-        mac = station.get("mac_address", "")
-        if mac and network.validate_mac(mac):
-            discovered_ip = network.scan_lan_for_mac(mac)
-            if discovered_ip and discovered_ip != ip1:
-                ip1 = discovered_ip
-                database.update_station_ip(sid, "ip_camera_1", ip1)
-                brand = station.get("camera_brand", "imou")
-                code = station.get("safety_code", "")
-                with api._streams_lock:
-                    sm = api.stream_managers.get(sid)
-                if sm:
-                    live_quality = database.get_setting("LIVE_VIEW_STREAM") or "sub"
-                    url_fn = api.get_rtsp_url if live_quality == "main" else api.get_rtsp_sub_url
-                    live_url = url_fn(ip1, code, channel=1, brand=brand)
-                    sm.update_url(live_url)
-
-        url1 = api.get_rtsp_url(ip1, code, channel=1, brand=brand)
-        if c_mode in ["dual_file", "pip"]:
-            url2 = api.get_rtsp_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
-        elif c_mode in ["dual_file_sim", "pip_sim"]:
-            url2 = url1
-        else:
-            url2 = url1
-
-        if c_mode in ["dual_file", "dual_file_sim"]:
-            r_mode = "DUAL_FILE"
-        elif c_mode in ["pip", "pip_sim"]:
-            r_mode = "PIP"
-        else:
-            r_mode = "SINGLE"
-
-        record_id = database.create_record(sid, barcode, r_mode)
-
-        new_recorder = CameraRecorder(url1, rtsp_url_2=url2, record_mode=r_mode)
-        with api._recorders_lock:
-            api.active_record_ids[sid] = record_id
-            api.active_recorders[sid] = new_recorder
-        new_recorder.start_recording(barcode)
-
-        api._cancel_recording_timer(sid)
-        with api._recording_timers_lock:
-            api._recording_start_times[sid] = time.time()
-            warning_timer = threading.Timer(
-                api._RECORDING_WARNING_SECONDS,
-                api._emit_recording_warning,
-                args=[sid],
-            )
-            warning_timer.daemon = True
-            warning_timer.start()
-            api._recording_warning_timers[sid] = warning_timer
-            stop_timer = threading.Timer(
-                api._MAX_RECORDING_SECONDS,
-                api._auto_stop_recording,
-                args=[sid, record_id],
-            )
-            stop_timer.daemon = True
-            stop_timer.start()
-            api._recording_timers[sid] = stop_timer
-
-        database.log_audit(
-            current_user["id"],
-            "START_RECORD",
-            f"waybill={barcode}",
-            station_id=sid,
-        )
-
-        api.notify_sse(
-            "video_status",
-            {
-                "station_id": sid,
-                "status": "RECORDING",
-                "record_id": record_id,
-                "waybill": barcode,
-            },
-        )
-
-        return {
-            "status": "recording",
-            "record_id": record_id,
-            "message": f"Bắt đầu ghi hình đơn {barcode} tại Trạm {sid}...",
-        }
+        return _handle_scan_start(sid, barcode, station, current_user)
 
     @app.get("/api/status")
     def get_status(station_id: int, current_user: CurrentUser):
@@ -358,7 +374,7 @@ def register_routes(app):
             database.delete_record(record_id)
             return {"status": "success"}
         except Exception as e:
-            print(f"[DB] delete record {record_id} failed: {e}")
+            logger.error(f"[DB] delete record {record_id} failed: {e}")
             return JSONResponse(
                 status_code=500,
                 content={"status": "error", "message": "Không thể xoá bản ghi."},

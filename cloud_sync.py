@@ -1,24 +1,29 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.1.0
+# V-Pack Monitor - CamDongHang v3.2.0
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
-import os
-import zipfile
 import datetime
-import sqlite3
+import os
 import threading
-from database import DB_FILE, get_setting
-import telegram_bot
+import zipfile
+
+# AWS / S3 API
+import boto3
+from botocore.exceptions import NoCredentialsError
 
 # Google API
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# AWS / S3 API
-import boto3
-from botocore.exceptions import NoCredentialsError
+import database
+import telegram_bot
+from database import get_setting
 
 # Scope cho Google Drive
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
@@ -29,9 +34,7 @@ def _safe_video_path(path, recordings_dir=None):
     if not recordings_dir:
         recordings_dir = os.path.abspath("recordings")
     path_abs = os.path.abspath(path)
-    if not path_abs.startswith(recordings_dir + os.sep) and path_abs != recordings_dir:
-        return False
-    return True
+    return path_abs.startswith(recordings_dir + os.sep) or path_abs == recordings_dir
 
 
 _gdrive_creds = None
@@ -59,8 +62,7 @@ _sync_lock = threading.Lock()
 
 
 def get_unsynced_records():
-    # TODO: Use database.get_connection() once available
-    with sqlite3.connect(DB_FILE) as conn:
+    with database.get_connection() as conn:
         cursor = conn.cursor()
         # Lấy file chua sync từ ngày hqua trở về trước (tuỳ ý, hoặc lấy hết).
         # Tạm thời lấy hết.
@@ -71,7 +73,7 @@ def get_unsynced_records():
 def mark_as_synced(record_ids):
     if not record_ids:
         return
-    with sqlite3.connect(DB_FILE) as conn:
+    with database.get_connection() as conn:
         cursor = conn.cursor()
         placeholders = ",".join("?" for _ in record_ids)
         cursor.execute(
@@ -101,7 +103,7 @@ def create_backup_zip():
                 if not path or not os.path.exists(path):
                     continue
                 if not _safe_video_path(path):
-                    print(f"[CLOUD] Skipping unsafe path: {path}")
+                    logger.warning(f"[CLOUD] Skipping unsafe path: {path}")
                     continue
                 zipf.write(path, arcname=os.path.basename(path))
                 added_any = True
@@ -138,9 +140,9 @@ def upload_to_gdrive(file_path, folder_id=None):
         status, response = request.next_chunk()
         # Có thể in ra % progress nếu muốn console
         if status:
-            print(f"Uploading... {int(status.progress() * 100)}%")
+            logger.info(f"Uploading... {int(status.progress() * 100)}%")
 
-    print(f"Upload Google Drive Hoàn Tất: File ID {response.get('id')}")
+    logger.info(f"Upload Google Drive Hoàn Tất: File ID {response.get('id')}")
     return True
 
 
@@ -154,7 +156,7 @@ def upload_to_s3(file_path, endpoint, access_key, secret_key, bucket_name):
     file_name = os.path.basename(file_path)
     try:
         s3_client.upload_file(file_path, bucket_name, file_name)
-        print(f"Upload S3 Hoàn Tất: {file_name}")
+        logger.info(f"Upload S3 Hoàn Tất: {file_name}")
         return True
     except NoCredentialsError:
         raise Exception("Sai thông tin S3 Credentials")

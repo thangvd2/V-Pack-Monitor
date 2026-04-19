@@ -1,17 +1,23 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.1.0
+# V-Pack Monitor - CamDongHang v3.2.0
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
 import os
 import secrets
-import jwt
-import bcrypt
 from datetime import datetime, timedelta, timezone
+from typing import Annotated
+
+import bcrypt
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from typing import Annotated
+
 import database
 
 
@@ -44,7 +50,7 @@ def revoke_token(token: str):
         if jti and exp:
             database.revoke_jti(jti, exp)
     except Exception as e:
-        print(f"[AUTH] Token revocation failed: {e}")
+        logger.error(f"[AUTH] Token revocation failed: {e}")
 
 
 def is_token_revoked(jti: str) -> bool:
@@ -53,10 +59,6 @@ def is_token_revoked(jti: str) -> bool:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
-
-
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def create_access_token(data: dict) -> str:

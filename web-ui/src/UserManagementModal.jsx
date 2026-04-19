@@ -1,5 +1,5 @@
 /**
- * V-Pack Monitor - CamDongHang v2.4.2
+ * V-Pack Monitor - CamDongHang v3.2.0
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
@@ -51,7 +51,7 @@ const timeAgo = (dateStr) => {
   return `${Math.floor(seconds / 3600)} giờ trước`;
 };
 
-export default function UserManagementModal({ isOpen, onClose, currentUser }) {
+export default function UserManagementModal({ isOpen, onClose, currentUser, showConfirmDialog }) {
   const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -180,14 +180,14 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
       alert('Không thể xoá tài khoản của chính bạn.');
       return;
     }
-    if (window.confirm(`Xoá user "${user.username}"?`)) {
+    showConfirmDialog(`Xoá user "${user.username}"?`, async () => {
       try {
         await axios.delete(`${API_BASE}/api/users/${user.id}`);
         fetchUsers();
       } catch {
         alert('Lỗi khi xoá user.');
       }
-    }
+    });
   };
 
   const handleToggleActive = async (user) => {
@@ -234,14 +234,14 @@ export default function UserManagementModal({ isOpen, onClose, currentUser }) {
 
   // --- Sessions handlers ---
   const handleKillSession = async (sessionId, username) => {
-    if (window.confirm(`Kết thúc phiên của "${username}"?`)) {
+    showConfirmDialog(`Kết thúc phiên của "${username}"?`, async () => {
       try {
         await axios.delete(`${API_BASE}/api/sessions/${sessionId}`);
         fetchSessions();
       } catch {
         alert('Lỗi khi kết thúc phiên.');
       }
-    }
+    });
   };
 
   // --- Logs handlers ---

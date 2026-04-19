@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.1.0
+# V-Pack Monitor - CamDongHang v3.2.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -18,12 +18,11 @@ Vi du:
 """
 
 import os
-import sys
 import socket
+import sys
 
 os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
 import cv2
-
 
 BRANDS = ["imou", "dahua", "tenda", "ezviz", "tapo"]
 

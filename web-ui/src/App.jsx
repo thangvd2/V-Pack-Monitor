@@ -1,5 +1,5 @@
 /**
- * V-Pack Monitor - CamDongHang v2.4.2
+ * V-Pack Monitor - CamDongHang v3.2.0
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
@@ -381,7 +381,7 @@ function App() {
     return () => axios.interceptors.response.eject(interceptor);
   }, []);
 
-  const stationsIdStr = stations.map((s) => s.id).join(',');
+  const stationsIdStr = useMemo(() => stations.map((s) => s.id).join(','), [stations]);
 
   useEffect(() => {
     const stationIds = viewMode === 'grid' ? stationsIdStr : String(activeStationId || '');
@@ -656,9 +656,9 @@ function App() {
       if (query) params.set('search', query);
       if (sid) params.set('station_id', sid);
       if (page > 1) params.set('page', String(page));
-      if (dateFrom) params.set('date_from', dateFrom);
-      if (dateTo) params.set('date_to', dateTo);
-      if (statusFilter) params.set('status', statusFilter);
+      if (dateFromRef.current) params.set('date_from', dateFromRef.current);
+      if (dateToRef.current) params.set('date_to', dateToRef.current);
+      if (statusFilterRef.current) params.set('status', statusFilterRef.current);
       params.set('limit', '20');
 
       const res = await axios.get(`${API_BASE}/api/records?${params.toString()}`, { signal });
@@ -1083,7 +1083,12 @@ function App() {
         onClose={() => setVideoModalOpen(false)}
       />
 
-      <UserManagementModal isOpen={showUserModal} onClose={() => setShowUserModal(false)} currentUser={currentUser} />
+      <UserManagementModal
+        isOpen={showUserModal}
+        onClose={() => setShowUserModal(false)}
+        currentUser={currentUser}
+        showConfirmDialog={showConfirmDialog}
+      />
 
       {showChangePassword && (
         <div

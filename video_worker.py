@@ -1,32 +1,28 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.1.0
+# V-Pack Monitor - CamDongHang v3.2.0
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
-import threading
 import os
-import time
 import subprocess
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
+
 import database
 import recorder
 import telegram_bot
-
 
 _executor = None
 _lock = threading.Lock()
 _pending_count = 0
 _pending_lock = threading.Lock()
 _MAX_PENDING = 10  # Max queued video processing tasks
-
-_decrement_callback = None
-
-
-def set_decrement_callback(callback):
-    """Set the callback for decrementing processing count. Called by api.py at startup."""
-    global _decrement_callback
-    _decrement_callback = callback
 
 
 def _verify_video(filepath):
@@ -55,13 +51,6 @@ def _verify_video(filepath):
 
 
 def _decrement_processing(station_id):
-    # Prefer callback if set (avoids lazy import of api internals)
-    if _decrement_callback:
-        try:
-            _decrement_callback(station_id)
-            return
-        except Exception as e:
-            print(f"[WORKER] Processing count decrement failed: {e}")
     # Fallback: import api directly (backward compat)
     try:
         import api
@@ -132,7 +121,7 @@ def _process_stop_and_save(record_id, rec, waybill, station_id, save=True):
             _decrement_processing(station_id)
             _notify_sse_safe(station_id, "FAILED", record_id)
     except Exception as e:
-        print(f"VideoWorker error for record {record_id}: {e}")
+        logger.error(f"VideoWorker error for record {record_id}: {e}")
         try:
             database.update_record_status(record_id, "FAILED")
             _send_failed_alert(record_id, waybill, f"Lỗi xử lý video: {e}")
@@ -161,7 +150,7 @@ def submit_stop_and_save(record_id, rec, waybill, station_id, save=True):
 
     with _pending_lock:
         if _pending_count >= _MAX_PENDING:
-            print(f"[WORKER] WARNING: Too many pending tasks ({_pending_count}), dropping record {record_id}")
+            logger.warning(f"[WORKER] WARNING: Too many pending tasks ({_pending_count}), dropping record {record_id}")
             _decrement_processing(station_id)
             return False
         _pending_count += 1
@@ -199,7 +188,7 @@ def shutdown():
                         if remaining > 0:
                             time.sleep(min(1.0, remaining))
                         else:
-                            print("[WORKER] WARNING: Shutdown timed out after 60s — forcing exit")
+                            logger.warning("[WORKER] WARNING: Shutdown timed out after 60s — forcing exit")
                             break
                     else:
                         break

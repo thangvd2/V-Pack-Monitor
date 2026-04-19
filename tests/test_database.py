@@ -1,57 +1,52 @@
 import os
-import sys
 import sqlite3
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from database import (
-    _encrypt_value,
-    _decrypt_value,
     _ENCRYPT_PREFIX,
     _SENSITIVE_KEYS,
-    init_db,
-    get_setting,
-    set_setting,
-    get_all_settings,
-    set_settings,
-    save_record,
-    create_record,
-    update_record_status,
-    get_pending_records,
-    get_records,
-    get_record_by_id,
+    _decrypt_value,
+    _encrypt_value,
+    add_station,
+    cleanup_audit_log,
     cleanup_old_records,
+    clear_must_change_password,
+    create_record,
+    create_session,
+    create_user,
     delete_record,
-    get_stations,
+    delete_station,
+    delete_user,
+    end_session,
+    end_session_by_id,
+    expire_stale_sessions,
+    get_active_session,
+    get_all_settings,
+    get_all_users,
+    get_audit_logs,
+    get_daily_trend,
+    get_hourly_stats,
+    get_pending_records,
+    get_record_by_id,
+    get_records_v2,
+    get_session_by_id,
+    get_setting,
     get_station,
+    get_stations,
+    get_stations_comparison,
+    get_user_by_id,
+    get_user_by_username,
+    init_db,
+    is_jti_revoked,
+    log_audit,
+    revoke_jti,
+    set_setting,
+    set_settings,
+    update_record_status,
+    update_session_heartbeat,
     update_station,
     update_station_ip,
-    add_station,
-    delete_station,
-    get_user_by_username,
-    get_user_by_id,
-    get_all_users,
-    create_user,
     update_user,
     update_user_password,
-    delete_user,
-    clear_must_change_password,
-    create_session,
-    get_active_session,
-    update_session_heartbeat,
-    end_session,
-    expire_stale_sessions,
-    log_audit,
-    cleanup_audit_log,
-    get_audit_logs,
-    get_session_by_id,
-    end_session_by_id,
-    get_hourly_stats,
-    get_daily_trend,
-    get_stations_comparison,
-    get_records_for_export,
-    revoke_jti,
-    is_jti_revoked,
 )
 
 
@@ -116,7 +111,7 @@ class TestInitDb:
         admin = get_user_by_username("admin")
         import bcrypt
 
-        assert bcrypt.checkpw("08012011".encode(), admin["password_hash"].encode())
+        assert bcrypt.checkpw(b"08012011", admin["password_hash"].encode())
 
     def test_idempotent(self):
         init_db()
@@ -185,9 +180,9 @@ class TestRecords:
     def test_get_records_search(self, sample_station_id):
         create_record(sample_station_id, "ALPHA-001", "SINGLE")
         create_record(sample_station_id, "BETA-002", "SINGLE")
-        results = get_records(search="ALPHA")
+        results = get_records_v2(search="ALPHA")["records"]
         assert len(results) == 1
-        assert results[0][1] == "ALPHA-001"
+        assert results[0]["waybill_code"] == "ALPHA-001"
 
     def test_get_records_by_station(self):
         sid1 = add_station(
@@ -214,8 +209,8 @@ class TestRecords:
         )
         create_record(sid1, "WB-S1", "SINGLE")
         create_record(sid2, "WB-S2", "SINGLE")
-        results = get_records(station_id=sid1)
-        assert all(r[6] == "S1" or True for r in results)
+        results = get_records_v2(station_id=sid1)
+        assert all(r["station_name"] == "S1" for r in results["records"])
 
     def test_get_record_by_id_not_found(self):
         assert get_record_by_id(99999) is None
@@ -228,11 +223,6 @@ class TestRecords:
         pending_ids = [r["id"] for r in pending]
         assert rid1 in pending_ids
         assert rid2 not in pending_ids
-
-    def test_save_record(self, sample_station_id):
-        save_record(sample_station_id, "WB-SAVE", ["/a.mp4", "/b.mp4"], "DUAL_FILE")
-        results = get_records(search="WB-SAVE")
-        assert len(results) == 1
 
     def test_cleanup_old_records(self, sample_station_id, tmp_path):
         fake_video = str(tmp_path / "old_video.mp4")
@@ -435,8 +425,8 @@ class TestUsers:
         import bcrypt
 
         user = get_user_by_username("pwchange")
-        assert bcrypt.checkpw("NewPassword!".encode(), user["password_hash"].encode())
-        assert not bcrypt.checkpw("OldPassword!".encode(), user["password_hash"].encode())
+        assert bcrypt.checkpw(b"NewPassword!", user["password_hash"].encode())
+        assert not bcrypt.checkpw(b"OldPassword!", user["password_hash"].encode())
 
     def test_delete_user(self):
         uid = create_user("deleteme", "Pass123!", "OPERATOR")
@@ -577,11 +567,11 @@ class TestAnalytics:
         trend = get_daily_trend(days=14)
         assert len(trend) == 14
 
-    def test_stations_comparison(self):
+    def test_stations_comparison(self, sample_station_id):
         sid1 = add_station(
             {
                 "name": "Comp1",
-                "ip_camera_1": "10.0.0.10",
+                "ip_camera_1": "10.0.0.1",
                 "ip_camera_2": "",
                 "safety_code": "X",
                 "camera_mode": "SINGLE",
@@ -594,12 +584,6 @@ class TestAnalytics:
         comparison = get_stations_comparison()
         assert len(comparison) >= 1
         assert any(c["station_name"] == "Comp1" for c in comparison)
-
-    def test_records_for_export(self, sample_station_id):
-        rid = create_record(sample_station_id, "EXPORT-WB", "SINGLE")
-        update_record_status(rid, "READY")
-        exports = get_records_for_export()
-        assert any(e["waybill_code"] == "EXPORT-WB" for e in exports)
 
 
 class TestTokenRevocation:

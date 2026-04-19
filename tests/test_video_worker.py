@@ -1,17 +1,15 @@
-import os
 import sys
-import pytest
 import threading
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import pytest
 
 # Pre-mock heavy external deps to avoid side effects during import
 for _mod in ("recorder", "telegram_bot", "telebot", "psutil", "cloud_sync", "network"):
     sys.modules.setdefault(_mod, MagicMock())
 
-import video_worker
 import database
+import video_worker
 
 
 @pytest.fixture(autouse=True)

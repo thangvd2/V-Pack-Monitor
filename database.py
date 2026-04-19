@@ -1,15 +1,19 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.1.0
+# V-Pack Monitor - CamDongHang v3.2.0
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
-import sqlite3
-import os
-import time as _time
-import hashlib
 import base64
+import hashlib
+import os
+import sqlite3
 import threading
+import time as _time
 from datetime import datetime, timezone
 
 _ENCRYPT_PREFIX = "enc:v2:"
@@ -37,7 +41,9 @@ def _get_enc_key():
     import secrets
 
     key_material = secrets.token_bytes(32)
-    print("[DB] WARNING: No encryption key configured. Using random key. Set VPACK_SECRET env var or auth.SECRET_KEY.")
+    logger.warning(
+        "[DB] WARNING: No encryption key configured. Using random key. Set VPACK_SECRET env var or auth.SECRET_KEY."
+    )
     return key_material
 
 
@@ -52,7 +58,7 @@ def _get_fernet():
 
 def _xor_decrypt_raw(data, key):
     """Legacy XOR decryption for v1 migration."""
-    return bytes(a ^ b for a, b in zip(data, (key * ((len(data) // len(key)) + 1))[: len(data)]))
+    return bytes(a ^ b for a, b in zip(data, (key * ((len(data) // len(key)) + 1))[: len(data)], strict=False))
 
 
 def _encrypt_value(plaintext: str) -> str:
@@ -112,9 +118,9 @@ def _migrate_v1_to_v2():
                         (new_value, key_name),
                     )
             conn.commit()
-            print("[DB] Encryption migration v1→v2 complete.")
+            logger.info("[DB] Encryption migration v1→v2 complete.")
     except Exception as e:
-        print(f"[DB] Encryption migration warning: {e}")
+        logger.warning(f"[DB] Encryption migration warning: {e}")
 
 
 _SENSITIVE_KEYS = {"S3_SECRET_KEY", "S3_ACCESS_KEY", "TELEGRAM_BOT_TOKEN"}
@@ -260,13 +266,15 @@ def init_db():
                 # Lazy import to avoid startup overhead when bcrypt not yet needed
                 import bcrypt as _bcrypt
 
-                hashed = _bcrypt.hashpw("08012011".encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
+                hashed = _bcrypt.hashpw(b"08012011", _bcrypt.gensalt()).decode("utf-8")
                 cursor.execute(
                     "INSERT INTO users (username, password_hash, role, full_name, must_change_password) VALUES (?, ?, 'ADMIN', 'Administrator', 1)",
                     ("admin", hashed),
                 )
                 # H6: Warn about default password
-                print("[DB] WARNING: Default admin password is '08012011'. Change it immediately after first login.")
+                logger.warning(
+                    "[DB] WARNING: Default admin password is '08012011'. Change it immediately after first login."
+                )
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS audit_log (
@@ -303,9 +311,9 @@ def init_db():
                 )
                 orphan_count = cursor.rowcount
                 if orphan_count:
-                    print(f"[DB] Cleaned {orphan_count} orphaned records.")
+                    logger.info(f"[DB] Cleaned {orphan_count} orphaned records.")
             except Exception as e:
-                print(f"[DB] Orphan cleanup warning: {e}")
+                logger.warning(f"[DB] Orphan cleanup warning: {e}")
 
             conn.commit()
 
@@ -392,7 +400,7 @@ def _rebuild_fts_index(conn=None):
             with get_connection() as c:
                 c.execute("INSERT INTO packing_video_fts(packing_video_fts) VALUES ('rebuild')")
     except Exception as e:
-        print(f"[DB] FTS5 rebuild warning: {e}")
+        logger.warning(f"[DB] FTS5 rebuild warning: {e}")
 
 
 def get_setting(key, default=None):
@@ -451,33 +459,6 @@ def set_settings(settings_dict):
             """,
                 (k, str_val),
             )
-        conn.commit()
-
-
-def save_record(station_id, waybill_code, video_paths, record_mode):
-    """Legacy record save. Prefer create_record() for new code."""
-    # H5: Handle non-iterable video_paths (str, list, tuple, etc.)
-    if isinstance(video_paths, str):
-        paths_str = video_paths
-    elif isinstance(video_paths, (list, tuple)):
-        paths_str = ",".join(video_paths)
-    else:
-        paths_str = str(video_paths) if video_paths else ""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO packing_video (station_id, waybill_code, video_paths, record_mode, recorded_at)
-            VALUES (?, ?, ?, ?, ?)
-        """,
-            (
-                station_id,
-                waybill_code,
-                paths_str,
-                record_mode,
-                datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-            ),
-        )
         conn.commit()
 
 
@@ -545,30 +526,6 @@ def get_pending_records():
             }
             for r in rows
         ]
-
-
-def get_records(search="", station_id=None):
-    """Legacy record fetch (no pagination, no FTS5).
-    Prefer get_records_v2() for all new code."""
-    # L3: Intentional 2-query pattern (search overrides station filter) for clarity
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        query = "SELECT p.id, p.waybill_code, p.video_paths, p.record_mode, datetime(p.recorded_at, 'localtime') AS recorded_at, s.name, p.status FROM packing_video p LEFT JOIN stations s ON p.station_id = s.id WHERE 1=1"
-        params = []
-
-        if search:
-            query += " AND p.waybill_code LIKE ?"
-            params.append(f"%{search}%")
-            # Nếu có nhập tên mã (Global Search) thì bỏ qua filter Trạm
-        else:
-            if station_id:
-                query += " AND p.station_id = ?"
-                params.append(station_id)
-
-        query += " ORDER BY p.id DESC LIMIT 100"
-        cursor.execute(query, params)
-        records = cursor.fetchall()
-    return records
 
 
 _SORT_COLUMNS = {
@@ -768,9 +725,9 @@ def cleanup_old_records(days=7):
                 if os.path.exists(path):
                     try:
                         os.remove(path)
-                        print(f"[DB] Cleaned old file: {path}")
+                        logger.info(f"[DB] Cleaned old file: {path}")
                     except Exception as e:
-                        print(f"Error removing {path}: {e}")
+                        logger.error(f"Error removing {path}: {e}")
             cursor.execute("DELETE FROM packing_video WHERE id = ?", (r_id,))
         conn.commit()
 
@@ -791,7 +748,7 @@ def delete_record(record_id):
                     try:
                         os.remove(path)
                     except Exception as e:
-                        print(f"Error removing {path}: {e}")
+                        logger.error(f"Error removing {path}: {e}")
             cursor.execute("DELETE FROM packing_video WHERE id = ?", (record_id,))
         conn.commit()
 

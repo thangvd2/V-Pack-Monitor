@@ -1,13 +1,8 @@
-import os
-import sys
-import time
 import threading
+import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import database
 import auth
-
+import database
 
 # ---------------------------------------------------------------------------
 # Plan #19 – Station input validation (backend hardening)
@@ -155,9 +150,7 @@ class TestStationConflict:
         warnings = r.json()["warnings"]
         assert len(warnings) > 0
 
-    def test_conflict_name_case_insensitive(
-        self, client, admin_headers, sample_station_id
-    ):
+    def test_conflict_name_case_insensitive(self, client, admin_headers, sample_station_id):
         """Name conflict detection is case-insensitive."""
         r = client.get(
             "/api/stations/check-conflict",
@@ -167,9 +160,7 @@ class TestStationConflict:
         warnings = r.json()["warnings"]
         assert len(warnings) > 0
 
-    def test_conflict_multiple_warnings_combined(
-        self, client, admin_headers, sample_station_id
-    ):
+    def test_conflict_multiple_warnings_combined(self, client, admin_headers, sample_station_id):
         """Requesting IP + MAC + name together yields >= 3 warnings."""
         r = client.get(
             "/api/stations/check-conflict",
@@ -294,9 +285,7 @@ class TestAutoUpdate:
         assert r1.json() == r2.json()
         assert r2.json()["current_version"] == "1.0.0"
 
-    def test_update_concurrent_rejected_by_lock(
-        self, client, admin_headers, monkeypatch
-    ):
+    def test_update_concurrent_rejected_by_lock(self, client, admin_headers, monkeypatch):
         """Second update attempt is rejected when ``_update_lock`` is held."""
         import routes_system
 

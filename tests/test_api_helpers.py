@@ -1,9 +1,4 @@
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from api import get_rtsp_url, get_rtsp_sub_url
+from api import get_rtsp_sub_url, get_rtsp_url
 
 
 class TestGetRtspUrl:

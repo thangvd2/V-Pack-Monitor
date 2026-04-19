@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v3.0.0
+# V-Pack Monitor - CamDongHang v3.2.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -8,13 +8,12 @@ import time
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
-import database
-import auth
-from auth import CurrentUser, AdminUser
+from pydantic import BaseModel, Field, model_validator
 
 import api
-
+import auth
+import database
+from auth import AdminUser, CurrentUser
 
 # --- AUTH API ---
 
@@ -102,15 +101,11 @@ def register_routes(app):
         old_password: str
         new_password: str
 
-        @staticmethod
-        def _validate_pwd(v):
-            if len(v) < 6:
+        @model_validator(mode="after")
+        def validate_pwd(self):
+            if len(self.new_password) < 6:
                 raise ValueError("Mật khẩu phải có ít nhất 6 ký tự.")
-            return v
-
-        def __init__(self, **data):
-            super().__init__(**data)
-            self._validate_pwd(self.new_password)
+            return self
 
     @app.put("/api/auth/change-password")
     def change_password(payload: ChangePasswordPayload, current_user: CurrentUser):
@@ -169,7 +164,7 @@ def register_routes(app):
 
     @app.put("/api/users/{user_id}")
     def update_user_api(user_id: int, payload: UserUpdatePayload, admin: AdminUser):
-        kwargs = {k: v for k, v in payload.dict().items() if v is not None}
+        kwargs = payload.model_dump(exclude_none=True)
         if not kwargs:
             return JSONResponse(
                 status_code=422,
@@ -196,10 +191,11 @@ def register_routes(app):
     class ResetPasswordPayload(BaseModel):
         password: str
 
-        def __init__(self, **data):
-            super().__init__(**data)
+        @model_validator(mode="after")
+        def validate_pwd(self):
             if len(self.password) < 6:
                 raise ValueError("Mật khẩu phải có ít nhất 6 ký tự.")
+            return self
 
     @app.put("/api/users/{user_id}/password")
     def reset_password(user_id: int, payload: ResetPasswordPayload, admin: AdminUser):

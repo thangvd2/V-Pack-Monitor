@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v3.0.0
+# V-Pack Monitor - CamDongHang v3.2.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -7,11 +7,11 @@
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
-import database
-import network
-from auth import CurrentUser, AdminUser
 
 import api
+import database
+import network
+from auth import AdminUser, CurrentUser
 
 
 class StationPayload(BaseModel):
@@ -64,7 +64,7 @@ def register_routes(app):
 
     @app.post("/api/stations")
     def create_station(payload: StationPayload, admin: AdminUser):
-        new_id = database.add_station(payload.dict())
+        new_id = database.add_station(payload.model_dump())
         database.log_audit(admin["id"], "STATION_CREATE", f"station_id={new_id}")
         live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
         url_fn = api.get_rtsp_url if live_quality == "main" else api.get_rtsp_sub_url
@@ -90,7 +90,7 @@ def register_routes(app):
 
     @app.put("/api/stations/{station_id}")
     def update_station(station_id: int, payload: StationPayload, admin: AdminUser):
-        database.update_station(station_id, payload.dict())
+        database.update_station(station_id, payload.model_dump())
         database.log_audit(admin["id"], "STATION_UPDATE", f"station_id={station_id}")
         with api._streams_lock:
             sm = api.stream_managers.get(station_id)
