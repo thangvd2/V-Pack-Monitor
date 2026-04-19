@@ -99,7 +99,7 @@ class TestBoundaryConditions:
         create_record(sid_b, "COMMON-BETA", "SINGLE")
         create_record(sid_a, "UNIQUE-GAMMA", "SINGLE")
 
-        # search="COMMON" with station_id=sid_a — station_id is ignored
+        # search="COMMON" with station_id=sid_a — station_id IS respected
         results = get_records_v2(search="COMMON", station_id=sid_a)["records"]
         waybills = [r["waybill_code"] for r in results]
 

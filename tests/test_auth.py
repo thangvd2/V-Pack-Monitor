@@ -40,7 +40,7 @@ class TestJWT:
             auth.SECRET_KEY,
             algorithm=auth.ALGORITHM,
         )
-        with pytest.raises(Exception):
+        with pytest.raises(_jwt.ExpiredSignatureError):
             auth.decode_token(expired)
 
     def test_invalid_token_raises(self):
