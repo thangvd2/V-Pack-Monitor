@@ -17,14 +17,14 @@ def main():
 
     errors = []
 
-    # Check Python files
-    py_files = list(root_dir.glob("*.py"))
-    header_pattern = re.compile(r"^# V-Pack Monitor(?: - CamDongHang)?\s+v(\d+\.\d+\.\d+)", flags=re.MULTILINE)
-    for py_file in py_files:
-        content = py_file.read_text(encoding="utf-8")
+    # Check Python and Frontend files
+    src_files = list(root_dir.glob("*.py")) + list((root_dir / "web-ui" / "src").rglob("*.[jt]s*"))
+    header_pattern = re.compile(r"^(?:#| \*) V-Pack Monitor(?: - CamDongHang)?\s+v(\d+\.\d+\.\d+)", flags=re.MULTILINE)
+    for src_file in src_files:
+        content = src_file.read_text(encoding="utf-8")
         match = header_pattern.search(content)
         if match and match.group(1) != expected_version:
-            errors.append(f"{py_file.name}: expected {expected_version}, found {match.group(1)}")
+            errors.append(f"{src_file.name}: expected {expected_version}, found {match.group(1)}")
 
     # Check README.md
     readme_file = root_dir / "README.md"
