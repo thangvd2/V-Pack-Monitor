@@ -66,10 +66,9 @@ Release PR → master: gh pr merge <N> --merge    ← giữ shared history, khô
 1. **Update version trên `dev`**:
    ```bash
    git checkout dev && git pull origin dev
-   # Update VERSION file: v3.0.0 → v3.1.0
-   # Update api.py header: v3.0.0 → v3.1.0
+   python scripts/bump_version.py 3.1.0
    # Add RELEASE_NOTES.md entry cho version mới
-   git commit -m "release: vX.Y.Z — update VERSION, release notes"
+   git commit -a -m "release: v3.1.0 — update VERSION, release notes"
    git push origin dev
    ```
 
