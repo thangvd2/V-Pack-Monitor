@@ -9,12 +9,11 @@ import time
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-import database
-import auth
-from auth import CurrentUser, AdminUser
 
 import api
-
+import auth
+import database
+from auth import AdminUser, CurrentUser
 
 # --- AUTH API ---
 

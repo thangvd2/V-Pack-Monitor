@@ -1,28 +1,40 @@
 # =============================================================================
 # V-Pack Monitor - CamDongHang v3.2.0
+import logging
+import sys
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(__name__)
+
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
 
-import os
-import sys
-import time
-import shutil
-import threading
-import json
 import asyncio
+import json
+import os
+import shutil
 import socket
 import subprocess
-import logging
-import urllib.request
+import sys
+import threading
+import time
 import urllib.error
+import urllib.request
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
 import database
-import recorder
 import network
+import recorder
 import video_worker
 
 _SERVER_START_TIME = time.time()
@@ -34,7 +46,7 @@ _RECORDING_WARNING_SECONDS = 540  # 9 minutes — emit warning SSE event
 def _read_version():
     try:
         vpath = os.path.join(os.path.dirname(__file__) or ".", "VERSION")
-        with open(vpath, "r") as f:
+        with open(vpath) as f:
             return f.read().strip()
     except Exception:
         return "unknown"
@@ -117,7 +129,7 @@ def _mtx_add_path(station_id, rtsp_url, suffix=""):
         urllib.request.urlopen(req, timeout=5)
         return
     except Exception as e:
-        print(f"[MTX] replace {name} failed: {e}")
+        logger.error(f"[MTX] replace {name} failed: {e}")
     try:
         req = urllib.request.Request(
             f"{MTX_API}/v3/config/paths/delete/{name}",
@@ -136,7 +148,7 @@ def _mtx_add_path(station_id, rtsp_url, suffix=""):
         )
         urllib.request.urlopen(req, timeout=5)
     except Exception as e:
-        print(f"[MTX] ERROR: add {name} failed after all retries: {e}")
+        logger.error(f"[MTX] ERROR: add {name} failed after all retries: {e}")
 
 
 def _mtx_remove_path(station_id, suffix=""):
@@ -149,7 +161,7 @@ def _mtx_remove_path(station_id, suffix=""):
         urllib.request.urlopen(req, timeout=5)
     except urllib.error.HTTPError as e:
         if e.code != 404:
-            print(f"[MTX] delete {name} failed: {e}")
+            logger.error(f"[MTX] delete {name} failed: {e}")
     except Exception:
         pass
 
@@ -244,7 +256,7 @@ class CameraStreamManager:
                     if not cam2_found:
                         _mtx_add_path(self.station_id, self.cam2_url, suffix="_cam2")
             except Exception as e:
-                print(f"[MTX] monitor loop error for station_{self.station_id}: {e}")
+                logger.error(f"[MTX] monitor loop error for station_{self.station_id}: {e}")
 
     def update_url(self, new_url):
         with self._lock:
@@ -426,7 +438,7 @@ def _recover_pending_records():
     pending = database.get_pending_records()
     if not pending:
         return
-    print(f"Crash recovery: found {len(pending)} pending records")
+    logger.info(f"Crash recovery: found {len(pending)} pending records")
     for rec in pending:
         rid = rec["id"]
         paths = rec["video_paths"]
@@ -466,17 +478,17 @@ def _recover_pending_records():
                             recovered = True
                             break
                     except Exception as e:
-                        print(f"[RECOVERY] transcode failed for record {rid}: {e}")
+                        logger.error(f"[RECOVERY] transcode failed for record {rid}: {e}")
                 elif os.path.exists(path) and _verify_video_external(path):
                     recovered = True
                     break
 
         if recovered:
             database.update_record_status(rid, "READY", video_paths=paths)
-            print(f"Recovered record {rid} ({waybill}) \u2192 READY")
+            logger.info(f"Recovered record {rid} ({waybill}) \u2192 READY")
         else:
             database.update_record_status(rid, "FAILED", video_paths=paths)
-            print(f"Failed to recover record {rid} ({waybill}) \u2192 FAILED")
+            logger.error(f"Failed to recover record {rid} ({waybill}) \u2192 FAILED")
             try:
                 msg = (
                     f"\u26a0\ufe0f <b>PH\u1ee4C H\u1ed2I VIDEO L\u1ed6I</b>\n\n"
@@ -613,8 +625,8 @@ except Exception:
 
 # --- REGISTER ROUTE MODULES ---
 import routes_auth
-import routes_stations
 import routes_records
+import routes_stations
 import routes_system
 
 routes_auth.register_routes(app)

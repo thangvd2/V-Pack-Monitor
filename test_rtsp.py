@@ -18,12 +18,11 @@ Vi du:
 """
 
 import os
-import sys
 import socket
+import sys
 
 os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
 import cv2
-
 
 BRANDS = ["imou", "dahua", "tenda", "ezviz", "tapo"]
 

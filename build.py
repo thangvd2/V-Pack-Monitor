@@ -5,8 +5,8 @@
 # =============================================================================
 
 import os
-import sys
 import subprocess
+import sys
 
 print("=== V-Pack Monitor Builder ===")
 

@@ -12,7 +12,6 @@ import re
 import socket
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Optional
 
 
 def get_local_subnet() -> str:
@@ -58,7 +57,7 @@ def validate_mac(mac: str) -> bool:
     return bool(re.fullmatch(r"[0-9A-Fa-f]{12}", hex_chars))
 
 
-def _parse_arp_table() -> List[dict]:
+def _parse_arp_table() -> list[dict]:
     """Parse the system ARP table into a list of {ip, mac} dicts."""
     results = []
     try:
@@ -126,7 +125,7 @@ def _is_private_ip(ip_str):
         return False
 
 
-def scan_lan_for_mac(target_mac: str, subnet: Optional[str] = None) -> Optional[str]:
+def scan_lan_for_mac(target_mac: str, subnet: str | None = None) -> str | None:
     """Scan the LAN to find a device's IP address by its MAC address.
 
     Args:
@@ -171,7 +170,7 @@ def scan_lan_for_mac(target_mac: str, subnet: Optional[str] = None) -> Optional[
     return None
 
 
-def scan_lan_all() -> List[dict]:
+def scan_lan_all() -> list[dict]:
     """Return all MAC-IP pairs found in the system ARP table.
 
     Returns:

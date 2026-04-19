@@ -7,11 +7,11 @@
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
-import database
-import network
-from auth import CurrentUser, AdminUser
 
 import api
+import database
+import network
+from auth import AdminUser, CurrentUser
 
 
 class StationPayload(BaseModel):
