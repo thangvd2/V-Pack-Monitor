@@ -16,27 +16,6 @@ Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa 
 - **Frontend**: React, WebRTC, Vite
 - **Infrastructure**: MediaMTX (RTSP→WebRTC), Docker, GitHub Actions CI
 
-## Project Structure
-
-```
-├── api.py                  # FastAPI app, shared state, lifespan (DO NOT add routes here)
-├── routes_auth.py          # Auth + User management routes
-├── routes_stations.py      # Station CRUD + sessions + discovery
-├── routes_records.py       # Scan, records, download, SSE, live
-├── routes_system.py        # Settings, analytics, health, update
-├── database.py             # DB layer, Fernet encryption, FTS5 search
-├── auth.py                 # JWT, password hashing, token revocation
-├── video_worker.py         # Video processing queue (bounded, max 10 pending)
-├── recorder.py             # FFmpeg recording
-├── cloud_sync.py           # Google Drive / S3 backup
-├── telegram_bot.py         # Telegram notifications
-├── network.py              # LAN scanner
-├── tests/                  # Pytest suite with tmp_path isolation
-├── web-ui/                 # React frontend
-├── requirements.txt        # Python dependencies (production)
-├── requirements-dev.txt    # Python dependencies (development only)
-```
-
 ## Versioning
 
 - **PATCH** (x.x.Z): bugfix only

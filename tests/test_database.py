@@ -215,7 +215,7 @@ class TestRecords:
         create_record(sid1, "WB-S1", "SINGLE")
         create_record(sid2, "WB-S2", "SINGLE")
         results = get_records(station_id=sid1)
-        assert all(r[6] == "S1" or True for r in results)
+        assert all(r[5] == "S1" for r in results)
 
     def test_get_record_by_id_not_found(self):
         assert get_record_by_id(99999) is None

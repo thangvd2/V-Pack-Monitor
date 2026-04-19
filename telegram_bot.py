@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v2.1.0
+# V-Pack Monitor - CamDongHang v3.2.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -9,7 +9,6 @@ import database
 import threading
 import time
 import shutil
-import sqlite3
 
 _bot = None
 _bot_thread = None
@@ -49,7 +48,7 @@ def _run_bot(bot_token, authorized_chat_id):
             try:
                 # 1. Đếm số đơn hôm nay
                 # Replace direct SQL with database module calls where possible
-                with sqlite3.connect(database.DB_FILE) as conn:
+                with database.get_connection() as conn:
                     cursor = conn.cursor()
                     cursor.execute(
                         "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at, 'localtime') = date('now', 'localtime')"

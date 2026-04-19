@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v3.0.0
+# V-Pack Monitor - CamDongHang v3.2.0
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
@@ -18,7 +18,6 @@ import csv
 import threading
 import urllib.request
 import urllib.error
-import sqlite3
 import platform as _platform
 
 from fastapi import UploadFile, File, HTTPException
@@ -526,10 +525,7 @@ def register_routes(app):
 
     @app.get("/api/analytics/today")
     def get_analytics_today(station_id: int, current_user: CurrentUser):
-        try:
-            conn = database.get_connection()
-        except AttributeError:
-            conn = sqlite3.connect(database.DB_FILE)
+        conn = database.get_connection()
         with conn:
             cursor = conn.cursor()
 
