@@ -1,8 +1,15 @@
 # =============================================================================
 # V-Pack Monitor - CamDongHang v3.2.0
-from logger import get_logger
+import logging
+import sys
 
-logger = get_logger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(__name__)
 
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.

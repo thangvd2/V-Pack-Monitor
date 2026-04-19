@@ -1,8 +1,8 @@
 # =============================================================================
 # V-Pack Monitor - CamDongHang v3.2.0
-from logger import get_logger
+import logging
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
@@ -58,7 +58,7 @@ def _get_fernet():
 
 def _xor_decrypt_raw(data, key):
     """Legacy XOR decryption for v1 migration."""
-    return bytes(a ^ b for a, b in zip(data, (key * ((len(data) // len(key)) + 1))[: len(data)]))
+    return bytes(a ^ b for a, b in zip(data, (key * ((len(data) // len(key)) + 1))[: len(data)], strict=False))
 
 
 def _encrypt_value(plaintext: str) -> str:

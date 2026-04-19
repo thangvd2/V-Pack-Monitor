@@ -1,8 +1,8 @@
 # =============================================================================
 # V-Pack Monitor - CamDongHang v3.2.0
-from logger import get_logger
+import logging
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
@@ -394,9 +394,7 @@ def _validate_ping_ip(ip_str):
     """Validate that IP is a valid IPv4 address."""
     try:
         addr = ipaddress.ip_address(ip_str)
-        if not isinstance(addr, ipaddress.IPv4Address):
-            return False
-        return True
+        return isinstance(addr, ipaddress.IPv4Address)
     except ValueError:
         return False
 

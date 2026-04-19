@@ -1,8 +1,8 @@
 # =============================================================================
 # V-Pack Monitor - CamDongHang v3.2.0
-from logger import get_logger
+import logging
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
@@ -34,9 +34,7 @@ def _safe_video_path(path, recordings_dir=None):
     if not recordings_dir:
         recordings_dir = os.path.abspath("recordings")
     path_abs = os.path.abspath(path)
-    if not path_abs.startswith(recordings_dir + os.sep) and path_abs != recordings_dir:
-        return False
-    return True
+    return not (not path_abs.startswith(recordings_dir + os.sep) and path_abs != recordings_dir)
 
 
 _gdrive_creds = None

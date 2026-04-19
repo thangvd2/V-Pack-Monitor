@@ -1,8 +1,8 @@
 # =============================================================================
 # V-Pack Monitor - CamDongHang v3.2.0
-from logger import get_logger
+import logging
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
