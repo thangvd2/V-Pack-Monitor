@@ -1,10 +1,7 @@
 import os
 import sqlite3
-import sys
 
 import pytest
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import database
 from database import (
@@ -14,7 +11,7 @@ from database import (
     create_user,
     get_hourly_stats,
     get_record_by_id,
-    get_records,
+    get_records_v2,
     get_setting,
     get_station,
     get_user_by_username,
@@ -32,15 +29,15 @@ class TestSQLInjectionGuards:
         create_record(sample_station_id, "NORMAL-WB-001", "SINGLE")
 
         injection = "'; DROP TABLE packing_video; --"
-        results = get_records(search=injection)
+        results = get_records_v2(search=injection)["records"]
 
         # Injection string is literal — no waybill matches it
         assert results == []
 
         # Table still exists and original data is intact
-        all_results = get_records(search="NORMAL")
+        all_results = get_records_v2(search="NORMAL")["records"]
         assert len(all_results) == 1
-        assert all_results[0][1] == "NORMAL-WB-001"
+        assert all_results[0]["waybill_code"] == "NORMAL-WB-001"
 
     def test_update_station_ip_rejects_disallowed_field(self):
         """Allow-list filtering prevents column injection — rejected fields ignored,
@@ -73,9 +70,8 @@ class TestSQLInjectionGuards:
 class TestBoundaryConditions:
     """Tests for boundary and off-by-one conditions."""
 
-    def test_get_records_search_overrides_station_filter(self):
-        """When search is provided, station_id filter is intentionally ignored
-        (by design — global search supersedes station filter)."""
+    def test_get_records_search_respects_station_filter(self):
+        """When search is provided, station_id filter is still applied."""
         sid_a = add_station(
             {
                 "name": "Station A",
@@ -104,11 +100,11 @@ class TestBoundaryConditions:
         create_record(sid_a, "UNIQUE-GAMMA", "SINGLE")
 
         # search="COMMON" with station_id=sid_a — station_id is ignored
-        results = get_records(search="COMMON", station_id=sid_a)
-        waybills = [r[1] for r in results]
+        results = get_records_v2(search="COMMON", station_id=sid_a)["records"]
+        waybills = [r["waybill_code"] for r in results]
 
         assert "COMMON-ALPHA" in waybills  # from station A
-        assert "COMMON-BETA" in waybills  # from station B — station filter skipped
+        assert "COMMON-BETA" not in waybills  # from station B — station filter is respected
 
     def test_cleanup_exactly_N_days_old_deleted(self, sample_station_id, tmp_path):
         """Record exactly at the N-day boundary IS deleted (<= comparison)."""

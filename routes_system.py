@@ -438,7 +438,7 @@ def register_routes(app):
 
     @app.post("/api/settings")
     def update_settings(payload: SettingsUpdate, admin: AdminUser):
-        data = payload.dict()
+        data = payload.model_dump()
         current = database.get_all_settings()
         for k in _SENSITIVE_KEYS:
             if k in data and data[k] == "****":

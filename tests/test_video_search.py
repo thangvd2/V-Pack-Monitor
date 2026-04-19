@@ -3,11 +3,7 @@
 Covers FTS5 search, pagination, date range, status filter, sorting, and API response format.
 """
 
-import os
-import sys
 from datetime import date
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import database
 

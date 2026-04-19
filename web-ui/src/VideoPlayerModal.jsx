@@ -149,7 +149,7 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
           className={`flex items-center justify-between p-4 bg-black/40 border-b border-white/10 absolute top-0 left-0 right-0 z-10 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}
         >
           <h3 className="text-white font-bold tracking-wider">
-            Ma van don: <span className="text-blue-400">{waybillCode}</span>
+            Mã vận đơn: <span className="text-blue-400">{waybillCode}</span>
           </h3>
           <div className="flex items-center gap-2">
             <span className="text-white/60 text-xs font-mono">
@@ -264,7 +264,7 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
                 <button
                   onClick={takeSnapshot}
                   className="p-2 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 rounded-lg flex items-center gap-1.5 transition-all font-semibold px-3 text-sm"
-                  title="Chup khung hinh hien tai"
+                  title="Chụp khung hình hiện tại"
                 >
                   <Camera className="w-4 h-4" />
                   <span className="hidden md:inline">Snapshot</span>
@@ -295,7 +295,7 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
                     }
                   }}
                   className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors border border-white/5"
-                  title="Tai video xuong"
+                  title="Tải video xuống"
                 >
                   <Download className="w-4 h-4" />
                 </button>

@@ -1083,7 +1083,12 @@ function App() {
         onClose={() => setVideoModalOpen(false)}
       />
 
-      <UserManagementModal isOpen={showUserModal} onClose={() => setShowUserModal(false)} currentUser={currentUser} />
+      <UserManagementModal
+        isOpen={showUserModal}
+        onClose={() => setShowUserModal(false)}
+        currentUser={currentUser}
+        showConfirmDialog={showConfirmDialog}
+      />
 
       {showChangePassword && (
         <div
