@@ -104,7 +104,7 @@ def _run_bot(bot_token, authorized_chat_id):
                 time.sleep(_backoff)
                 _backoff = min(_backoff * 2, _MAX_BACKOFF)
     except Exception as e:
-        logger.info(f"Lỗi khởi chạy Telegram Bot: {e}")
+        logger.error(f"Lỗi khởi chạy Telegram Bot: {e}")
 
 
 def start_polling():

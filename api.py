@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 import asyncio
 import json
-import logging
 import os
 import shutil
 import socket

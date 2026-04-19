@@ -34,7 +34,7 @@ def _safe_video_path(path, recordings_dir=None):
     if not recordings_dir:
         recordings_dir = os.path.abspath("recordings")
     path_abs = os.path.abspath(path)
-    return not (not path_abs.startswith(recordings_dir + os.sep) and path_abs != recordings_dir)
+    return path_abs.startswith(recordings_dir + os.sep) or path_abs == recordings_dir
 
 
 _gdrive_creds = None
@@ -103,7 +103,7 @@ def create_backup_zip():
                 if not path or not os.path.exists(path):
                     continue
                 if not _safe_video_path(path):
-                    logger.info(f"[CLOUD] Skipping unsafe path: {path}")
+                    logger.warning(f"[CLOUD] Skipping unsafe path: {path}")
                     continue
                 zipf.write(path, arcname=os.path.basename(path))
                 added_any = True

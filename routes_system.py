@@ -272,7 +272,7 @@ def _update_production():
                 if not member_path.startswith(os.path.realpath(tmp_dir) + os.sep) and member_path != os.path.realpath(
                     tmp_dir
                 ):
-                    logger.info(f"[UPDATE] Zip Slip detected: skipping {member.filename}")
+                    logger.warning(f"[UPDATE] Zip Slip detected: skipping {member.filename}")
                     continue
                 zf.extract(member, tmp_dir)
         tag_ver = tag[1:] if tag.startswith("v") else tag
@@ -876,8 +876,5 @@ def register_routes(app):
         except Exception as e:
             _is_updating = False
             _update_lock.release()
-            logger.error(f"[UPDATE] Update failed: {e}")
-            import traceback
-
-            traceback.print_exc()
+            logger.exception(f"[UPDATE] Update failed: {e}")
             return {"status": "error", "message": "Lỗi cập nhật."}
