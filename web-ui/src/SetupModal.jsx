@@ -65,9 +65,7 @@ const isValidMAC = (mac) => {
 const CAMERA_MODE_DESC = {
   single: 'Ghi 1 luồng từ 1 camera',
   pip: 'Ghép hình-in-picture từ 2 camera (hoặc 1 camera 2 mắt)',
-  pip_sim: 'Ghép PIP thử nghiệm từ 1 camera',
   dual_file: 'Ghi 2 file riêng từ 2 camera (hoặc 1 camera 2 mắt)',
-  dual_file_sim: 'Ghi 2 file riêng từ 1 camera',
 };
 
 const MODES_NEED_IP2 = ['dual_file', 'pip'];
@@ -624,9 +622,7 @@ export default function SetupModal({
               >
                 <option value="single">SINGLE — Ghi 1 luồng</option>
                 <option value="pip">PIP — Ghép 2 camera (hoặc 1 camera 2 mắt)</option>
-                <option value="pip_sim">PIP SIM — Ghép thử từ 1 camera</option>
                 <option value="dual_file">DUAL FILE — 2 file từ 2 camera</option>
-                <option value="dual_file_sim">DUAL SIM — 2 file từ 1 camera</option>
               </select>
               <p className="mt-1 text-xs text-slate-500">{CAMERA_MODE_DESC[cameraMode]}</p>
             </div>

@@ -158,16 +158,14 @@ def _handle_scan_start(sid, barcode, station, current_user):
                 sm.update_url(live_url)
 
     url1 = api.get_rtsp_url(ip1, code, channel=1, brand=brand)
-    if c_mode in ["dual_file", "pip"]:
+    if c_mode == "dual_file" or c_mode == "pip":
         url2 = api.get_rtsp_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
-    elif c_mode in ["dual_file_sim", "pip_sim"]:
-        url2 = url1
     else:
         url2 = url1
 
-    if c_mode in ["dual_file", "dual_file_sim"]:
+    if c_mode == "dual_file":
         r_mode = "DUAL_FILE"
-    elif c_mode in ["pip", "pip_sim"]:
+    elif c_mode == "pip":
         r_mode = "PIP"
     else:
         r_mode = "SINGLE"
