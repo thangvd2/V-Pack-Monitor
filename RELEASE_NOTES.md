@@ -2,6 +2,20 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v3.3.1] - 2026-04-22 (Bugfixes & Cleanup) 🐛 PATCH RELEASE
+
+### 🐛 Bug Fixes
+- **Barcode Overwrite**: Sửa lỗi hiển thị mã vận đơn bị ghi đè im lặng khi quét mã mới trong lúc đang ghi hình, bổ sung cảnh báo tức thời trên UI và âm báo tự động.
+- **Database FK Error**: Sửa lỗi Foreign Key cản trở việc xóa trạm thao tác (Station) nếu trạm đó từng có lịch sử phiên làm việc (bỏ điều kiện `status = 'ACTIVE'`).
+- **Windows CI Compat**: Viết lại `pre-push` hook bằng Python với encoding `utf-8` để xử lý triệt để lỗi không tương thích bash script trên Windows.
+
+### 🧹 Cleanup & Refactoring
+- **Remove _sim modes**: Xóa bỏ hoàn toàn các chế độ giả lập (`pip_sim`, `dual_file_sim`) gây nhầm lẫn trên giao diện và backend, tự động fallback về SINGLE cho các cấu hình camera đơn giản.
+- **Gitattributes Normalize**: Bổ sung tệp `.gitattributes` bắt buộc `LF` line endings cho text files, khắc phục dứt điểm lỗi perpetual diff của Prettier trên Windows.
+
+### 📊 Stats
+- **Total tests**: 323 (+1 new test cho edge case xoá station). All tests green.
+
 ## [v3.3.0] - 2026-04-19 (Phase 3 Infrastructure & Pydantic v2 Migration) 🚀 MINOR RELEASE
 
 ### 🏗️ Infrastructure & Refactor
