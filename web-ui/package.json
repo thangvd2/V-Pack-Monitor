@@ -1,7 +1,7 @@
 {
   "name": "v-pack-monitor",
   "private": true,
-  "version": "3.3.0",
+  "version": "3.3.1",
   "description": "V-Pack Monitor - Camera Recording & Packing Management System by VDT",
   "author": "VDT - Vu Duc Thang <thangvd2>",
   "license": "UNLICENSED",
