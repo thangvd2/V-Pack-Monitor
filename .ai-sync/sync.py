@@ -19,9 +19,16 @@ Architecture (per Antigravity official docs + empirical validation):
 """
 
 import hashlib
+import io
 import shutil
 import sys
 from pathlib import Path
+
+# Windows cp1252 console cannot encode emoji chars in print() statements.
+# Force stdout/stderr to UTF-8 so sync.py works on all platforms.
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 SYNC_DIR = Path(__file__).parent.resolve()
 PROJECT_ROOT = SYNC_DIR.parent

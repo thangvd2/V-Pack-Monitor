@@ -1,5 +1,5 @@
 /**
- * V-Pack Monitor - CamDongHang v3.2.0
+ * V-Pack Monitor - CamDongHang v3.3.1
  * Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
@@ -270,6 +270,8 @@ function App() {
   const [updateProgress, setUpdateProgress] = useState(null);
   const [updating, setUpdating] = useState(false);
   const activeRecordIdRef = useRef(null);
+  const packingStatusRef = useRef(packingStatus);
+  packingStatusRef.current = packingStatus;
   const searchTermRef = useRef(searchTerm);
   useEffect(() => {
     searchTermRef.current = searchTerm;
@@ -761,9 +763,14 @@ function App() {
         station_id: activeStationId,
       });
       if (res.data.status === 'recording') {
-        activeRecordIdRef.current = res.data.record_id || null;
-        setPackingStatus('packing');
-        setCurrentWaybill(finalBarcode);
+        if (res.data.record_id) {
+          activeRecordIdRef.current = res.data.record_id;
+          setPackingStatus('packing');
+          setCurrentWaybill(finalBarcode);
+        } else {
+          showToast(res.data.message || 'Đang ghi đơn. Quét STOP trước khi quét mã mới.', 'warning');
+          playRecordingWarning();
+        }
       } else if (res.data.status === 'error') {
         if (res.data.message) {
           showToast(res.data.message, 'error');
@@ -893,7 +900,12 @@ function App() {
         barcodeBuffer = '';
 
         if (finalBarcode.length > 0) {
-          await sendScanAction(finalBarcode);
+          if (packingStatusRef.current === 'packing' && finalBarcode !== 'STOP' && finalBarcode !== 'EXIT') {
+            showToast('Đang ghi đơn. Quét STOP trước khi quét mã mới.', 'warning');
+            playRecordingWarning();
+          } else {
+            await sendScanAction(finalBarcode);
+          }
         }
       } else {
         if (e.key.length === 1) {
@@ -923,7 +935,15 @@ function App() {
     () => stations.find((s) => s.id === activeStationId) || {},
     [stations, activeStationId],
   );
-  const hasCam2 = activeStation?.ip_camera_2 && activeStation.ip_camera_2.trim() !== '';
+
+  const isDualCamStation = (station) => {
+    if (!station) return false;
+    const hasIp2 = station.ip_camera_2 && station.ip_camera_2.trim() !== '';
+    const isDualMode = ['pip', 'dual_file'].includes(station.camera_mode?.toLowerCase());
+    return hasIp2 || isDualMode;
+  };
+
+  const hasCam2 = isDualCamStation(activeStation);
 
   const doChangePassword = useCallback(async () => {
     setChangePasswordError('');
@@ -1602,7 +1622,7 @@ function App() {
                               </div>
                             )}
                           </div>
-                          {station.ip_camera_2 && station.ip_camera_2.trim() !== '' && (
+                          {isDualCamStation(station) && (
                             <div className="absolute top-3 right-3 px-2 py-0.5 bg-blue-500/30 border border-blue-400/40 rounded text-[10px] text-blue-200 font-bold pointer-events-none z-10">
                               2 CAM
                             </div>

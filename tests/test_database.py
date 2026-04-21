@@ -377,6 +377,31 @@ class TestStations:
         delete_station(sid)
         assert get_station(sid) is None
 
+    def test_delete_station_with_expired_sessions(self):
+        sid = add_station(
+            {
+                "name": "Delete Me",
+                "ip_camera_1": "10.0.0.9",
+                "ip_camera_2": "",
+                "safety_code": "X",
+                "camera_mode": "SINGLE",
+                "camera_brand": "imou",
+                "mac_address": "",
+            }
+        )
+        uid = create_user("op1_del_test", "Pass123!", "OPERATOR", "Op1")
+        if not uid:
+            uid = get_user_by_username("op1_del_test")["id"]
+
+        session_id = create_session(uid, sid)
+        end_session(session_id)
+
+        session = get_session_by_id(session_id)
+        assert session["status"] == "EXPIRED"
+
+        delete_station(sid)
+        assert get_station(sid) is None
+
     def test_get_station_not_found(self):
         assert get_station(99999) is None
 

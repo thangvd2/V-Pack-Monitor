@@ -40,7 +40,7 @@ repos:
     hooks:
       - id: check-protected-branch
         name: check protected branch (master/dev)
-        entry: bash .git-hooks/check-protected-branch.sh
+        entry: python .git-hooks/check-protected-branch.py
         language: system
         stages: [pre-push]
         pass_filenames: false
@@ -54,15 +54,17 @@ repos:
         entry: python -m pytest tests/ --tb=short -q
         language: system
         stages: [pre-push]
+        files: \.py$
         pass_filenames: false
-        always_run: true
       - id: eslint
         name: eslint (frontend)
-        entry: bash -c 'files=(); for f in "$@"; do files+=("${f#web-ui/}"); done; cd web-ui && npx eslint "${files[@]}"' --
+        entry: python -c "import subprocess,sys; files=[f.replace('web-ui/','',1) for f in sys.argv[1:]]; subprocess.run(['npx','eslint']+(files or ['.']), cwd='web-ui', check=True, shell=True)"
         language: system
         files: ^web-ui/src/.*\.(js|jsx)$
+        pass_filenames: true
       - id: prettier
         name: prettier (frontend)
-        entry: bash -c 'files=(); for f in "$@"; do files+=("${f#web-ui/}"); done; cd web-ui && npx prettier --write "${files[@]}"' --
+        entry: python -c "import subprocess,sys; files=[f.replace('web-ui/','',1) for f in sys.argv[1:]]; subprocess.run(['npx','prettier','--check']+(files or ['.']), cwd='web-ui', check=True, shell=True)"
         language: system
         files: ^web-ui/src/.*\.(js|jsx)$
+        pass_filenames: true

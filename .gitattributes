@@ -1,0 +1,16 @@
+# .gitattributes
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.exe binary
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.db binary
+*.pyc binary
+*.map binary
+*.gz binary
+*.dll binary
+*.pem binary
+*.pkl binary
+*.woff2 binary
