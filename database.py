@@ -865,7 +865,7 @@ def delete_station(station_id):
         cursor = conn.cursor()
         # End active sessions for this station
         cursor.execute(
-            "DELETE FROM sessions WHERE station_id = ? AND status = 'ACTIVE'",
+            "DELETE FROM sessions WHERE station_id = ?",
             (station_id,),
         )
         # Set packing_video.station_id to NULL (preserve evidence)
