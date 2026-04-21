@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v3.3.1
+# V-Pack Monitor - CamDongHang
 # Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 # All rights reserved. Unauthorized copying or distribution is prohibited.
 # =============================================================================
