@@ -542,8 +542,15 @@ async def lifespan(app: FastAPI):
                 brand=brand,
             )
         cam2_url = None
-        if st.get("ip_camera_2"):
-            cam2_ip = st["ip_camera_2"]
+        cam2_ip = st.get("ip_camera_2", "").strip()
+        mode = st.get("camera_mode", "SINGLE").upper()
+        if cam2_ip:
+            if live_quality == "main":
+                cam2_url = get_rtsp_url(cam2_ip, code, channel=2, brand=brand)
+            else:
+                cam2_url = get_rtsp_sub_url(cam2_ip, code, channel=2, brand=brand)
+        elif mode in ("PIP", "DUAL_FILE"):
+            cam2_ip = st["ip_camera_1"]
             if live_quality == "main":
                 cam2_url = get_rtsp_url(cam2_ip, code, channel=2, brand=brand)
             else:

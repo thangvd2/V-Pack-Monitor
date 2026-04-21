@@ -24,6 +24,16 @@ class StationPayload(BaseModel):
     mac_address: str = ""
 
 
+def _resolve_cam2_url(payload, url_fn):
+    """Generate cam2_url. If ip_camera_2 is provided, use it.
+    If empty but camera_mode is dual/pip, use ip_camera_1 (same device, channel 2)."""
+    if payload.ip_camera_2:
+        return url_fn(payload.ip_camera_2, payload.safety_code, channel=2, brand=payload.camera_brand)
+    if payload.camera_mode.lower() in ("pip", "dual_file"):
+        return url_fn(payload.ip_camera_1, payload.safety_code, channel=2, brand=payload.camera_brand)
+    return None
+
+
 def register_routes(app):
     # --- STATIONS CRUD API ---
 
@@ -74,14 +84,7 @@ def register_routes(app):
             channel=1,
             brand=payload.camera_brand,
         )
-        cam2_url = None
-        if payload.ip_camera_2:
-            cam2_url = url_fn(
-                payload.ip_camera_2,
-                payload.safety_code,
-                channel=2,
-                brand=payload.camera_brand,
-            )
+        cam2_url = _resolve_cam2_url(payload, url_fn)
         sm = api.CameraStreamManager(url, station_id=new_id, cam2_url=cam2_url)
         with api._streams_lock:
             api.stream_managers[new_id] = sm
@@ -104,14 +107,7 @@ def register_routes(app):
                 brand=payload.camera_brand,
             )
             sm.update_url(url)
-            cam2_url = None
-            if payload.ip_camera_2:
-                cam2_url = url_fn(
-                    payload.ip_camera_2,
-                    payload.safety_code,
-                    channel=2,
-                    brand=payload.camera_brand,
-                )
+            cam2_url = _resolve_cam2_url(payload, url_fn)
             sm.update_cam2_url(cam2_url)
         return {"status": "success"}
 

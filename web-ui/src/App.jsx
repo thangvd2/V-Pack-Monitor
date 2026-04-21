@@ -923,7 +923,15 @@ function App() {
     () => stations.find((s) => s.id === activeStationId) || {},
     [stations, activeStationId],
   );
-  const hasCam2 = activeStation?.ip_camera_2 && activeStation.ip_camera_2.trim() !== '';
+
+  const isDualCamStation = (station) => {
+    if (!station) return false;
+    const hasIp2 = station.ip_camera_2 && station.ip_camera_2.trim() !== '';
+    const isDualMode = ['pip', 'dual_file'].includes(station.camera_mode?.toLowerCase());
+    return hasIp2 || isDualMode;
+  };
+
+  const hasCam2 = isDualCamStation(activeStation);
 
   const doChangePassword = useCallback(async () => {
     setChangePasswordError('');
@@ -1602,7 +1610,7 @@ function App() {
                               </div>
                             )}
                           </div>
-                          {station.ip_camera_2 && station.ip_camera_2.trim() !== '' && (
+                          {isDualCamStation(station) && (
                             <div className="absolute top-3 right-3 px-2 py-0.5 bg-blue-500/30 border border-blue-400/40 rounded text-[10px] text-blue-200 font-bold pointer-events-none z-10">
                               2 CAM
                             </div>
