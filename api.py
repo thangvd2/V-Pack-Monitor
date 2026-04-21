@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v3.3.1
+# V-Pack Monitor - CamDongHang v3.3.2
 import logging
 import sys
 
@@ -174,12 +174,14 @@ class CameraStreamManager:
         self.is_running = False
         self.thread = None
         self._fail_count = 0
+        self._cam2_fail_count = 0
         self._lock = threading.Lock()
 
     def start(self):
         if not self.is_running and self.url:
             self.is_running = True
             self._fail_count = 0
+            self._cam2_fail_count = 0
             self._mtx_register()
             if self.cam2_url:
                 _mtx_add_path(self.station_id, self.cam2_url, suffix="_cam2")
@@ -249,11 +251,24 @@ class CameraStreamManager:
                 found = any(p.get("name") == path_name for p in items)
                 if not found:
                     self._mtx_register()
-                # Also check cam2 path
+                # Check cam2 path health
                 if self.cam2_url:
                     cam2_path_name = f"station_{self.station_id}_cam2"
-                    cam2_found = any(p.get("name") == cam2_path_name for p in items)
-                    if not cam2_found:
+                    cam2_item = next((p for p in items if p.get("name") == cam2_path_name), None)
+
+                    if cam2_item and cam2_item.get("ready") is True:
+                        self._cam2_fail_count = 0
+                    elif cam2_item and cam2_item.get("ready") is False:
+                        self._cam2_fail_count += 1
+                        if self._cam2_fail_count >= 2:
+                            logger.warning(
+                                f"[MTX] station_{self.station_id}_cam2 failed health check "
+                                f"{self._cam2_fail_count}x — removing broken cam2 path"
+                            )
+                            _mtx_remove_path(self.station_id, suffix="_cam2")
+                            self.cam2_url = None
+                            self._cam2_fail_count = 0
+                    else:
                         _mtx_add_path(self.station_id, self.cam2_url, suffix="_cam2")
             except Exception as e:
                 logger.error(f"[MTX] monitor loop error for station_{self.station_id}: {e}")
@@ -269,6 +284,7 @@ class CameraStreamManager:
         with self._lock:
             old_cam2 = self.cam2_url
             self.cam2_url = new_url
+        self._cam2_fail_count = 0
         if old_cam2 and self.station_id:
             _mtx_remove_path(self.station_id, suffix="_cam2")
         if new_url and self.station_id:
@@ -544,6 +560,17 @@ async def lifespan(app: FastAPI):
         cam2_url = None
         cam2_ip = st.get("ip_camera_2", "").strip()
         mode = st.get("camera_mode", "SINGLE").upper()
+        # Auto-migrate deprecated camera modes
+        if mode in ("PIP_SIM", "DUAL_FILE_SIM"):
+            migrated = "PIP" if mode == "PIP_SIM" else "DUAL_FILE"
+            logger.warning(
+                "Station %d has deprecated camera_mode '%s'. Auto-migrated to '%s'.",
+                st["id"],
+                mode,
+                migrated,
+            )
+            database.update_station_camera_mode(st["id"], migrated)
+            mode = migrated
         if cam2_ip:
             if live_quality == "main":
                 cam2_url = get_rtsp_url(cam2_ip, code, channel=2, brand=brand)

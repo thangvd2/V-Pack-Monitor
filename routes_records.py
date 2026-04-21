@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v3.3.1
+# V-Pack Monitor - CamDongHang
 import logging
 
 logger = logging.getLogger(__name__)
@@ -158,6 +158,14 @@ def _handle_scan_start(sid, barcode, station, current_user):
                 sm.update_url(live_url)
 
     url1 = api.get_rtsp_url(ip1, code, channel=1, brand=brand)
+    # Log warning for deprecated modes (should be migrated by lifespan init)
+    if c_mode in ("pip_sim", "dual_file_sim"):
+        logger.warning(
+            "Station %d still uses deprecated mode '%s'. Should have been auto-migrated on server start.",
+            sid,
+            c_mode,
+        )
+        c_mode = "pip" if c_mode == "pip_sim" else "dual_file"
     if c_mode == "dual_file" or c_mode == "pip":
         url2 = api.get_rtsp_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
     else:

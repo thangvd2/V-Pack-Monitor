@@ -67,6 +67,7 @@ Release PR → master: gh pr merge <N> --merge    ← giữ shared history, khô
    ```bash
    git checkout dev && git pull origin dev
    python scripts/bump_version.py 3.1.0
+   python scripts/check_version_consistency.py   # Verify all files match
    # Add RELEASE_NOTES.md entry cho version mới
    git commit -a -m "release: v3.1.0 — update VERSION, release notes"
    git push origin dev

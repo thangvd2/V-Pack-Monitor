@@ -13,16 +13,14 @@ import video_worker
 
 
 @pytest.fixture(autouse=True)
-def _reset_worker():
-    """Ensure executor is cleaned up between tests."""
+def _reset_worker(monkeypatch):
+    """Ensure executor is cleaned up between tests and shutdown is fast."""
+    monkeypatch.setattr(video_worker, "_SHUTDOWN_TIMEOUT", 0.1)
     yield
-    # Use short timeout to avoid hanging test suite on shutdown poll
-    original = video_worker._SHUTDOWN_TIMEOUT
-    video_worker._SHUTDOWN_TIMEOUT = 2
     try:
         video_worker.shutdown()
     finally:
-        video_worker._SHUTDOWN_TIMEOUT = original
+        video_worker._executor = None
 
 
 # =============================================================================

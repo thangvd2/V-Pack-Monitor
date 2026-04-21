@@ -6,8 +6,23 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import bcrypt
+
 import auth
 import database
+
+
+@pytest.fixture(autouse=True, scope="session")
+def patch_bcrypt_for_tests():
+    """Make bcrypt extremely fast during tests to avoid 200s+ test suites on Windows."""
+    original_gensalt = bcrypt.gensalt
+
+    def fast_gensalt(rounds=12, prefix=b"2b"):
+        return original_gensalt(rounds=4, prefix=prefix)
+
+    bcrypt.gensalt = fast_gensalt
+    yield
+    bcrypt.gensalt = original_gensalt
 
 
 @pytest.fixture(autouse=True)

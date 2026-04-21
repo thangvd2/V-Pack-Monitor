@@ -2,6 +2,21 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v3.3.2] - 2026-04-22 (Performance & Cleanup) 🧹 PATCH RELEASE
+
+### 🧹 Cleanup & Refactoring
+- **Post-Release Cleanups (PR #40)**:
+  - **Auto-remove broken cam2 path**: Added a MediaMTX health check monitor to detect unsupported/offline secondary cameras and gracefully stop re-registering them, stopping EOF log spam.
+  - **Auto-migrate deprecated _sim modes**: Implemented a lifespan DB migration script to seamlessly convert deprecated `pip_sim` and `dual_file_sim` modes to standard modes without breaking existing station configurations.
+  - **Remove version headers**: Cleaned up the file headers of 13 `.py` and 7 `.jsx` files by removing hardcoded version strings. Refactored build scripts to rely solely on the entry points, reducing noisy PR diffs.
+- **Bump Version Cleanup (PR #38)**: Cleaned up the versioning script.
+
+### ⚡ Performance & Testing
+- **Pytest Performance Optimization (PR #39)**:
+  - Patched `bcrypt` hashing rounds from 12 to 4 strictly for tests via `conftest.py` fixture.
+  - Monkeypatched `video_worker._SHUTDOWN_TIMEOUT` down to 0.1s during test teardowns to prevent 60-second polling delays.
+  - Reduced local pytest suite execution time from ~250 seconds down to ~40 seconds!
+
 ## [v3.3.1] - 2026-04-22 (Bugfixes & Cleanup) 🐛 PATCH RELEASE
 
 ### 🐛 Bug Fixes

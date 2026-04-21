@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v3.3.1
+# V-Pack Monitor - CamDongHang
 import logging
 
 logger = logging.getLogger(__name__)

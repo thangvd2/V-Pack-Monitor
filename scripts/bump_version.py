@@ -1,3 +1,5 @@
+import json
+import os
 import re
 import subprocess
 import sys
@@ -20,17 +22,15 @@ def main():
         version_file.write_text(f"v{new_version}\n", encoding="utf-8")
         print("Updated VERSION")
 
-    # 2. Update Python and Frontend headers
-    src_files = list(root_dir.glob("*.py")) + list((root_dir / "web-ui" / "src").rglob("*.[jt]s*"))
+    # 2. Update api.py header
+    api_file = root_dir / "api.py"
     header_pattern = re.compile(r"^((?:#| \*) V-Pack Monitor(?: - CamDongHang)?\s+v)\d+\.\d+\.\d+", flags=re.MULTILINE)
-    count = 0
-    for src_file in src_files:
-        content = src_file.read_text(encoding="utf-8")
+    if api_file.exists():
+        content = api_file.read_text(encoding="utf-8")
         new_content, num = header_pattern.subn(rf"\g<1>{new_version}", content)
         if num > 0:
-            src_file.write_text(new_content, encoding="utf-8")
-            count += 1
-    print(f"Updated {count} Python/Frontend files")
+            api_file.write_text(new_content, encoding="utf-8")
+            print("Updated api.py header")
 
     # 3. Update README.md
     readme_file = root_dir / "README.md"
@@ -45,13 +45,9 @@ def main():
     web_ui_dir = root_dir / "web-ui"
     package_json = web_ui_dir / "package.json"
     if package_json.exists():
-        import json
-
         with open(package_json, encoding="utf-8") as f:
             data = json.load(f)
         if data.get("version") != new_version:
-            import os
-
             subprocess.run(
                 ["npm", "version", new_version, "--no-git-tag-version"],
                 cwd=str(web_ui_dir),
