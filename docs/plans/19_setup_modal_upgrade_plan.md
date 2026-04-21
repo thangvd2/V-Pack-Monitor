@@ -57,7 +57,6 @@ Khi user bấm "LƯU TRẠM NÀY", kiểm tra trước khi gửi API:
 - **Bắt buộc** — dropdown, luôn có giá trị (default: single)
 - **Nếu chọn `single`** → ẩn field ip_camera_2
 - **Nếu chọn `dual_file` hoặc `pip`** → hiện ip_camera_2 (optional — để trống = dùng cùng IP với camera 1, tức 1 thiết bị 2 mắt)
-- **Nếu chọn `pip_sim` hoặc `dual_file_sim`** → ẩn field ip_camera_2 (dùng 1 camera)
 
 ### A8. Keep Days
 - **Bắt buộc** — dropdown, luôn có giá trị
@@ -89,9 +88,7 @@ Khi user bấm "LƯU TRẠM NÀY", kiểm tra trước khi gửi API:
 - Camera mode description ngắn gọn bên dưới dropdown:
   - `single`: "Ghi 1 luồng từ 1 camera"
   - `pip`: "Ghép hình-in-picture từ 2 camera (hoặc 1 camera 2 mắt)"
-  - `pip_sim`: "Ghép PIP thử nghiệm từ 1 camera"
   - `dual_file`: "Ghi 2 file riêng từ 2 camera (hoặc 1 camera 2 mắt)"
-  - `dual_file_sim`: "Ghi 2 file riêng từ 1 camera"
 - Cloud provider fields chỉ hiện khi chọn provider đó (đã có)
 
 ### B5. Safety Code Toggle Visibility

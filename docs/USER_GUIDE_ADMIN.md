@@ -143,9 +143,7 @@ Chi tiết các chế độ ghi video:
 |--------|--------|
 | **SINGLE** | Ghi từ một camera chính duy nhất |
 | **PIP** | Camera chính toàn màn hình, camera phụ chèn nhỏ ở góc (Picture-in-Picture) |
-| **PIP SIMULATION** | Giống PIP nhưng dùng chế độ mô phỏng |
 | **DUAL_FILE** | Ghi hai file video riêng biệt, mỗi camera một file |
-| **DUAL SIMULATION** | Giống DUAL_FILE nhưng dùng chế độ mô phỏng |
 
 ### 4.2 Hệ thống chung
 
