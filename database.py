@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v3.3.1
+# V-Pack Monitor - CamDongHang
 import logging
 
 logger = logging.getLogger(__name__)
@@ -819,6 +819,17 @@ def update_station(station_id, data):
                 data.get("mac_address", ""),
                 station_id,
             ),
+        )
+        conn.commit()
+
+
+def update_station_camera_mode(station_id, new_mode):
+    """Update only the camera_mode field for a station."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE stations SET camera_mode = ? WHERE id = ?",
+            (new_mode, station_id),
         )
         conn.commit()
 
