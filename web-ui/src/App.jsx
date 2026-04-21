@@ -270,6 +270,8 @@ function App() {
   const [updateProgress, setUpdateProgress] = useState(null);
   const [updating, setUpdating] = useState(false);
   const activeRecordIdRef = useRef(null);
+  const packingStatusRef = useRef(packingStatus);
+  packingStatusRef.current = packingStatus;
   const searchTermRef = useRef(searchTerm);
   useEffect(() => {
     searchTermRef.current = searchTerm;
@@ -761,9 +763,14 @@ function App() {
         station_id: activeStationId,
       });
       if (res.data.status === 'recording') {
-        activeRecordIdRef.current = res.data.record_id || null;
-        setPackingStatus('packing');
-        setCurrentWaybill(finalBarcode);
+        if (res.data.record_id) {
+          activeRecordIdRef.current = res.data.record_id;
+          setPackingStatus('packing');
+          setCurrentWaybill(finalBarcode);
+        } else {
+          showToast(res.data.message || 'Đang ghi đơn. Quét STOP trước khi quét mã mới.', 'warning');
+          playRecordingWarning();
+        }
       } else if (res.data.status === 'error') {
         if (res.data.message) {
           showToast(res.data.message, 'error');
@@ -893,7 +900,12 @@ function App() {
         barcodeBuffer = '';
 
         if (finalBarcode.length > 0) {
-          await sendScanAction(finalBarcode);
+          if (packingStatusRef.current === 'packing' && finalBarcode !== 'STOP' && finalBarcode !== 'EXIT') {
+            showToast('Đang ghi đơn. Quét STOP trước khi quét mã mới.', 'warning');
+            playRecordingWarning();
+          } else {
+            await sendScanAction(finalBarcode);
+          }
         }
       } else {
         if (e.key.length === 1) {
