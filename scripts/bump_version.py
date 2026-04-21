@@ -1,3 +1,5 @@
+import json
+import os
 import re
 import subprocess
 import sys
@@ -45,13 +47,9 @@ def main():
     web_ui_dir = root_dir / "web-ui"
     package_json = web_ui_dir / "package.json"
     if package_json.exists():
-        import json
-
         with open(package_json, encoding="utf-8") as f:
             data = json.load(f)
         if data.get("version") != new_version:
-            import os
-
             subprocess.run(
                 ["npm", "version", new_version, "--no-git-tag-version"],
                 cwd=str(web_ui_dir),
