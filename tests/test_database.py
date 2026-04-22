@@ -129,7 +129,7 @@ class TestInitDb:
 
         # First init — migration runs. It will auto-create the fallback station.
         database.init_db()
-        
+
         # Clear ALL stations (simulating user deleting everything)
         for s in database.get_stations():
             database.delete_station(s["id"])

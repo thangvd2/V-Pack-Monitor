@@ -2005,9 +2005,17 @@ function App() {
                           )}
                         </div>
 
-                        <p className="text-xs text-slate-400 mb-3 md:mb-4 font-mono">
-                          {new Date(record.recorded_at).toLocaleString('vi-VN')}
-                        </p>
+                        <div className="flex items-center gap-3 mb-3 md:mb-4 text-xs text-slate-400 font-mono">
+                          <span>{new Date(record.recorded_at).toLocaleString('vi-VN')}</span>
+                          {record.duration > 0 && (
+                            <span className="px-2 py-0.5 bg-white/5 rounded text-emerald-400 border border-emerald-500/20">
+                              ⏱ {Math.floor(record.duration / 60)}:
+                              {Math.floor(record.duration % 60)
+                                .toString()
+                                .padStart(2, '0')}
+                            </span>
+                          )}
+                        </div>
 
                         {/* Danh sách các file video lưu trữ */}
                         <div className="space-y-2">

@@ -427,11 +427,11 @@ def _preflight_checks(station_id):
     return True, ""
 
 
-def _verify_video_external(filepath):
+def _get_video_info_external(filepath):
     if not filepath or not os.path.exists(filepath):
-        return False
+        return (False, 0)
     if os.path.getsize(filepath) == 0:
-        return False
+        return (False, 0)
     try:
         cmd = [
             recorder._ffmpeg_bin("ffprobe"),
@@ -445,9 +445,13 @@ def _verify_video_external(filepath):
         ]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         dur = r.stdout.strip()
-        return bool(dur and float(dur) > 0)
+        if dur:
+            dur_float = float(dur)
+            if dur_float > 0:
+                return (True, dur_float)
     except Exception:
-        return False
+        pass
+    return (False, 0)
 
 
 def _recover_pending_records():
@@ -460,6 +464,7 @@ def _recover_pending_records():
         paths = rec["video_paths"]
         waybill = rec["waybill_code"]
         recovered = False
+        total_duration = 0.0
         if paths:
             for path in paths.split(","):
                 ts_path = path + ".tmp.ts"
@@ -490,17 +495,20 @@ def _recover_pending_records():
                             os.remove(ts_path)
                         except Exception:
                             pass
-                        if _verify_video_external(path):
+                        is_valid, dur = _get_video_info_external(path)
+                        if is_valid:
                             recovered = True
-                            break
+                            total_duration = max(total_duration, dur)
                     except Exception as e:
                         logger.error(f"[RECOVERY] transcode failed for record {rid}: {e}")
-                elif os.path.exists(path) and _verify_video_external(path):
-                    recovered = True
-                    break
+                elif os.path.exists(path):
+                    is_valid, dur = _get_video_info_external(path)
+                    if is_valid:
+                        recovered = True
+                        total_duration = max(total_duration, dur)
 
         if recovered:
-            database.update_record_status(rid, "READY", video_paths=paths)
+            database.update_record_status(rid, "READY", video_paths=paths, duration=total_duration)
             logger.info(f"Recovered record {rid} ({waybill}) \u2192 READY")
         else:
             database.update_record_status(rid, "FAILED", video_paths=paths)
