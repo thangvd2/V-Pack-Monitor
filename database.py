@@ -715,6 +715,9 @@ def get_record_by_id(record_id):
 
 def cleanup_old_records(days=7):
     """Xóa các video và bản ghi cũ hơn X ngày để giải phóng dung lượng ổ cứng."""
+    if days <= 0:
+        logger.info("[DB] cleanup_old_records: skipped (keep_days=%s, never delete)", days)
+        return
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -737,6 +740,8 @@ def cleanup_old_records(days=7):
                         logger.error(f"Error removing {path}: {e}")
             cursor.execute("DELETE FROM packing_video WHERE id = ?", (r_id,))
         conn.commit()
+        if old_records:
+            logger.info("[DB] cleanup_old_records: deleted %d old records (older than %d days)", len(old_records), days)
 
 
 def delete_record(record_id):
