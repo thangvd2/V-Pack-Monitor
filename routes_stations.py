@@ -85,7 +85,7 @@ def register_routes(app):
             brand=payload.camera_brand,
         )
         cam2_url = _resolve_cam2_url(payload, url_fn)
-        sm = api.CameraStreamManager(url, station_id=new_id, cam2_url=cam2_url)
+        sm = api.CameraStreamManager(url, station_id=new_id, cam2_url=cam2_url, station_name=payload.name)
         with api._streams_lock:
             api.stream_managers[new_id] = sm
         sm.start()
@@ -108,6 +108,7 @@ def register_routes(app):
             )
             sm.update_url(url)
             cam2_url = _resolve_cam2_url(payload, url_fn)
+            sm.station_name = payload.name
             sm.update_cam2_url(cam2_url)
         return {"status": "success"}
 

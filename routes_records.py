@@ -180,7 +180,7 @@ def _handle_scan_start(sid, barcode, station, current_user):
 
     record_id = database.create_record(sid, barcode, r_mode)
 
-    new_recorder = CameraRecorder(url1, rtsp_url_2=url2, record_mode=r_mode)
+    new_recorder = CameraRecorder(url1, rtsp_url_2=url2, record_mode=r_mode, station_name=station.get("name", ""))
     with api._recorders_lock:
         api.active_record_ids[sid] = record_id
         api.active_recorders[sid] = new_recorder
