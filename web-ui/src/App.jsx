@@ -1616,10 +1616,6 @@ function App() {
                 <AdminDashboard
                   stations={stations}
                   stationStatuses={stationStatuses}
-                  activeStationId={activeStationId}
-                  storageInfo={storageInfo}
-                  currentUser={currentUser}
-                  analytics={analytics}
                   reconnectInfo={reconnectInfo}
                   mtxAvailable={mtxAvailable}
                   isDualCamStation={isDualCamStation}
