@@ -109,6 +109,7 @@ def _build_pip_encode_args(encoder):
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-crf", "23",
+            "-pix_fmt", "yuv420p",
             "-threads", "0",
         ]
     elif encoder == "h264_videotoolbox":
@@ -268,17 +269,23 @@ class CameraRecorder:
             encoder, hw_accel = _detect_hw_encoder()
 
             if self.rtsp_url_1 == self.rtsp_url_2:
-                command = ["ffmpeg", "-y"]
+                command = ["ffmpeg", "-y", "-fflags", "+genpts+discardcorrupt"]
                 if hw_accel:
                     command += hw_accel.split()
                 command += [
+                    "-thread_queue_size",
+                    "512",
                     "-rtsp_transport",
                     "tcp",
                     "-i",
                     self.rtsp_url_1,
                     "-filter_complex",
-                    "[0:v]split=2[main][pip_raw]; [pip_raw]scale=iw/3:-1[pip]; [main][pip]overlay=main_w-overlay_w-10:main_h-overlay_h-10",
+                    "[0:v]split=2[main][pip_raw]; [pip_raw]scale=iw/3:-1[pip]; [main][pip]overlay=main_w-overlay_w-10:main_h-overlay_h-10, setpts=PTS-STARTPTS[out]",
                     *_build_pip_encode_args(encoder),
+                    "-fps_mode",
+                    "cfr",
+                    "-r",
+                    "15",
                     "-c:a",
                     "aac",
                     "-f",
@@ -288,25 +295,29 @@ class CameraRecorder:
                     tmpfile,
                 ]
             else:
-                command = ["ffmpeg", "-y"]
+                command = ["ffmpeg", "-y", "-fflags", "+genpts+discardcorrupt"]
                 if hw_accel:
                     command += hw_accel.split()
                 command += [
-                    "-use_wallclock_as_timestamps",
-                    "1",
+                    "-thread_queue_size",
+                    "512",
                     "-rtsp_transport",
                     "tcp",
                     "-i",
                     self.rtsp_url_1,
-                    "-use_wallclock_as_timestamps",
-                    "1",
+                    "-thread_queue_size",
+                    "512",
                     "-rtsp_transport",
                     "tcp",
                     "-i",
                     self.rtsp_url_2,
                     "-filter_complex",
-                    "[1:v]scale=iw/3:-1[pip]; [0:v][pip]overlay=main_w-overlay_w-10:main_h-overlay_h-10",
+                    "[0:v]setpts=PTS-STARTPTS[main]; [1:v]setpts=PTS-STARTPTS,scale=iw/3:-1[pip]; [main][pip]overlay=main_w-overlay_w-10:main_h-overlay_h-10",
                     *_build_pip_encode_args(encoder),
+                    "-fps_mode",
+                    "cfr",
+                    "-r",
+                    "15",
                     "-c:a",
                     "aac",
                     "-f",
@@ -389,10 +400,14 @@ class CameraRecorder:
                     cmd = [
                         _ffmpeg_bin("ffmpeg"),
                         "-y",
+                        "-fflags",
+                        "+igndts",
                         "-i",
                         ts_path,
                         "-c",
                         "copy",
+                        "-fflags",
+                        "+genpts",
                         "-movflags",
                         "+faststart",
                         final_path,
