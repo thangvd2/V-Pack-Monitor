@@ -153,9 +153,10 @@ def _is_hevc(filepath):
 
 
 class CameraRecorder:
-    def __init__(self, rtsp_url_1, rtsp_url_2=None, output_dir="recordings", record_mode="SINGLE"):
+    def __init__(self, rtsp_url_1, rtsp_url_2=None, output_dir="recordings", record_mode="SINGLE", station_name=""):
         self.rtsp_url_1 = rtsp_url_1
         self.rtsp_url_2 = rtsp_url_2 if rtsp_url_2 else rtsp_url_1
+        self.station_name = station_name
 
         self.output_dir = output_dir
         self.record_mode = record_mode
@@ -329,9 +330,10 @@ class CameraRecorder:
             self._launch_ffmpeg(command, final_path=filepath)
             self.current_files.append(filepath)
 
-        logger.info(f"Bat dau ghi hinh ({self.record_mode}) Don hang: {waybill_code}")
+        tag = f"[{self.station_name or 'Unknown'}] " if self.station_name else ""
+        logger.info(f"{tag}Bat dau ghi hinh ({self.record_mode}) Don hang: {waybill_code}")
         for f in self.current_files:
-            logger.info(f"Luu tai: {f}")
+            logger.info(f"{tag}Luu tai: {f}")
 
         return self.current_files
 
@@ -354,7 +356,8 @@ class CameraRecorder:
                 return []
             self._stopped = True
 
-        logger.info("Dang dung ghi hinh va dong goi video...")
+        tag = f"[{self.station_name or 'Unknown'}] " if self.station_name else ""
+        logger.info(f"{tag}Dang dung ghi hinh va dong goi video...")
 
         for pinfo in self.processes:
             p = pinfo["proc"]

@@ -111,7 +111,7 @@ def notify_sse(event_type, data):
             _sse_clients.pop(i)
 
 
-def _mtx_add_path(station_id, rtsp_url, suffix=""):
+def _mtx_add_path(station_id, rtsp_url, suffix="", station_name=""):
     name = f"station_{station_id}{suffix}"
     conf = {
         "name": name,
@@ -127,6 +127,8 @@ def _mtx_add_path(station_id, rtsp_url, suffix=""):
             method="POST",
         )
         urllib.request.urlopen(req, timeout=5)
+        tag = f' "{station_name}"' if station_name else ""
+        logger.info(f"[MTX] Registered path {name}{tag}")
         return
     except Exception as e:
         logger.error(f"[MTX] replace {name} failed: {e}")
@@ -147,11 +149,13 @@ def _mtx_add_path(station_id, rtsp_url, suffix=""):
             method="POST",
         )
         urllib.request.urlopen(req, timeout=5)
+        tag = f' "{station_name}"' if station_name else ""
+        logger.info(f"[MTX] Registered path {name}{tag}")
     except Exception as e:
         logger.error(f"[MTX] ERROR: add {name} failed after all retries: {e}")
 
 
-def _mtx_remove_path(station_id, suffix=""):
+def _mtx_remove_path(station_id, suffix="", station_name=""):
     name = f"station_{station_id}{suffix}"
     try:
         req = urllib.request.Request(
@@ -159,6 +163,8 @@ def _mtx_remove_path(station_id, suffix=""):
             method="POST",
         )
         urllib.request.urlopen(req, timeout=5)
+        tag = f' "{station_name}"' if station_name else ""
+        logger.info(f"[MTX] Removed path {name}{tag}")
     except urllib.error.HTTPError as e:
         if e.code != 404:
             logger.error(f"[MTX] delete {name} failed: {e}")
@@ -167,10 +173,11 @@ def _mtx_remove_path(station_id, suffix=""):
 
 
 class CameraStreamManager:
-    def __init__(self, url, station_id=None, cam2_url=None):
+    def __init__(self, url, station_id=None, cam2_url=None, station_name=""):
         self.url = url
         self.station_id = station_id
         self.cam2_url = cam2_url
+        self.station_name = station_name
         self.is_running = False
         self.thread = None
         self._fail_count = 0
@@ -191,15 +198,15 @@ class CameraStreamManager:
     def stop(self):
         self.is_running = False
         if self.station_id:
-            _mtx_remove_path(self.station_id)
+            _mtx_remove_path(self.station_id, station_name=self.station_name)
             if self.cam2_url:
-                _mtx_remove_path(self.station_id, suffix="_cam2")
+                _mtx_remove_path(self.station_id, suffix="_cam2", station_name=self.station_name)
         if self.thread:
             self.thread.join()
 
     def _mtx_register(self):
         if self.station_id and self.url:
-            _mtx_add_path(self.station_id, self.url)
+            _mtx_add_path(self.station_id, self.url, station_name=self.station_name)
 
     def _try_rediscover_camera(self):
         if not self.station_id:
@@ -261,23 +268,25 @@ class CameraStreamManager:
                     elif cam2_item and cam2_item.get("ready") is False:
                         self._cam2_fail_count += 1
                         if self._cam2_fail_count >= 2:
+                            tag = f' "{self.station_name}"' if self.station_name else ""
                             logger.warning(
-                                f"[MTX] station_{self.station_id}_cam2 failed health check "
+                                f"[MTX] station_{self.station_id}{tag} cam2 failed health check "
                                 f"{self._cam2_fail_count}x — removing broken cam2 path"
                             )
-                            _mtx_remove_path(self.station_id, suffix="_cam2")
+                            _mtx_remove_path(self.station_id, suffix="_cam2", station_name=self.station_name)
                             self.cam2_url = None
                             self._cam2_fail_count = 0
                     else:
-                        _mtx_add_path(self.station_id, self.cam2_url, suffix="_cam2")
+                        _mtx_add_path(self.station_id, self.cam2_url, suffix="_cam2", station_name=self.station_name)
             except Exception as e:
-                logger.error(f"[MTX] monitor loop error for station_{self.station_id}: {e}")
+                tag = f' "{self.station_name}"' if self.station_name else ""
+                logger.error(f"[MTX] monitor loop error for station_{self.station_id}{tag}: {e}")
 
     def update_url(self, new_url):
         with self._lock:
             self.url = new_url
         if self.station_id:
-            _mtx_remove_path(self.station_id)
+            _mtx_remove_path(self.station_id, station_name=self.station_name)
             self._mtx_register()
 
     def update_cam2_url(self, new_url):
@@ -286,9 +295,9 @@ class CameraStreamManager:
             self.cam2_url = new_url
         self._cam2_fail_count = 0
         if old_cam2 and self.station_id:
-            _mtx_remove_path(self.station_id, suffix="_cam2")
+            _mtx_remove_path(self.station_id, suffix="_cam2", station_name=self.station_name)
         if new_url and self.station_id:
-            _mtx_add_path(self.station_id, new_url, suffix="_cam2")
+            _mtx_add_path(self.station_id, new_url, suffix="_cam2", station_name=self.station_name)
         self._mtx_register()
 
 
@@ -590,7 +599,7 @@ async def lifespan(app: FastAPI):
                 cam2_url = get_rtsp_url(cam2_ip, code, channel=2, brand=brand)
             else:
                 cam2_url = get_rtsp_sub_url(cam2_ip, code, channel=2, brand=brand)
-        manager = CameraStreamManager(live_url, station_id=st["id"], cam2_url=cam2_url)
+        manager = CameraStreamManager(live_url, station_id=st["id"], cam2_url=cam2_url, station_name=st.get("name", ""))
         with _streams_lock:
             stream_managers[st["id"]] = manager
         manager.start()
