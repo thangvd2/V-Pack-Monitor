@@ -34,6 +34,7 @@ import VideoPlayerModal from './VideoPlayerModal';
 import UserManagementModal from './UserManagementModal';
 import Dashboard from './Dashboard';
 import AdminDashboard from './AdminDashboard';
+import SystemHealth from './SystemHealth';
 import MtxFallback from './MtxFallback';
 import API_BASE from './config';
 import { playScanStart, playRecordingStop, playVideoReady, playRecordingWarning } from './utils/notificationSounds';
@@ -223,6 +224,7 @@ function App() {
 
   // Grid View State
   const [viewMode, setViewMode] = useState('single'); // 'single' | 'grid'
+  const [adminTab, setAdminTab] = useState('operations'); // 'operations' | 'overview'
   const [cameraMode, setCameraMode] = useState('single-cam'); // 'single-cam' | 'dual' | 'pip'
   const [showDashboard, setShowDashboard] = useState(false);
   const [stationStatuses, setStationStatuses] = useState({}); // { [stationId]: { status, waybill } }
@@ -316,6 +318,7 @@ function App() {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         if (user.role === 'ADMIN') {
           setStationAssigned(true);
+          setViewMode('grid');
         }
         if (user.must_change_password) {
           setShowChangePassword(true);
@@ -562,9 +565,11 @@ function App() {
   useEffect(() => {
     if (activeStationId) {
       fetchStatus(activeStationId);
-      fetchAnalytics(activeStationId);
     }
-  }, [activeStationId]);
+    if (currentUser) {
+      fetchAnalytics(activeStationId || '');
+    }
+  }, [activeStationId, currentUser]);
 
   useEffect(() => {
     if (!activeStationId) return;
@@ -601,7 +606,8 @@ function App() {
 
   const fetchAnalytics = async (sid) => {
     try {
-      const res = await axios.get(`${API_BASE}/api/analytics/today?station_id=${sid}`);
+      const url = sid ? `${API_BASE}/api/analytics/today?station_id=${sid}` : `${API_BASE}/api/analytics/today`;
+      const res = await axios.get(url);
       if (res.data.data) {
         setAnalytics(res.data.data);
       }
@@ -651,7 +657,7 @@ function App() {
 
   // Fetch records (with AbortController)
   useEffect(() => {
-    if (activeStationId && currentUser) {
+    if (currentUser) {
       setRecordsPage(1);
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -846,6 +852,7 @@ function App() {
         setCurrentUser(user);
         if (user.role === 'ADMIN') {
           setStationAssigned(true);
+          setViewMode('grid');
         }
         if (user.must_change_password) {
           setShowChangePassword(true);
@@ -869,6 +876,7 @@ function App() {
     setCurrentUser(null);
     setStationAssigned(false);
     setActiveSessionId(null);
+    setAdminTab('operations');
   };
 
   // --- Hàm xoá bản ghi (Đã qua kiểm duyệt bảo mật) ---
@@ -1333,7 +1341,7 @@ function App() {
 
           <div className="mt-4 md:mt-6 flex items-center gap-2 md:gap-3 w-full md:w-auto flex-wrap">
             {/* Station Selector Dropdown */}
-            {viewMode !== 'grid' && (
+            {!(currentUser?.role === 'ADMIN' && viewMode === 'grid') && (
               <div className="relative group flex items-center border border-white/10 rounded-xl bg-white/5 h-10 min-h-[44px] px-2 md:px-3 shadow-lg">
                 <Monitor className="w-5 h-5 text-indigo-400 mr-2" />
                 <select
@@ -1403,10 +1411,39 @@ function App() {
               </div>
             )}
 
+            {/* Admin Tab Navigation */}
+            {currentUser?.role === 'ADMIN' && viewMode === 'grid' && (
+              <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1 border border-white/10">
+                <button
+                  onClick={() => setAdminTab('operations')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    adminTab === 'operations'
+                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  📹 Vận hành
+                </button>
+                <button
+                  onClick={() => setAdminTab('overview')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    adminTab === 'overview'
+                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  📊 Tổng quan
+                </button>
+              </div>
+            )}
+
             {/* Back to Tổng quan (Admin only) */}
             {viewMode === 'single' && currentUser?.role === 'ADMIN' && (
               <button
-                onClick={() => setViewMode('grid')}
+                onClick={() => {
+                  setViewMode('grid');
+                  setAdminTab('operations');
+                }}
                 className="hidden md:flex h-10 items-center justify-center px-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/30 rounded-xl transition-all shadow-lg text-slate-400 hover:text-blue-400 font-medium text-sm gap-2"
                 title="Quay lại giao diện tổng quan"
               >
@@ -1575,22 +1612,31 @@ function App() {
             className={`${viewMode === 'grid' || currentUser?.role === 'ADMIN' ? 'lg:col-span-1' : 'lg:col-span-2'} flex flex-col gap-4`}
           >
             {currentUser?.role === 'ADMIN' && viewMode === 'grid' ? (
-              <AdminDashboard
-                stations={stations}
-                stationStatuses={stationStatuses}
-                activeStationId={activeStationId}
-                storageInfo={storageInfo}
-                currentUser={currentUser}
-                analytics={analytics}
-                reconnectInfo={reconnectInfo}
-                mtxAvailable={mtxAvailable}
-                isDualCamStation={isDualCamStation}
-                MTX_HOST={MTX_HOST}
-                onStationClick={(id) => {
-                  setActiveStationId(id);
-                  setViewMode('single');
-                }}
-              />
+              adminTab === 'operations' ? (
+                <AdminDashboard
+                  stations={stations}
+                  stationStatuses={stationStatuses}
+                  reconnectInfo={reconnectInfo}
+                  mtxAvailable={mtxAvailable}
+                  isDualCamStation={isDualCamStation}
+                  MTX_HOST={MTX_HOST}
+                  onStationClick={(id) => {
+                    setActiveStationId(id);
+                    setViewMode('single');
+                  }}
+                />
+              ) : (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <Dashboard
+                    stations={stations}
+                    activeStationId={''}
+                    storageInfo={storageInfo}
+                    currentUser={currentUser}
+                    analytics={analytics}
+                  />
+                  <SystemHealth currentUser={currentUser} />
+                </div>
+              )
             ) : viewMode === 'grid' ? (
               <>
                 <div className="flex items-center justify-between">
@@ -1917,7 +1963,7 @@ function App() {
             )}
           </div>
 
-          {viewMode !== 'grid' && (
+          {(viewMode !== 'grid' || (currentUser?.role === 'ADMIN' && adminTab === 'operations')) && (
             <div className="flex flex-col gap-4 h-[calc(100vh-160px)] md:h-[calc(100vh-200px)]">
               <div className="flex items-center justify-between pointer-events-none">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -1932,7 +1978,10 @@ function App() {
                 {currentUser?.role === 'ADMIN' && (
                   <select
                     value={activeStationId || ''}
-                    onChange={(e) => setActiveStationId(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setActiveStationId(val === '' || val === 'orphaned' ? val : Number(val));
+                    }}
                     className="bg-white/10 text-white text-xs rounded px-2 py-1 border border-white/20 focus:outline-none focus:border-blue-400"
                     style={{ colorScheme: 'dark' }}
                   >
