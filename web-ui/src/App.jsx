@@ -412,6 +412,7 @@ function App() {
               },
             };
           });
+          // Station-specific UI (sounds, packing status) only when viewing that station
           if (data.station_id === activeStationId) {
             if (isRecording) {
               playScanStart();
@@ -436,10 +437,18 @@ function App() {
                 setCurrentWaybill('');
                 activeRecordIdRef.current = null;
               }
-              fetchStorageInfo();
             }
-            fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
           }
+          // Always refresh records + storage for admin on any station status change
+          if (
+            data.status === 'PROCESSING' ||
+            data.status === 'READY' ||
+            data.status === 'FAILED' ||
+            data.status === 'DELETED'
+          ) {
+            fetchStorageInfo();
+          }
+          fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
         } else {
           if (data.station_id !== activeStationId) return;
 
