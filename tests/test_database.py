@@ -121,6 +121,26 @@ class TestInitDb:
         users = get_all_users()
         assert len(users) == 1
 
+    def test_no_ghost_station_after_delete_all(self, tmp_path, monkeypatch):
+        """Deleting all stations then re-initing DB should NOT auto-create a station."""
+        import database
+        monkeypatch.setattr(database, "DB_FILE", str(tmp_path / "test.db"))
+        database._init_done = False
+
+        # First init — migration runs. It will auto-create the fallback station.
+        database.init_db()
+        
+        # Clear ALL stations (simulating user deleting everything)
+        for s in database.get_stations():
+            database.delete_station(s["id"])
+
+        assert len(database.get_stations()) == 0
+
+        # Re-init — should NOT create a ghost station because stations_migrated is set
+        database._init_done = False
+        database.init_db()
+        assert len(database.get_stations()) == 0, "Ghost station appeared after re-init!"
+
 
 class TestSettings:
     def test_set_get_roundtrip(self):
