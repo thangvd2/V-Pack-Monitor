@@ -208,27 +208,34 @@ def init_db():
             if "mac_address" not in st_cols:
                 cursor.execute("ALTER TABLE stations ADD COLUMN mac_address TEXT DEFAULT '';")
 
-            # Migrate old settings to station 1 if stations table is empty
-            cursor.execute("SELECT COUNT(*) FROM stations")
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'IP_CAMERA'")
-                ip_row = cursor.fetchone()
-                ip1 = ip_row[0] if ip_row else ""
+            # One-time migration: import old single-station settings into stations table
+            # Guard: only run once, even if stations table is empty later (e.g. user deleted all)
+            cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'stations_migrated'")
+            if not cursor.fetchone():
+                cursor.execute("SELECT COUNT(*) FROM stations")
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'IP_CAMERA'")
+                    ip_row = cursor.fetchone()
+                    ip1 = ip_row[0] if ip_row else ""
 
-                cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'SAFETY_CODE'")
-                code_row = cursor.fetchone()
-                code = code_row[0] if code_row else ""
+                    cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'SAFETY_CODE'")
+                    code_row = cursor.fetchone()
+                    code = code_row[0] if code_row else ""
 
-                cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'RECORD_MODE'")
-                mode_row = cursor.fetchone()
-                mode = mode_row[0] if mode_row else "SINGLE"
+                    cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'RECORD_MODE'")
+                    mode_row = cursor.fetchone()
+                    mode = mode_row[0] if mode_row else "SINGLE"
 
+                    cursor.execute(
+                        """
+                        INSERT INTO stations (name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand)
+                        VALUES ('Bàn Chốt Đơn 1', ?, '', ?, ?, 'imou')
+                    """,
+                        (ip1, code, mode),
+                    )
+                # Mark migration as done (regardless of whether station was created)
                 cursor.execute(
-                    """
-                    INSERT INTO stations (name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand)
-                    VALUES ('Bàn Chốt Đơn 1', ?, '', ?, ?, 'imou')
-                """,
-                    (ip1, code, mode),
+                    "INSERT OR REPLACE INTO system_settings (config_key, config_value) VALUES ('stations_migrated', '1')"
                 )
 
             cursor.execute("""
