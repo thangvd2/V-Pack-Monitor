@@ -1477,13 +1477,15 @@ function App() {
               </button>
             )}
 
-            <button
-              onClick={() => setShowDashboard((prev) => !prev)}
-              className={`hidden md:flex h-10 w-10 items-center justify-center border rounded-xl transition-all shadow-lg ${showDashboard ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-blue-500/30 text-slate-400 hover:text-blue-400'}`}
-              title={showDashboard ? 'Quay lại giao diện chính' : 'Bảng điều khiển'}
-            >
-              <BarChart3 className="w-5 h-5" />
-            </button>
+            {!(currentUser?.role === 'ADMIN' && viewMode === 'grid') && (
+              <button
+                onClick={() => setShowDashboard((prev) => !prev)}
+                className={`hidden md:flex h-10 w-10 items-center justify-center border rounded-xl transition-all shadow-lg ${showDashboard ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-blue-500/30 text-slate-400 hover:text-blue-400'}`}
+                title={showDashboard ? 'Quay lại giao diện chính' : 'Bảng điều khiển'}
+              >
+                <BarChart3 className="w-5 h-5" />
+              </button>
+            )}
 
             <div className="relative w-full md:w-64 group order-last md:order-none">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -1626,7 +1628,7 @@ function App() {
                   }}
                 />
               ) : (
-                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <Dashboard
                     stations={stations}
                     activeStationId={''}
@@ -1634,7 +1636,6 @@ function App() {
                     currentUser={currentUser}
                     analytics={analytics}
                   />
-                  <SystemHealth currentUser={currentUser} />
                 </div>
               )
             ) : viewMode === 'grid' ? (

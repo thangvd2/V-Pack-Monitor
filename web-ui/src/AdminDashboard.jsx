@@ -130,7 +130,7 @@ export default function AdminDashboard({
                       allow="autoplay"
                     />
                   )}
-                  <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/5 transition-all duration-300 pointer-events-none" />
+                  <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/5 transition-all duration-300 z-20 cursor-pointer" />
                 </div>
               );
             })}
