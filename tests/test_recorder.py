@@ -57,7 +57,8 @@ def test_start_recording_dual(mock_popen, tmp_path):
 
 
 @patch("subprocess.Popen")
-def test_start_recording_pip(mock_popen, tmp_path):
+@patch("recorder._detect_hw_encoder", return_value=("libx264", ""))
+def test_start_recording_pip(mock_detect, mock_popen, tmp_path):
     mock_popen.return_value = MagicMock()
     rec = CameraRecorder("rtsp://fake1", "rtsp://fake2", output_dir=str(tmp_path), record_mode="PIP")
 

@@ -96,9 +96,35 @@ def _build_transcode_cmd(input_file, output_file):
     elif encoder == "h264_videotoolbox":
         cmd += ["-c:v", encoder, "-b:v", "5M", "-c:a", "copy"]
     else:
-        cmd += ["-c:v", encoder, "-c:a", "copy"]
+        cmd += ["-c:v", encoder, "-b:v", "5M", "-c:a", "copy"]
     cmd += ["-movflags", "+faststart", output_file]
     return cmd
+
+
+def _build_pip_encode_args(encoder):
+    """Build encoding args optimized for PIP composite recording."""
+    if encoder == "libx264":
+        # CRF adapts quality to content complexity — good for PIP with mixed static/detail areas
+        return [
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-crf", "23",
+            "-threads", "0",
+        ]
+    elif encoder == "h264_videotoolbox":
+        # VideoToolbox does not support CRF — use higher bitrate for PIP composite
+        return [
+            "-c:v", "h264_videotoolbox",
+            "-b:v", "6M",
+            "-pix_fmt", "yuv420p",
+        ]
+    else:
+        # GPU encoders (h264_qsv, h264_nvenc, h264_amf)
+        return [
+            "-c:v", encoder,
+            "-b:v", "6M",
+            "-pix_fmt", "yuv420p",
+        ]
 
 
 def _is_hevc(filepath):
@@ -239,27 +265,20 @@ class CameraRecorder:
             filepath = os.path.join(self.output_dir, filename)
             tmpfile = filepath + ".tmp.ts"
 
-            sys_os = platform.system()
-            vcodec = "libx264"
-            if sys_os == "Darwin":
-                vcodec = "h264_videotoolbox"
+            encoder, hw_accel = _detect_hw_encoder()
 
             if self.rtsp_url_1 == self.rtsp_url_2:
-                command = [
-                    "ffmpeg",
-                    "-y",
+                command = ["ffmpeg", "-y"]
+                if hw_accel:
+                    command += hw_accel.split()
+                command += [
                     "-rtsp_transport",
                     "tcp",
                     "-i",
                     self.rtsp_url_1,
                     "-filter_complex",
                     "[0:v]split=2[main][pip_raw]; [pip_raw]scale=iw/3:-1[pip]; [main][pip]overlay=main_w-overlay_w-10:main_h-overlay_h-10",
-                    "-c:v",
-                    vcodec,
-                    "-b:v",
-                    "2000k",
-                    "-pix_fmt",
-                    "yuv420p",
+                    *_build_pip_encode_args(encoder),
                     "-c:a",
                     "aac",
                     "-f",
@@ -269,9 +288,10 @@ class CameraRecorder:
                     tmpfile,
                 ]
             else:
-                command = [
-                    "ffmpeg",
-                    "-y",
+                command = ["ffmpeg", "-y"]
+                if hw_accel:
+                    command += hw_accel.split()
+                command += [
                     "-use_wallclock_as_timestamps",
                     "1",
                     "-rtsp_transport",
@@ -286,12 +306,7 @@ class CameraRecorder:
                     self.rtsp_url_2,
                     "-filter_complex",
                     "[1:v]scale=iw/3:-1[pip]; [0:v][pip]overlay=main_w-overlay_w-10:main_h-overlay_h-10",
-                    "-c:v",
-                    vcodec,
-                    "-b:v",
-                    "2000k",
-                    "-pix_fmt",
-                    "yuv420p",
+                    *_build_pip_encode_args(encoder),
                     "-c:a",
                     "aac",
                     "-f",
