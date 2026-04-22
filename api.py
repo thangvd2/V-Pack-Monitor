@@ -651,8 +651,12 @@ if not os.path.exists("recordings"):
 
 # Tự động dọn dẹp các video cũ
 try:
-    keep_days = int(database.get_setting("RECORD_KEEP_DAYS", 7))
-    database.cleanup_old_records(keep_days)
+    keep_days = int(database.get_setting("RECORD_KEEP_DAYS", 365))
+    if keep_days > 0:
+        logger.info(f"[STARTUP] Auto-cleanup: removing records older than {keep_days} days")
+        database.cleanup_old_records(keep_days)
+    else:
+        logger.info("[STARTUP] Auto-cleanup: disabled (keep_days=0, never delete)")
 except Exception:
     pass
 

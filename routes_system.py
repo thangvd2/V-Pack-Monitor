@@ -27,7 +27,7 @@ import urllib.request
 import psutil
 from fastapi import File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 import api
 import cloud_sync
@@ -410,6 +410,13 @@ class SettingsUpdate(BaseModel):
     S3_BUCKET_NAME: str = ""
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
+
+    @field_validator("RECORD_KEEP_DAYS")
+    @classmethod
+    def validate_keep_days(cls, v):
+        if v not in (0, 3, 7, 15, 30, 60, 90, 150, 365):
+            raise ValueError("RECORD_KEEP_DAYS must be one of: 0, 3, 7, 15, 30, 60, 90, 150, 365")
+        return v
 
 
 def register_routes(app):

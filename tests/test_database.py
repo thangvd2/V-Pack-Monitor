@@ -261,6 +261,40 @@ class TestRecords:
         assert not os.path.exists(fake_video)
         assert get_record_by_id(rid) is None
 
+    def test_cleanup_old_records_disabled(self, sample_station_id, tmp_path):
+        fake_video = str(tmp_path / "old_video_disabled.mp4")
+        with open(fake_video, "w") as f:
+            f.write("fake")
+        rid = create_record(sample_station_id, "OLD-WB-0", "SINGLE")
+        update_record_status(rid, "READY", video_paths=fake_video)
+        with sqlite3.connect(database.DB_FILE) as conn:
+            conn.execute(
+                "UPDATE packing_video SET recorded_at = datetime('now', '-10 days') WHERE id = ?",
+                (rid,),
+            )
+            conn.commit()
+        assert os.path.exists(fake_video)
+        cleanup_old_records(days=0)
+        assert os.path.exists(fake_video)
+        assert get_record_by_id(rid) is not None
+
+    def test_cleanup_old_records_365_days(self, sample_station_id, tmp_path):
+        fake_video = str(tmp_path / "old_video_365.mp4")
+        with open(fake_video, "w") as f:
+            f.write("fake")
+        rid = create_record(sample_station_id, "OLD-WB-365", "SINGLE")
+        update_record_status(rid, "READY", video_paths=fake_video)
+        with sqlite3.connect(database.DB_FILE) as conn:
+            conn.execute(
+                "UPDATE packing_video SET recorded_at = datetime('now', '-366 days') WHERE id = ?",
+                (rid,),
+            )
+            conn.commit()
+        assert os.path.exists(fake_video)
+        cleanup_old_records(days=365)
+        assert not os.path.exists(fake_video)
+        assert get_record_by_id(rid) is None
+
     def test_delete_record(self, sample_station_id, tmp_path):
         fake_video = str(tmp_path / "del_video.mp4")
         with open(fake_video, "w") as f:
