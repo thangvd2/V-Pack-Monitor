@@ -168,7 +168,8 @@ def init_db():
                     record_mode TEXT NOT NULL,
                     recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     status TEXT DEFAULT 'READY' CHECK(status IN ('READY', 'RECORDING', 'PROCESSING', 'FAILED', 'SYNCED')),
-                    is_synced INTEGER DEFAULT 0
+                    is_synced INTEGER DEFAULT 0,
+                    duration REAL DEFAULT 0
                 )
             """)
 
@@ -182,6 +183,8 @@ def init_db():
                 cursor.execute("ALTER TABLE packing_video ADD COLUMN is_synced INTEGER DEFAULT 0;")
             if "status" not in columns:
                 cursor.execute("ALTER TABLE packing_video ADD COLUMN status TEXT DEFAULT 'READY';")
+            if "duration" not in columns:
+                cursor.execute("ALTER TABLE packing_video ADD COLUMN duration REAL DEFAULT 0;")
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS system_settings (
@@ -495,7 +498,7 @@ def create_record(station_id, waybill_code, record_mode, video_paths=""):
         return cursor.lastrowid
 
 
-def update_record_status(record_id, status, video_paths=None):
+def update_record_status(record_id, status, video_paths=None, duration=None):
     # H2: Validate status before update
     if status not in _VALID_RECORD_STATUSES:
         raise ValueError(f"Invalid record status: {status}. Must be one of {_VALID_RECORD_STATUSES}")
@@ -503,15 +506,27 @@ def update_record_status(record_id, status, video_paths=None):
         cursor = conn.cursor()
         if video_paths is not None:
             paths_str = ",".join(video_paths) if isinstance(video_paths, list) else video_paths
-            cursor.execute(
-                "UPDATE packing_video SET status = ?, video_paths = ? WHERE id = ?",
-                (status, paths_str, record_id),
-            )
+            if duration is not None:
+                cursor.execute(
+                    "UPDATE packing_video SET status = ?, video_paths = ?, duration = ? WHERE id = ?",
+                    (status, paths_str, duration, record_id),
+                )
+            else:
+                cursor.execute(
+                    "UPDATE packing_video SET status = ?, video_paths = ? WHERE id = ?",
+                    (status, paths_str, record_id),
+                )
         else:
-            cursor.execute(
-                "UPDATE packing_video SET status = ? WHERE id = ?",
-                (status, record_id),
-            )
+            if duration is not None:
+                cursor.execute(
+                    "UPDATE packing_video SET status = ?, duration = ? WHERE id = ?",
+                    (status, duration, record_id),
+                )
+            else:
+                cursor.execute(
+                    "UPDATE packing_video SET status = ? WHERE id = ?",
+                    (status, record_id),
+                )
         conn.commit()
 
 
@@ -563,7 +578,7 @@ def get_records_v2(
     sort_col = _SORT_COLUMNS.get(sort_by, "p.recorded_at")
     sort_dir = "DESC" if sort_order.lower() == "desc" else "ASC"
 
-    base_select = "p.id, p.waybill_code, p.video_paths, p.record_mode, datetime(p.recorded_at, 'localtime') AS recorded_at, s.name, p.status"
+    base_select = "p.id, p.waybill_code, p.video_paths, p.record_mode, datetime(p.recorded_at, 'localtime') AS recorded_at, s.name, p.status, p.duration"
 
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -677,6 +692,7 @@ def get_records_v2(
                 "recorded_at": r[4],
                 "station_name": r[5],
                 "status": r[6],
+                "duration": r[7] if len(r) > 7 else 0,
             }
         )
 

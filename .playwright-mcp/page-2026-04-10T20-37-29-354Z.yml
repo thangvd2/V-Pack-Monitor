@@ -1,0 +1,466 @@
+- generic [ref=e3]:
+  - banner [ref=e24]:
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - img [ref=e28]
+        - generic [ref=e33]:
+          - heading "V-Pack Monitor" [level=1] [ref=e34]
+          - paragraph [ref=e35]: Hệ thống Camera Đóng hàng E-Commerce
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - img [ref=e38]
+          - combobox [ref=e40] [cursor=pointer]:
+            - 'option "Trạm: Bàn Chốt Đơn 1" [selected]'
+            - 'option "Trạm: Bàn Gói Hàng 2"'
+          - button "Thêm Trạm Mới" [ref=e41]:
+            - img [ref=e42]
+        - button "Xem tổng quan tất cả trạm" [ref=e43]:
+          - img [ref=e44]
+        - button "Bảng điều khiển" [ref=e49]:
+          - img [ref=e50]
+        - button "Sức khỏe hệ thống" [ref=e52]:
+          - img [ref=e53]
+        - generic [ref=e55]:
+          - generic:
+            - img
+          - textbox "Tìm mã vận đơn..." [ref=e56]
+        - generic [ref=e57]:
+          - img [ref=e58]
+          - generic [ref=e60]:
+            - generic [ref=e61]: Đã Sử Dụng
+            - generic [ref=e62]: 948.95 MB (39 file)
+        - button "Administrator ADMIN" [ref=e64]:
+          - img [ref=e65]
+          - generic [ref=e68]:
+            - generic [ref=e69]: Administrator
+            - generic [ref=e70]: ADMIN
+          - img [ref=e71]
+    - generic [ref=e73]:
+      - generic [ref=e74]:
+        - generic [ref=e75]:
+          - img [ref=e76]
+          - generic [ref=e78]: "Cảnh Báo: Ổ Cứng Sắp Đầy!"
+        - generic [ref=e79]: 423.9 GB / 460.4 GB
+      - generic [ref=e83]: "Đã dùng: 92.06%"
+  - generic [ref=e84]:
+    - generic [ref=e85]:
+      - generic [ref=e87]:
+        - heading "Chế Độ Quan Sát Live" [level=2] [ref=e88]:
+          - img [ref=e89]
+          - text: Chế Độ Quan Sát Live
+        - button "Tổng quan" [ref=e92]:
+          - img [ref=e93]
+          - text: Tổng quan
+      - generic [ref=e101]:
+        - iframe [ref=e102]:
+          
+        - generic:
+          - generic:
+            - generic: Bàn Chốt Đơn 1
+    - generic [ref=e103]:
+      - generic:
+        - heading "Lịch sử ghi hình" [level=2]:
+          - img
+          - text: Lịch sử ghi hình
+        - generic: 33 videos
+      - generic [ref=e104]:
+        - generic [ref=e105] [cursor=pointer]:
+          - generic [ref=e106]:
+            - generic [ref=e107]:
+              - heading "123123123" [level=3] [ref=e108]
+              - generic [ref=e109]: SINGLE
+              - generic [ref=e110]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e111]:
+              - img [ref=e112]
+          - paragraph [ref=e115]: 03:31:43 11/4/2026
+          - button "123123123_20260411_033143.mp4" [ref=e117]:
+            - img [ref=e118]
+            - generic [ref=e121]: 123123123_20260411_033143.mp4
+        - generic [ref=e122] [cursor=pointer]:
+          - generic [ref=e123]:
+            - generic [ref=e124]:
+              - heading "123123" [level=3] [ref=e125]
+              - generic [ref=e126]: SINGLE
+              - generic [ref=e127]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e128]:
+              - img [ref=e129]
+          - paragraph [ref=e132]: 03:31:41 11/4/2026
+          - button "123123_20260411_033141.mp4" [ref=e134]:
+            - img [ref=e135]
+            - generic [ref=e138]: 123123_20260411_033141.mp4
+        - generic [ref=e139] [cursor=pointer]:
+          - generic [ref=e140]:
+            - generic [ref=e141]:
+              - heading "23123" [level=3] [ref=e142]
+              - generic [ref=e143]: SINGLE
+              - generic [ref=e144]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e145]:
+              - img [ref=e146]
+          - paragraph [ref=e149]: 03:31:38 11/4/2026
+          - button "23123_20260411_033138.mp4" [ref=e151]:
+            - img [ref=e152]
+            - generic [ref=e155]: 23123_20260411_033138.mp4
+        - generic [ref=e156] [cursor=pointer]:
+          - generic [ref=e157]:
+            - generic [ref=e158]:
+              - heading "''''" [level=3] [ref=e159]
+              - generic [ref=e160]: SINGLE
+              - generic [ref=e161]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e162]:
+              - img [ref=e163]
+          - paragraph [ref=e166]: 03:31:29 11/4/2026
+          - button "''''_20260411_033129.mp4" [ref=e168]:
+            - img [ref=e169]
+            - generic [ref=e172]: "''''_20260411_033129.mp4"
+        - generic [ref=e173] [cursor=pointer]:
+          - generic [ref=e174]:
+            - generic [ref=e175]:
+              - heading "XZCZXCQS3" [level=3] [ref=e176]
+              - generic [ref=e177]: SINGLE
+              - generic [ref=e178]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e179]:
+              - img [ref=e180]
+          - paragraph [ref=e183]: 03:31:16 11/4/2026
+          - button "XZCZXCQS3_20260411_033116.mp4" [ref=e185]:
+            - img [ref=e186]
+            - generic [ref=e189]: XZCZXCQS3_20260411_033116.mp4
+        - generic [ref=e190] [cursor=pointer]:
+          - generic [ref=e191]:
+            - generic [ref=e192]:
+              - heading "XZCZXCQS2" [level=3] [ref=e193]
+              - generic [ref=e194]: SINGLE
+              - generic [ref=e195]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e196]:
+              - img [ref=e197]
+          - paragraph [ref=e200]: 03:31:09 11/4/2026
+          - button "XZCZXCQS2_20260411_033109.mp4" [ref=e202]:
+            - img [ref=e203]
+            - generic [ref=e206]: XZCZXCQS2_20260411_033109.mp4
+        - generic [ref=e207] [cursor=pointer]:
+          - generic [ref=e208]:
+            - generic [ref=e209]:
+              - heading "XZCZXCQS1" [level=3] [ref=e210]
+              - generic [ref=e211]: SINGLE
+              - generic [ref=e212]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e213]:
+              - img [ref=e214]
+          - paragraph [ref=e217]: 03:30:44 11/4/2026
+          - button "XZCZXCQS1_20260411_033044.mp4" [ref=e219]:
+            - img [ref=e220]
+            - generic [ref=e223]: XZCZXCQS1_20260411_033044.mp4
+        - generic [ref=e224] [cursor=pointer]:
+          - generic [ref=e225]:
+            - generic [ref=e226]:
+              - heading "1231231312" [level=3] [ref=e227]
+              - generic [ref=e228]: SINGLE
+              - generic [ref=e229]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e230]:
+              - img [ref=e231]
+          - paragraph [ref=e234]: 03:15:38 11/4/2026
+          - button "1231231312_20260411_031538.mp4" [ref=e236]:
+            - img [ref=e237]
+            - generic [ref=e240]: 1231231312_20260411_031538.mp4
+        - generic [ref=e241] [cursor=pointer]:
+          - generic [ref=e242]:
+            - generic [ref=e243]:
+              - heading "SDASDA1231" [level=3] [ref=e244]
+              - generic [ref=e245]: SINGLE
+              - generic [ref=e246]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e247]:
+              - img [ref=e248]
+          - paragraph [ref=e251]: 03:15:33 11/4/2026
+          - button "SDASDA1231_20260411_031533.mp4" [ref=e253]:
+            - img [ref=e254]
+            - generic [ref=e257]: SDASDA1231_20260411_031533.mp4
+        - generic [ref=e258] [cursor=pointer]:
+          - generic [ref=e259]:
+            - generic [ref=e260]:
+              - heading "DASDASDASD111" [level=3] [ref=e261]
+              - generic [ref=e262]: SINGLE
+              - generic [ref=e263]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e264]:
+              - img [ref=e265]
+          - paragraph [ref=e268]: 03:15:06 11/4/2026
+          - button "DASDASDASD111_20260411_031506.mp4" [ref=e270]:
+            - img [ref=e271]
+            - generic [ref=e274]: DASDASDASD111_20260411_031506.mp4
+        - generic [ref=e275] [cursor=pointer]:
+          - generic [ref=e276]:
+            - generic [ref=e277]:
+              - heading "ADASD" [level=3] [ref=e278]
+              - generic [ref=e279]: SINGLE
+              - generic [ref=e280]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e281]:
+              - img [ref=e282]
+          - paragraph [ref=e285]: 03:14:50 11/4/2026
+          - button "ADASD_20260411_031450.mp4" [ref=e287]:
+            - img [ref=e288]
+            - generic [ref=e291]: ADASD_20260411_031450.mp4
+        - generic [ref=e292] [cursor=pointer]:
+          - generic [ref=e293]:
+            - generic [ref=e294]:
+              - heading "JJSJSJ1111" [level=3] [ref=e295]
+              - generic [ref=e296]: SINGLE
+              - generic [ref=e297]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e298]:
+              - img [ref=e299]
+          - paragraph [ref=e302]: 03:13:49 11/4/2026
+          - button "JJSJSJ1111_20260411_031349.mp4" [ref=e304]:
+            - img [ref=e305]
+            - generic [ref=e308]: JJSJSJ1111_20260411_031349.mp4
+        - generic [ref=e309] [cursor=pointer]:
+          - generic [ref=e310]:
+            - generic [ref=e311]:
+              - heading "NSNS111" [level=3] [ref=e312]
+              - generic [ref=e313]: SINGLE
+              - generic [ref=e314]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e315]:
+              - img [ref=e316]
+          - paragraph [ref=e319]: 03:13:17 11/4/2026
+          - button "NSNS111_20260411_031317.mp4" [ref=e321]:
+            - img [ref=e322]
+            - generic [ref=e325]: NSNS111_20260411_031317.mp4
+        - generic [ref=e326] [cursor=pointer]:
+          - generic [ref=e327]:
+            - generic [ref=e328]:
+              - heading "NSNS111" [level=3] [ref=e329]
+              - generic [ref=e330]: SINGLE
+              - generic [ref=e331]: Lỗi
+              - generic [ref=e332]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e333]:
+              - img [ref=e334]
+          - paragraph [ref=e337]: 03:13:17 11/4/2026
+          - button [ref=e339]:
+            - img [ref=e340]
+        - generic [ref=e343] [cursor=pointer]:
+          - generic [ref=e344]:
+            - generic [ref=e345]:
+              - heading "AD1123123ADA" [level=3] [ref=e346]
+              - generic [ref=e347]: SINGLE
+              - generic [ref=e348]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e349]:
+              - img [ref=e350]
+          - paragraph [ref=e353]: 02:42:34 11/4/2026
+          - button "AD1123123ADA_20260411_024234.mp4" [ref=e355]:
+            - img [ref=e356]
+            - generic [ref=e359]: AD1123123ADA_20260411_024234.mp4
+        - generic [ref=e360] [cursor=pointer]:
+          - generic [ref=e361]:
+            - generic [ref=e362]:
+              - heading "VBBVBB234343" [level=3] [ref=e363]
+              - generic [ref=e364]: SINGLE
+              - generic [ref=e365]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e366]:
+              - img [ref=e367]
+          - paragraph [ref=e370]: 02:42:00 11/4/2026
+          - button "VBBVBB234343_20260411_024200.mp4" [ref=e372]:
+            - img [ref=e373]
+            - generic [ref=e376]: VBBVBB234343_20260411_024200.mp4
+        - generic [ref=e377] [cursor=pointer]:
+          - generic [ref=e378]:
+            - generic [ref=e379]:
+              - heading "1AAA222" [level=3] [ref=e380]
+              - generic [ref=e381]: SINGLE
+              - generic [ref=e382]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e383]:
+              - img [ref=e384]
+          - paragraph [ref=e387]: 02:35:39 11/4/2026
+          - button "1AAA222_20260411_023539.mp4" [ref=e389]:
+            - img [ref=e390]
+            - generic [ref=e393]: 1AAA222_20260411_023539.mp4
+        - generic [ref=e394] [cursor=pointer]:
+          - generic [ref=e395]:
+            - generic [ref=e396]:
+              - heading "SSAA112312" [level=3] [ref=e397]
+              - generic [ref=e398]: SINGLE
+              - generic [ref=e399]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e400]:
+              - img [ref=e401]
+          - paragraph [ref=e404]: 02:22:02 11/4/2026
+          - button "SSAA112312_20260411_022202.mp4" [ref=e406]:
+            - img [ref=e407]
+            - generic [ref=e410]: SSAA112312_20260411_022202.mp4
+        - generic [ref=e411] [cursor=pointer]:
+          - generic [ref=e412]:
+            - generic [ref=e413]:
+              - heading "1ASDAD1A" [level=3] [ref=e414]
+              - generic [ref=e415]: SINGLE
+              - generic [ref=e416]: Lỗi
+              - generic [ref=e417]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e418]:
+              - img [ref=e419]
+          - paragraph [ref=e422]: 02:09:49 11/4/2026
+          - button [ref=e424]:
+            - img [ref=e425]
+        - generic [ref=e428] [cursor=pointer]:
+          - generic [ref=e429]:
+            - generic [ref=e430]:
+              - heading "ASIASIDI12313" [level=3] [ref=e431]
+              - generic [ref=e432]: SINGLE
+              - generic [ref=e433]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e434]:
+              - img [ref=e435]
+          - paragraph [ref=e438]: 02:00:50 11/4/2026
+          - button "ASIASIDI12313_20260411_020050.mp4" [ref=e440]:
+            - img [ref=e441]
+            - generic [ref=e444]: ASIASIDI12313_20260411_020050.mp4
+        - generic [ref=e445] [cursor=pointer]:
+          - generic [ref=e446]:
+            - generic [ref=e447]:
+              - heading "KKAD81AD919JADD" [level=3] [ref=e448]
+              - generic [ref=e449]: SINGLE
+              - generic [ref=e450]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e451]:
+              - img [ref=e452]
+          - paragraph [ref=e455]: 01:55:50 11/4/2026
+          - button "KKAD81AD919JADD_20260411_015550.mp4" [ref=e457]:
+            - img [ref=e458]
+            - generic [ref=e461]: KKAD81AD919JADD_20260411_015550.mp4
+        - generic [ref=e462] [cursor=pointer]:
+          - generic [ref=e463]:
+            - generic [ref=e464]:
+              - heading "XXXZX" [level=3] [ref=e465]
+              - generic [ref=e466]: SINGLE
+              - generic [ref=e467]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e468]:
+              - img [ref=e469]
+          - paragraph [ref=e472]: 01:48:06 11/4/2026
+          - button "XXXZX_20260411_014806.mp4" [ref=e474]:
+            - img [ref=e475]
+            - generic [ref=e478]: XXXZX_20260411_014806.mp4
+        - generic [ref=e479] [cursor=pointer]:
+          - generic [ref=e480]:
+            - generic [ref=e481]:
+              - heading "ASDSAD3222311" [level=3] [ref=e482]
+              - generic [ref=e483]: SINGLE
+              - generic [ref=e484]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e485]:
+              - img [ref=e486]
+          - paragraph [ref=e489]: 02:49:50 10/4/2026
+          - button "ASDSAD3222311_20260410_024950.mp4" [ref=e491]:
+            - img [ref=e492]
+            - generic [ref=e495]: ASDSAD3222311_20260410_024950.mp4
+        - generic [ref=e496] [cursor=pointer]:
+          - generic [ref=e497]:
+            - generic [ref=e498]:
+              - heading "RET123" [level=3] [ref=e499]
+              - generic [ref=e500]: SINGLE
+              - generic [ref=e501]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e502]:
+              - img [ref=e503]
+          - paragraph [ref=e506]: 02:02:37 9/4/2026
+          - button "RET123_20260409_020230.mp4" [ref=e508]:
+            - img [ref=e509]
+            - generic [ref=e512]: RET123_20260409_020230.mp4
+        - generic [ref=e513] [cursor=pointer]:
+          - generic [ref=e514]:
+            - generic [ref=e515]:
+              - heading "ƯUHJUIHHH" [level=3] [ref=e516]
+              - generic [ref=e517]: PIP
+              - generic [ref=e518]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e519]:
+              - img [ref=e520]
+          - paragraph [ref=e523]: 07:46:33 6/4/2026
+          - button "ƯUHJUIHHH_20260406_074606_PIP.mp4" [ref=e525]:
+            - img [ref=e526]
+            - generic [ref=e529]: ƯUHJUIHHH_20260406_074606_PIP.mp4
+        - generic [ref=e530] [cursor=pointer]:
+          - generic [ref=e531]:
+            - generic [ref=e532]:
+              - heading "AA1234" [level=3] [ref=e533]
+              - generic [ref=e534]: PIP
+              - generic [ref=e535]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e536]:
+              - img [ref=e537]
+          - paragraph [ref=e540]: 02:03:37 6/4/2026
+          - button "AA1234_20260406_020328_PIP.mp4" [ref=e542]:
+            - img [ref=e543]
+            - generic [ref=e546]: AA1234_20260406_020328_PIP.mp4
+        - generic [ref=e547] [cursor=pointer]:
+          - generic [ref=e548]:
+            - generic [ref=e549]:
+              - heading "I988484" [level=3] [ref=e550]
+              - generic [ref=e551]: PIP
+              - generic [ref=e552]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e553]:
+              - img [ref=e554]
+          - paragraph [ref=e557]: 01:30:06 6/4/2026
+          - button "I988484_20260406_013003_PIP.mp4" [ref=e559]:
+            - img [ref=e560]
+            - generic [ref=e563]: I988484_20260406_013003_PIP.mp4
+        - generic [ref=e564] [cursor=pointer]:
+          - generic [ref=e565]:
+            - generic [ref=e566]:
+              - heading "H2883" [level=3] [ref=e567]
+              - generic [ref=e568]: SINGLE
+              - generic [ref=e569]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e570]:
+              - img [ref=e571]
+          - paragraph [ref=e574]: 01:26:53 6/4/2026
+          - button "H2883_20260406_012649.mp4" [ref=e576]:
+            - img [ref=e577]
+            - generic [ref=e580]: H2883_20260406_012649.mp4
+        - generic [ref=e581] [cursor=pointer]:
+          - generic [ref=e582]:
+            - generic [ref=e583]:
+              - heading "G91919" [level=3] [ref=e584]
+              - generic [ref=e585]: PIP
+              - generic [ref=e586]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e587]:
+              - img [ref=e588]
+          - paragraph [ref=e591]: 01:20:58 6/4/2026
+          - button "G91919_20260406_012053_PIP.mp4" [ref=e593]:
+            - img [ref=e594]
+            - generic [ref=e597]: G91919_20260406_012053_PIP.mp4
+        - generic [ref=e598] [cursor=pointer]:
+          - generic [ref=e599]:
+            - generic [ref=e600]:
+              - heading "F999" [level=3] [ref=e601]
+              - generic [ref=e602]: PIP
+              - generic [ref=e603]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e604]:
+              - img [ref=e605]
+          - paragraph [ref=e608]: 01:19:56 6/4/2026
+          - button "F999_20260406_011953_PIP.mp4" [ref=e610]:
+            - img [ref=e611]
+            - generic [ref=e614]: F999_20260406_011953_PIP.mp4
+        - generic [ref=e615] [cursor=pointer]:
+          - generic [ref=e616]:
+            - generic [ref=e617]:
+              - heading "E999" [level=3] [ref=e618]
+              - generic [ref=e619]: SINGLE
+              - generic [ref=e620]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e621]:
+              - img [ref=e622]
+          - paragraph [ref=e625]: 01:17:47 6/4/2026
+          - button "E999_20260406_011740.mp4" [ref=e627]:
+            - img [ref=e628]
+            - generic [ref=e631]: E999_20260406_011740.mp4
+        - generic [ref=e632] [cursor=pointer]:
+          - generic [ref=e633]:
+            - generic [ref=e634]:
+              - heading "C123" [level=3] [ref=e635]
+              - generic [ref=e636]: PIP
+              - generic [ref=e637]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e638]:
+              - img [ref=e639]
+          - paragraph [ref=e642]: 23:45:50 5/4/2026
+          - button "C123_20260405_234542_PIP.mp4" [ref=e644]:
+            - img [ref=e645]
+            - generic [ref=e648]: C123_20260405_234542_PIP.mp4
+        - generic [ref=e649] [cursor=pointer]:
+          - generic [ref=e650]:
+            - generic [ref=e651]:
+              - heading "B123" [level=3] [ref=e652]
+              - generic [ref=e653]: DUAL_FILE
+              - generic [ref=e654]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e655]:
+              - img [ref=e656]
+          - paragraph [ref=e659]: 23:45:07 5/4/2026
+          - generic [ref=e660]:
+            - button "B123_20260405_234457_Cam1.mp4" [ref=e661]:
+              - img [ref=e662]
+              - generic [ref=e665]: B123_20260405_234457_Cam1.mp4
+            - button "B123_20260405_234457_Cam2.mp4" [ref=e666]:
+              - img [ref=e667]
+              - generic [ref=e670]: B123_20260405_234457_Cam2.mp4

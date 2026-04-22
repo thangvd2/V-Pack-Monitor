@@ -1,0 +1,117 @@
+- generic [ref=e3]:
+  - generic [ref=e173]:
+    - generic [ref=e174]:
+      - 'heading "Ma van don: 38382020" [level=3] [ref=e175]'
+      - generic [ref=e176]:
+        - generic [ref=e177]: 0:01 / 0:05
+        - button [ref=e178]:
+          - img [ref=e179]
+    - generic [ref=e189]:
+      - generic [ref=e190]:
+        - button [ref=e191]:
+          - img [ref=e192]
+        - generic [ref=e195]:
+          - button [ref=e196]:
+            - img [ref=e197]
+          - slider [ref=e201] [cursor=pointer]: "1"
+        - generic [ref=e202]: 0:01 / 0:05
+        - generic [ref=e203]:
+          - button "0.5x" [ref=e204]
+          - button "1x" [ref=e205]
+          - button "1.5x" [ref=e206]
+          - button "2x" [ref=e207]
+      - generic [ref=e208]:
+        - button "Snapshot" [ref=e209]:
+          - img [ref=e210]
+          - generic [ref=e213]: Snapshot
+        - link "Tai video xuong" [ref=e214] [cursor=pointer]:
+          - /url: http://localhost:8001/recordings/38382020_20260411_174037_PIP.mp4
+          - img [ref=e215]
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e13]:
+          - heading "V-Pack Monitor" [level=1] [ref=e14]
+          - paragraph [ref=e15]: Hệ thống Camera Đóng hàng E-Commerce
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - img [ref=e18]
+          - combobox [ref=e20] [cursor=pointer]:
+            - 'option "Trạm: Bàn Chốt Đơn 1"'
+            - 'option "Trạm: Bàn Gói Hàng 2" [selected]'
+          - button "Thêm Trạm Mới" [ref=e21]:
+            - img [ref=e22]
+        - button "Xem tổng quan tất cả trạm" [ref=e23]:
+          - img [ref=e24]
+        - button "Bảng điều khiển" [ref=e29]:
+          - img [ref=e30]
+        - generic [ref=e32]:
+          - generic:
+            - img
+          - textbox "Tìm mã vận đơn..." [ref=e33]
+        - button "Administrator ADMIN" [ref=e35]:
+          - img [ref=e36]
+          - generic [ref=e39]:
+            - generic [ref=e40]: Administrator
+            - generic [ref=e41]: ADMIN
+          - img [ref=e42]
+  - generic [ref=e44]:
+    - generic [ref=e45]:
+      - generic [ref=e47]:
+        - heading "Chế Độ Quan Sát Live" [level=2] [ref=e48]:
+          - img [ref=e49]
+          - text: Chế Độ Quan Sát Live
+        - button "Tổng quan" [ref=e52]:
+          - img [ref=e53]
+          - text: Tổng quan
+      - generic [ref=e61]:
+        - iframe [ref=e119]:
+          
+        - generic:
+          - generic:
+            - generic: Bàn Gói Hàng 2
+    - generic [ref=e63]:
+      - generic:
+        - heading "Lịch sử ghi hình" [level=2]:
+          - img
+          - text: Lịch sử ghi hình
+        - generic: 5 videos
+      - generic [ref=e64]:
+        - generic [ref=e120] [cursor=pointer]:
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - heading "38382020" [level=3] [ref=e123]
+              - generic [ref=e124]: PIP
+              - generic [ref=e125]: "Trạm: Bàn Gói Hàng 2"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e126]:
+              - img [ref=e127]
+          - paragraph [ref=e130]: 17:40:37 11/4/2026
+          - button "38382020_20260411_174037_PIP.mp4" [ref=e132]:
+            - img [ref=e133]
+            - generic [ref=e136]: 38382020_20260411_174037_PIP.mp4
+        - generic [ref=e137] [cursor=pointer]:
+          - generic [ref=e138]:
+            - generic [ref=e139]:
+              - heading "2602285208" [level=3] [ref=e140]
+              - generic [ref=e141]: PIP
+              - generic [ref=e142]: "Trạm: Bàn Gói Hàng 2"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e143]:
+              - img [ref=e144]
+          - paragraph [ref=e147]: 17:38:29 11/4/2026
+          - button "2602285208_20260411_173829_PIP.mp4" [ref=e149]:
+            - img [ref=e150]
+            - generic [ref=e153]: 2602285208_20260411_173829_PIP.mp4
+        - generic [ref=e154] [cursor=pointer]:
+          - generic [ref=e155]:
+            - generic [ref=e156]:
+              - heading "9498393SJSJS" [level=3] [ref=e157]
+              - generic [ref=e158]: PIP
+              - generic [ref=e159]: "Trạm: Bàn Gói Hàng 2"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e160]:
+              - img [ref=e161]
+          - paragraph [ref=e164]: 02:23:11 11/4/2026
+          - button "9498393SJSJS_20260411_022311_PIP.mp4" [ref=e166]:
+            - img [ref=e167]
+            - generic [ref=e170]: 9498393SJSJS_20260411_022311_PIP.mp4
+        - button "Xem thêm (2 bản ghi khác)" [ref=e171]

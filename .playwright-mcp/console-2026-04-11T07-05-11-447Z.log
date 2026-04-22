@@ -1,0 +1,20 @@
+[      47ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:8001/api/status?station_id=1:0
+[      47ms] [LOG] Status not ready AxiosError: Request failed with status code 401
+    at Ft (http://localhost:8001/assets/index-CLF1ucEP.js:11:1071)
+    at XMLHttpRequest.g (http://localhost:8001/assets/index-CLF1ucEP.js:11:5656)
+    at Tn.request (http://localhost:8001/assets/index-CLF1ucEP.js:13:1994)
+    at async je (http://localhost:8001/assets/index-CLF1ucEP.js:55:4619) @ http://localhost:8001/assets/index-CLF1ucEP.js:54
+[      48ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:8001/api/analytics/today?station_id=1:0
+[      48ms] [LOG] Analytics not ready @ http://localhost:8001/assets/index-CLF1ucEP.js:54
+[     141ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8001/:0
+[   21968ms] ReferenceError: videoModalOpen is not defined
+    at rV (http://localhost:8001/assets/index-CLF1ucEP.js:55:9889)
+    at xo (http://localhost:8001/assets/index-CLF1ucEP.js:8:47539)
+    at fc (http://localhost:8001/assets/index-CLF1ucEP.js:8:70090)
+    at kc (http://localhost:8001/assets/index-CLF1ucEP.js:8:80368)
+    at Mu (http://localhost:8001/assets/index-CLF1ucEP.js:8:115856)
+    at ku (http://localhost:8001/assets/index-CLF1ucEP.js:8:114935)
+    at Ou (http://localhost:8001/assets/index-CLF1ucEP.js:8:114772)
+    at gu (http://localhost:8001/assets/index-CLF1ucEP.js:8:111634)
+    at cd (http://localhost:8001/assets/index-CLF1ucEP.js:8:123171)
+    at MessagePort.D (http://localhost:8001/assets/index-CLF1ucEP.js:1:10347)

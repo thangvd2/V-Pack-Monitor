@@ -1,0 +1,89 @@
+- generic [ref=e3]:
+  - banner [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - img [ref=e27]
+        - generic [ref=e32]:
+          - heading "V-Pack Monitor" [level=1] [ref=e33]
+          - paragraph [ref=e34]: Hệ thống Camera Đóng hàng E-Commerce
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - img [ref=e37]
+          - combobox [ref=e39] [cursor=pointer]:
+            - 'option "Trạm: Bàn Chốt Đơn 1" [selected]'
+            - 'option "Trạm: Bàn Gói Hàng 2"'
+          - button "Thêm Trạm Mới" [ref=e40]:
+            - img [ref=e41]
+        - button "Xem tổng quan tất cả trạm" [ref=e42]:
+          - img [ref=e43]
+        - button "Bảng điều khiển" [ref=e48]:
+          - img [ref=e49]
+        - generic [ref=e51]:
+          - generic:
+            - img
+          - textbox "Tìm mã vận đơn..." [ref=e52]
+        - button "Administrator ADMIN" [ref=e54]:
+          - img [ref=e55]
+          - generic [ref=e58]:
+            - generic [ref=e59]: Administrator
+            - generic [ref=e60]: ADMIN
+          - img [ref=e61]
+  - generic [ref=e63]:
+    - generic [ref=e64]:
+      - generic [ref=e66]:
+        - heading "Chế Độ Quan Sát Live" [level=2] [ref=e67]:
+          - img [ref=e68]
+          - text: Chế Độ Quan Sát Live
+        - button "Tổng quan" [ref=e71]:
+          - img [ref=e72]
+          - text: Tổng quan
+      - generic [ref=e80]:
+        - iframe [ref=e81]:
+          
+        - generic:
+          - generic:
+            - generic: Bàn Chốt Đơn 1
+    - generic [ref=e82]:
+      - generic:
+        - heading "Lịch sử ghi hình" [level=2]:
+          - img
+          - text: Lịch sử ghi hình
+        - generic: 59 videos
+      - generic [ref=e83]:
+        - generic [ref=e84] [cursor=pointer]:
+          - generic [ref=e85]:
+            - generic [ref=e86]:
+              - heading "2602285207" [level=3] [ref=e87]
+              - generic [ref=e88]: SINGLE
+              - generic [ref=e89]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e90]:
+              - img [ref=e91]
+          - paragraph [ref=e94]: 17:19:17 11/4/2026
+          - button "2602285207_20260411_171917.mp4" [ref=e96]:
+            - img [ref=e97]
+            - generic [ref=e100]: 2602285207_20260411_171917.mp4
+        - generic [ref=e101] [cursor=pointer]:
+          - generic [ref=e102]:
+            - generic [ref=e103]:
+              - heading "8934673100526" [level=3] [ref=e104]
+              - generic [ref=e105]: SINGLE
+              - generic [ref=e106]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e107]:
+              - img [ref=e108]
+          - paragraph [ref=e111]: 14:36:45 11/4/2026
+          - button "8934673100526_20260411_143645.mp4" [ref=e113]:
+            - img [ref=e114]
+            - generic [ref=e117]: 8934673100526_20260411_143645.mp4
+        - generic [ref=e118] [cursor=pointer]:
+          - generic [ref=e119]:
+            - generic [ref=e120]:
+              - heading "2602285207" [level=3] [ref=e121]
+              - generic [ref=e122]: SINGLE
+              - generic [ref=e123]: "Trạm: Bàn Chốt Đơn 1"
+            - button "Xoá bản ghi lưu trữ dọn ổ đĩa" [ref=e124]:
+              - img [ref=e125]
+          - paragraph [ref=e128]: 14:34:36 11/4/2026
+          - button "2602285207_20260411_143436.mp4" [ref=e130]:
+            - img [ref=e131]
+            - generic [ref=e134]: 2602285207_20260411_143436.mp4
+        - button "Xem thêm (56 bản ghi khác)" [ref=e135]

@@ -1,0 +1,35 @@
+- generic [ref=e3]:
+  - generic [ref=e142]:
+    - generic [ref=e143]:
+      - img [ref=e145]
+      - generic [ref=e161]:
+        - heading "V-Pack Monitor" [level=1] [ref=e162]
+        - paragraph [ref=e163]: Chọn trạm làm việc
+    - button "Đăng xuất" [ref=e164]:
+      - img [ref=e165]
+      - text: Đăng xuất
+  - generic [ref=e168]:
+    - generic [ref=e169]:
+      - img [ref=e171]
+      - heading "Chọn Trạm Làm Việc" [level=2] [ref=e173]
+      - paragraph [ref=e174]: Xin chào nhân viên 1, vui lòng chọn trạm để bắt đầu
+    - generic [ref=e175]:
+      - 'button "🟢 Trống Bàn Chốt Đơn 1 ID: 1 Nhấn để chọn →" [ref=e176] [cursor=pointer]':
+        - generic [ref=e177]:
+          - img [ref=e179]
+          - generic [ref=e181]:
+            - generic [ref=e182]: 🟢
+            - text: Trống
+        - heading "Bàn Chốt Đơn 1" [level=3] [ref=e183]
+        - paragraph [ref=e184]: "ID: 1"
+        - paragraph [ref=e186]: Nhấn để chọn →
+      - 'button "🟢 Trống Bàn Gói Hàng 2 ID: 2 Nhấn để chọn →" [ref=e187] [cursor=pointer]':
+        - generic [ref=e188]:
+          - img [ref=e190]
+          - generic [ref=e192]:
+            - generic [ref=e193]: 🟢
+            - text: Trống
+        - heading "Bàn Gói Hàng 2" [level=3] [ref=e194]
+        - paragraph [ref=e195]: "ID: 2"
+        - paragraph [ref=e197]: Nhấn để chọn →
+    - paragraph [ref=e198]: Trạng thái tự động cập nhật mỗi 10 giây
