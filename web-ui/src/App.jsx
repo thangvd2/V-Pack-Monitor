@@ -876,6 +876,7 @@ function App() {
     setCurrentUser(null);
     setStationAssigned(false);
     setActiveSessionId(null);
+    setAdminTab('operations');
   };
 
   // --- Hàm xoá bản ghi (Đã qua kiểm duyệt bảo mật) ---
