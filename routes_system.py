@@ -532,7 +532,7 @@ def register_routes(app):
     # --- ANALYTICS DASHBOARD API ---
 
     @app.get("/api/analytics/today")
-    def get_analytics_today(station_id: int, current_user: CurrentUser):
+    def get_analytics_today(current_user: CurrentUser, station_id: int | None = None):
         conn = database.get_connection()
         with conn:
             cursor = conn.cursor()
@@ -543,12 +543,14 @@ def register_routes(app):
             )
             total_today = cursor.fetchone()[0]
 
-            # Đếm số đơn riêng của trạm đang chọn
-            cursor.execute(
-                "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at, 'localtime') = date('now', 'localtime') AND station_id = ?",
-                (station_id,),
-            )
-            station_today = cursor.fetchone()[0]
+            station_today = 0
+            if station_id is not None:
+                # Đếm số đơn riêng của trạm đang chọn
+                cursor.execute(
+                    "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at, 'localtime') = date('now', 'localtime') AND station_id = ?",
+                    (station_id,),
+                )
+                station_today = cursor.fetchone()[0]
 
             return {"data": {"total_today": total_today, "station_today": station_today}}
 

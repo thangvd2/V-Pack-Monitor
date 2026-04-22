@@ -561,6 +561,7 @@ _SORT_COLUMNS = {
 def get_records_v2(
     search: str = "",
     station_id: int | None = None,
+    orphaned: bool = False,
     status: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
@@ -619,7 +620,9 @@ def get_records_v2(
         # Save params before FTS so we can fall back to LIKE on MATCH error
         params_before_fts = list(params) if search else []
 
-        if station_id is not None:
+        if orphaned:
+            where_clauses.append("p.station_id NOT IN (SELECT id FROM stations)")
+        elif station_id is not None:
             where_clauses.append("p.station_id = ?")
             params.append(station_id)
 

@@ -71,12 +71,17 @@ def _notify_sse_safe(station_id, status, record_id):
     try:
         import api
 
+        p_count = 0
+        with api._processing_lock:
+            p_count = api._processing_count.get(station_id, 0)
+
         api.notify_sse(
             "video_status",
             {
                 "station_id": station_id,
                 "status": status,
                 "record_id": record_id,
+                "processing_count": p_count,
             },
         )
     except Exception:
