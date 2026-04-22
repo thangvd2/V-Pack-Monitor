@@ -168,7 +168,8 @@ def init_db():
                     record_mode TEXT NOT NULL,
                     recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     status TEXT DEFAULT 'READY' CHECK(status IN ('READY', 'RECORDING', 'PROCESSING', 'FAILED', 'SYNCED')),
-                    is_synced INTEGER DEFAULT 0
+                    is_synced INTEGER DEFAULT 0,
+                    duration REAL DEFAULT 0
                 )
             """)
 
@@ -182,6 +183,8 @@ def init_db():
                 cursor.execute("ALTER TABLE packing_video ADD COLUMN is_synced INTEGER DEFAULT 0;")
             if "status" not in columns:
                 cursor.execute("ALTER TABLE packing_video ADD COLUMN status TEXT DEFAULT 'READY';")
+            if "duration" not in columns:
+                cursor.execute("ALTER TABLE packing_video ADD COLUMN duration REAL DEFAULT 0;")
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS system_settings (
@@ -208,27 +211,34 @@ def init_db():
             if "mac_address" not in st_cols:
                 cursor.execute("ALTER TABLE stations ADD COLUMN mac_address TEXT DEFAULT '';")
 
-            # Migrate old settings to station 1 if stations table is empty
-            cursor.execute("SELECT COUNT(*) FROM stations")
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'IP_CAMERA'")
-                ip_row = cursor.fetchone()
-                ip1 = ip_row[0] if ip_row else ""
+            # One-time migration: import old single-station settings into stations table
+            # Guard: only run once, even if stations table is empty later (e.g. user deleted all)
+            cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'stations_migrated'")
+            if not cursor.fetchone():
+                cursor.execute("SELECT COUNT(*) FROM stations")
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'IP_CAMERA'")
+                    ip_row = cursor.fetchone()
+                    ip1 = ip_row[0] if ip_row else ""
 
-                cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'SAFETY_CODE'")
-                code_row = cursor.fetchone()
-                code = code_row[0] if code_row else ""
+                    cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'SAFETY_CODE'")
+                    code_row = cursor.fetchone()
+                    code = code_row[0] if code_row else ""
 
-                cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'RECORD_MODE'")
-                mode_row = cursor.fetchone()
-                mode = mode_row[0] if mode_row else "SINGLE"
+                    cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'RECORD_MODE'")
+                    mode_row = cursor.fetchone()
+                    mode = mode_row[0] if mode_row else "SINGLE"
 
+                    cursor.execute(
+                        """
+                        INSERT INTO stations (name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand)
+                        VALUES ('Bàn Chốt Đơn 1', ?, '', ?, ?, 'imou')
+                    """,
+                        (ip1, code, mode),
+                    )
+                # Mark migration as done (regardless of whether station was created)
                 cursor.execute(
-                    """
-                    INSERT INTO stations (name, ip_camera_1, ip_camera_2, safety_code, camera_mode, camera_brand)
-                    VALUES ('Bàn Chốt Đơn 1', ?, '', ?, ?, 'imou')
-                """,
-                    (ip1, code, mode),
+                    "INSERT OR REPLACE INTO system_settings (config_key, config_value) VALUES ('stations_migrated', '1')"
                 )
 
             cursor.execute("""
@@ -488,7 +498,7 @@ def create_record(station_id, waybill_code, record_mode, video_paths=""):
         return cursor.lastrowid
 
 
-def update_record_status(record_id, status, video_paths=None):
+def update_record_status(record_id, status, video_paths=None, duration=None):
     # H2: Validate status before update
     if status not in _VALID_RECORD_STATUSES:
         raise ValueError(f"Invalid record status: {status}. Must be one of {_VALID_RECORD_STATUSES}")
@@ -496,15 +506,27 @@ def update_record_status(record_id, status, video_paths=None):
         cursor = conn.cursor()
         if video_paths is not None:
             paths_str = ",".join(video_paths) if isinstance(video_paths, list) else video_paths
-            cursor.execute(
-                "UPDATE packing_video SET status = ?, video_paths = ? WHERE id = ?",
-                (status, paths_str, record_id),
-            )
+            if duration is not None:
+                cursor.execute(
+                    "UPDATE packing_video SET status = ?, video_paths = ?, duration = ? WHERE id = ?",
+                    (status, paths_str, duration, record_id),
+                )
+            else:
+                cursor.execute(
+                    "UPDATE packing_video SET status = ?, video_paths = ? WHERE id = ?",
+                    (status, paths_str, record_id),
+                )
         else:
-            cursor.execute(
-                "UPDATE packing_video SET status = ? WHERE id = ?",
-                (status, record_id),
-            )
+            if duration is not None:
+                cursor.execute(
+                    "UPDATE packing_video SET status = ?, duration = ? WHERE id = ?",
+                    (status, duration, record_id),
+                )
+            else:
+                cursor.execute(
+                    "UPDATE packing_video SET status = ? WHERE id = ?",
+                    (status, record_id),
+                )
         conn.commit()
 
 
@@ -539,6 +561,7 @@ _SORT_COLUMNS = {
 def get_records_v2(
     search: str = "",
     station_id: int | None = None,
+    orphaned: bool = False,
     status: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
@@ -556,7 +579,7 @@ def get_records_v2(
     sort_col = _SORT_COLUMNS.get(sort_by, "p.recorded_at")
     sort_dir = "DESC" if sort_order.lower() == "desc" else "ASC"
 
-    base_select = "p.id, p.waybill_code, p.video_paths, p.record_mode, datetime(p.recorded_at, 'localtime') AS recorded_at, s.name, p.status"
+    base_select = "p.id, p.waybill_code, p.video_paths, p.record_mode, datetime(p.recorded_at, 'localtime') AS recorded_at, s.name, p.status, p.duration"
 
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -597,7 +620,9 @@ def get_records_v2(
         # Save params before FTS so we can fall back to LIKE on MATCH error
         params_before_fts = list(params) if search else []
 
-        if station_id is not None:
+        if orphaned:
+            where_clauses.append("(p.station_id IS NULL OR p.station_id NOT IN (SELECT id FROM stations))")
+        elif station_id is not None:
             where_clauses.append("p.station_id = ?")
             params.append(station_id)
 
@@ -670,6 +695,7 @@ def get_records_v2(
                 "recorded_at": r[4],
                 "station_name": r[5],
                 "status": r[6],
+                "duration": r[7] if len(r) > 7 else 0,
             }
         )
 
@@ -708,6 +734,9 @@ def get_record_by_id(record_id):
 
 def cleanup_old_records(days=7):
     """Xóa các video và bản ghi cũ hơn X ngày để giải phóng dung lượng ổ cứng."""
+    if days <= 0:
+        logger.info("[DB] cleanup_old_records: skipped (keep_days=%s, never delete)", days)
+        return
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -730,6 +759,8 @@ def cleanup_old_records(days=7):
                         logger.error(f"Error removing {path}: {e}")
             cursor.execute("DELETE FROM packing_video WHERE id = ?", (r_id,))
         conn.commit()
+        if old_records:
+            logger.info("[DB] cleanup_old_records: deleted %d old records (older than %d days)", len(old_records), days)
 
 
 def delete_record(record_id):

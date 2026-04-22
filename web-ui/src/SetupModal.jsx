@@ -103,7 +103,7 @@ export default function SetupModal({
   const [macAddress, setMacAddress] = useState(currentStation.mac_address || '');
   const [discovering, setDiscovering] = useState(false);
   const [discoverResult, setDiscoverResult] = useState('');
-  const [keepDays, setKeepDays] = useState(initialSettings.RECORD_KEEP_DAYS || 7);
+  const [keepDays, setKeepDays] = useState(initialSettings.RECORD_KEEP_DAYS || 365);
   const [cloudProvider, setCloudProvider] = useState(initialSettings.CLOUD_PROVIDER || 'NONE');
   const [gDriveFolderId, setGDriveFolderId] = useState(initialSettings.GDRIVE_FOLDER_ID || '');
   const [gDriveCreds, setGDriveCreds] = useState('');
@@ -659,6 +659,11 @@ export default function SetupModal({
                     <option value="7">7 Ngày</option>
                     <option value="15">15 Ngày</option>
                     <option value="30">30 Ngày</option>
+                    <option value="60">60 Ngày</option>
+                    <option value="90">90 Ngày</option>
+                    <option value="150">150 Ngày</option>
+                    <option value="365">365 Ngày</option>
+                    <option value="0">Không bao giờ xoá</option>
                   </select>
                 </div>
 

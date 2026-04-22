@@ -125,7 +125,7 @@ class TestVideoWorker:
         mock_rec.stop_recording.return_value = ["/fake/video.mp4"]
 
         with (
-            patch("video_worker._verify_video", return_value=True),
+            patch("video_worker._get_video_info", return_value=(True, 30.5)),
             patch("video_worker._decrement_processing"),
             patch("video_worker._notify_sse_safe"),
         ):
@@ -221,7 +221,7 @@ class TestCrashRecovery:
 
         with (
             patch("os.path.exists", return_value=False),
-            patch("api._verify_video_external", return_value=False),
+            patch("api._get_video_info_external", return_value=(False, 0)),
         ):
             api._recover_pending_records()
 
@@ -240,7 +240,7 @@ class TestCrashRecovery:
 
         with (
             patch("os.path.exists", side_effect=mock_exists),
-            patch("api._verify_video_external", return_value=True),
+            patch("api._get_video_info_external", return_value=(True, 15.0)),
         ):
             api._recover_pending_records()
 

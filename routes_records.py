@@ -41,16 +41,19 @@ def _handle_scan_exit(sid, current_recorder, current_waybill, current_record_id)
         with api._recording_timers_lock:
             api._recording_start_times.pop(sid, None)
         database.update_record_status(current_record_id, "PROCESSING")
+        with api._processing_lock:
+            api._processing_count[sid] = api._processing_count.get(sid, 0) + 1
+            p_count = api._processing_count[sid]
+
         api.notify_sse(
             "video_status",
             {
                 "station_id": sid,
                 "status": "PROCESSING",
                 "record_id": current_record_id,
+                "processing_count": p_count,
             },
         )
-        with api._processing_lock:
-            api._processing_count[sid] = api._processing_count.get(sid, 0) + 1
         with api._recorders_lock:
             api.active_recorders.pop(sid, None)
             api.active_waybills.pop(sid, None)
@@ -180,7 +183,7 @@ def _handle_scan_start(sid, barcode, station, current_user):
 
     record_id = database.create_record(sid, barcode, r_mode)
 
-    new_recorder = CameraRecorder(url1, rtsp_url_2=url2, record_mode=r_mode)
+    new_recorder = CameraRecorder(url1, rtsp_url_2=url2, record_mode=r_mode, station_name=station.get("name", ""))
     with api._recorders_lock:
         api.active_record_ids[sid] = record_id
         api.active_recorders[sid] = new_recorder
@@ -352,6 +355,7 @@ def register_routes(app):
     def get_records(
         current_user: CurrentUser,
         station_id: int = None,
+        orphaned: bool = False,
         search: str = "",
         status: str = None,
         date_from: str = None,
@@ -364,6 +368,7 @@ def register_routes(app):
         result = database.get_records_v2(
             search=search,
             station_id=station_id,
+            orphaned=orphaned,
             status=status,
             date_from=date_from,
             date_to=date_to,

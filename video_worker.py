@@ -25,11 +25,11 @@ _pending_lock = threading.Lock()
 _MAX_PENDING = 10  # Max queued video processing tasks
 
 
-def _verify_video(filepath):
+def _get_video_info(filepath):
     if not filepath or not os.path.exists(filepath):
-        return False
+        return (False, 0)
     if os.path.getsize(filepath) == 0:
-        return False
+        return (False, 0)
     try:
         cmd = [
             recorder._ffmpeg_bin("ffprobe"),
@@ -43,11 +43,13 @@ def _verify_video(filepath):
         ]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         duration_str = r.stdout.strip()
-        if duration_str and float(duration_str) > 0:
-            return True
+        if duration_str:
+            duration = float(duration_str)
+            if duration > 0:
+                return (True, duration)
     except Exception:
         pass
-    return False
+    return (False, 0)
 
 
 def _decrement_processing(station_id):
@@ -69,12 +71,17 @@ def _notify_sse_safe(station_id, status, record_id):
     try:
         import api
 
+        p_count = 0
+        with api._processing_lock:
+            p_count = api._processing_count.get(station_id, 0)
+
         api.notify_sse(
             "video_status",
             {
                 "station_id": station_id,
                 "status": status,
                 "record_id": record_id,
+                "processing_count": p_count,
             },
         )
     except Exception:
@@ -102,13 +109,16 @@ def _process_stop_and_save(record_id, rec, waybill, station_id, save=True):
             return
 
         all_valid = True
+        total_duration = 0.0
         for f in saved_files:
-            if not _verify_video(f):
+            is_valid, file_duration = _get_video_info(f)
+            if not is_valid:
                 all_valid = False
                 break
+            total_duration = max(total_duration, file_duration)
 
         if all_valid:
-            database.update_record_status(record_id, "READY", video_paths=saved_files)
+            database.update_record_status(record_id, "READY", video_paths=saved_files, duration=total_duration)
             _decrement_processing(station_id)
             _notify_sse_safe(station_id, "READY", record_id)
         else:

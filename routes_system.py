@@ -27,7 +27,7 @@ import urllib.request
 import psutil
 from fastapi import File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 import api
 import cloud_sync
@@ -411,6 +411,13 @@ class SettingsUpdate(BaseModel):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
 
+    @field_validator("RECORD_KEEP_DAYS")
+    @classmethod
+    def validate_keep_days(cls, v):
+        if v not in (0, 3, 7, 15, 30, 60, 90, 150, 365):
+            raise ValueError("RECORD_KEEP_DAYS must be one of: 0, 3, 7, 15, 30, 60, 90, 150, 365")
+        return v
+
 
 def register_routes(app):
     # --- SYSTEM HEALTH API ---
@@ -525,7 +532,7 @@ def register_routes(app):
     # --- ANALYTICS DASHBOARD API ---
 
     @app.get("/api/analytics/today")
-    def get_analytics_today(station_id: int, current_user: CurrentUser):
+    def get_analytics_today(current_user: CurrentUser, station_id: int | None = None):
         conn = database.get_connection()
         with conn:
             cursor = conn.cursor()
@@ -536,12 +543,14 @@ def register_routes(app):
             )
             total_today = cursor.fetchone()[0]
 
-            # Đếm số đơn riêng của trạm đang chọn
-            cursor.execute(
-                "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at, 'localtime') = date('now', 'localtime') AND station_id = ?",
-                (station_id,),
-            )
-            station_today = cursor.fetchone()[0]
+            station_today = 0
+            if station_id is not None:
+                # Đếm số đơn riêng của trạm đang chọn
+                cursor.execute(
+                    "SELECT COUNT(*) FROM packing_video WHERE date(recorded_at, 'localtime') = date('now', 'localtime') AND station_id = ?",
+                    (station_id,),
+                )
+                station_today = cursor.fetchone()[0]
 
             return {"data": {"total_today": total_today, "station_today": station_today}}
 

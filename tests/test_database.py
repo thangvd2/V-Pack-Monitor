@@ -121,6 +121,26 @@ class TestInitDb:
         users = get_all_users()
         assert len(users) == 1
 
+    def test_no_ghost_station_after_delete_all(self, tmp_path, monkeypatch):
+        """Deleting all stations then re-initing DB should NOT auto-create a station."""
+        import database
+        monkeypatch.setattr(database, "DB_FILE", str(tmp_path / "test.db"))
+        database._init_done = False
+
+        # First init — migration runs. It will auto-create the fallback station.
+        database.init_db()
+
+        # Clear ALL stations (simulating user deleting everything)
+        for s in database.get_stations():
+            database.delete_station(s["id"])
+
+        assert len(database.get_stations()) == 0
+
+        # Re-init — should NOT create a ghost station because stations_migrated is set
+        database._init_done = False
+        database.init_db()
+        assert len(database.get_stations()) == 0, "Ghost station appeared after re-init!"
+
 
 class TestSettings:
     def test_set_get_roundtrip(self):
@@ -238,6 +258,40 @@ class TestRecords:
             conn.commit()
         assert os.path.exists(fake_video)
         cleanup_old_records(days=7)
+        assert not os.path.exists(fake_video)
+        assert get_record_by_id(rid) is None
+
+    def test_cleanup_old_records_disabled(self, sample_station_id, tmp_path):
+        fake_video = str(tmp_path / "old_video_disabled.mp4")
+        with open(fake_video, "w") as f:
+            f.write("fake")
+        rid = create_record(sample_station_id, "OLD-WB-0", "SINGLE")
+        update_record_status(rid, "READY", video_paths=fake_video)
+        with sqlite3.connect(database.DB_FILE) as conn:
+            conn.execute(
+                "UPDATE packing_video SET recorded_at = datetime('now', '-10 days') WHERE id = ?",
+                (rid,),
+            )
+            conn.commit()
+        assert os.path.exists(fake_video)
+        cleanup_old_records(days=0)
+        assert os.path.exists(fake_video)
+        assert get_record_by_id(rid) is not None
+
+    def test_cleanup_old_records_365_days(self, sample_station_id, tmp_path):
+        fake_video = str(tmp_path / "old_video_365.mp4")
+        with open(fake_video, "w") as f:
+            f.write("fake")
+        rid = create_record(sample_station_id, "OLD-WB-365", "SINGLE")
+        update_record_status(rid, "READY", video_paths=fake_video)
+        with sqlite3.connect(database.DB_FILE) as conn:
+            conn.execute(
+                "UPDATE packing_video SET recorded_at = datetime('now', '-366 days') WHERE id = ?",
+                (rid,),
+            )
+            conn.commit()
+        assert os.path.exists(fake_video)
+        cleanup_old_records(days=365)
         assert not os.path.exists(fake_video)
         assert get_record_by_id(rid) is None
 

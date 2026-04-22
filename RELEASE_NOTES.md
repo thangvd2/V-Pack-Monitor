@@ -2,6 +2,33 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v3.4.0] - 2026-04-23 (Admin Tab Navigation & UI Revamp) 🚀 MINOR RELEASE
+
+### 🚀 Tính Năng Mới
+- **Admin Tab Navigation (PR #52)**: 
+  - Tách giao diện Admin Dashboard thành 2 tab riêng biệt: `[📹 Vận hành]` (Live Cameras Grid + Lịch sử) và `[📊 Tổng quan]` (Dashboard stats/charts + SystemHealth).
+  - Khắc phục tình trạng quá tải thông tin, trộn lẫn Live Cameras và Stats.
+  - Tối ưu header controls: ẩn Station Selector khi ở chế độ lưới (Admin), tự động reset tab khi dùng nút Back.
+- **Admin UI Revamp (PR #51)**:
+  - Enrich data: Bổ sung `processing_count` vào API và SSE.
+  - Badge trạng thái: Thêm badge "⚙ N đang xử lý" trên Camera Cards.
+  - Drill-down Navigation: Admin click vào Camera Card để xem Single View chi tiết của trạm đó, kèm nút "← Tổng quan" để quay lại Grid View.
+
+### 🐛 Bug Fixes & Refactoring
+- **Orphaned Records Filtering**:
+  - Hỗ trợ xem các bản ghi của các trạm đã bị xoá (orphaned records).
+  - Backend bổ sung tham số `orphaned: bool` trong API.
+  - Frontend hiển thị nhãn `(trạm đã xoá)` cho các bản ghi này thay vì `Mặc định`.
+- **Global SSE for Admins**: Đảm bảo Admin nhận được SSE status updates của tất cả các trạm khi ở Grid View.
+- **Hotfixes & Cleanups**:
+  - Sửa lỗi type mismatch `station_id` (int vs str) trong DB queries.
+  - Xoá props thừa truyền vào `AdminDashboard.jsx`.
+  - Đảm bảo `adminTab` được reset đúng chuẩn khi logout.
+
+### 📊 Stats
+- **Testing**: 326/326 tests passed (100% green).
+- **Frontend**: Build Vite tối ưu, 0 lỗi linter (ESLint & Prettier).
+
 ## [v3.3.2] - 2026-04-22 (Performance & Cleanup) 🧹 PATCH RELEASE
 
 ### 🧹 Cleanup & Refactoring

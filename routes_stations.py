@@ -40,6 +40,11 @@ def register_routes(app):
     @app.get("/api/stations")
     def get_stations_api(current_user: CurrentUser):
         stations = database.get_stations()
+
+        with api._processing_lock:
+            for s in stations:
+                s["processing_count"] = api._processing_count.get(s["id"], 0)
+
         if current_user.get("role") != "ADMIN":
             for s in stations:
                 s.pop("safety_code", None)
@@ -85,7 +90,7 @@ def register_routes(app):
             brand=payload.camera_brand,
         )
         cam2_url = _resolve_cam2_url(payload, url_fn)
-        sm = api.CameraStreamManager(url, station_id=new_id, cam2_url=cam2_url)
+        sm = api.CameraStreamManager(url, station_id=new_id, cam2_url=cam2_url, station_name=payload.name)
         with api._streams_lock:
             api.stream_managers[new_id] = sm
         sm.start()
@@ -108,6 +113,7 @@ def register_routes(app):
             )
             sm.update_url(url)
             cam2_url = _resolve_cam2_url(payload, url_fn)
+            sm.station_name = payload.name
             sm.update_cam2_url(cam2_url)
         return {"status": "success"}
 

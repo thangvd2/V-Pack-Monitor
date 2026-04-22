@@ -285,7 +285,13 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
                       const url = window.URL.createObjectURL(blob);
                       const a = document.createElement('a');
                       a.href = url;
-                      a.download = `video_${match[1]}_${match[2]}.mp4`;
+                      const disposition = response.headers.get('Content-Disposition');
+                      let downloadName = `${waybillCode || 'video'}.mp4`;
+                      if (disposition) {
+                        const matchFilename = disposition.match(/filename\*?=(?:UTF-8''|"?)([^";]+)/i);
+                        if (matchFilename) downloadName = decodeURIComponent(matchFilename[1].replace(/"/g, ''));
+                      }
+                      a.download = downloadName;
                       document.body.appendChild(a);
                       a.click();
                       document.body.removeChild(a);
