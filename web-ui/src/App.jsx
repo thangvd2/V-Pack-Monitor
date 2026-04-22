@@ -33,6 +33,8 @@ import SetupModal from './SetupModal';
 import VideoPlayerModal from './VideoPlayerModal';
 import UserManagementModal from './UserManagementModal';
 import Dashboard from './Dashboard';
+import AdminDashboard from './AdminDashboard';
+import MtxFallback from './MtxFallback';
 import API_BASE from './config';
 import { playScanStart, playRecordingStop, playVideoReady, playRecordingWarning } from './utils/notificationSounds';
 
@@ -45,18 +47,6 @@ const HEARTBEAT_INTERVAL = 30000;
 const RESTART_DELAY = 5000;
 const SEARCH_DEBOUNCE = 300;
 const TOAST_DURATIONS = { info: 2000, error: 3000, warning: 5000 };
-
-function MtxFallback() {
-  return (
-    <div className="w-full h-full flex items-center justify-center" style={{ background: '#09090b' }}>
-      <div className="text-center">
-        <div className="text-4xl mb-3">📡</div>
-        <p className="text-slate-400 text-sm font-medium">MediaMTX chưa khởi động</p>
-        <p className="text-slate-500 text-xs mt-1">Live view cần MediaMTX chạy ở port 8889</p>
-      </div>
-    </div>
-  );
-}
 
 function StationSelectionScreen({ stations, stationStatusList, fetchStationStatus, acquireStation, currentUser }) {
   const [loading, setLoading] = useState(true);
@@ -386,7 +376,8 @@ function App() {
   const stationsIdStr = useMemo(() => stations.map((s) => s.id).join(','), [stations]);
 
   useEffect(() => {
-    const stationIds = viewMode === 'grid' ? stationsIdStr : String(activeStationId || '');
+    const isGlobalSSE = viewMode === 'grid' || currentUser?.role === 'ADMIN';
+    const stationIds = isGlobalSSE ? stationsIdStr : String(activeStationId || '');
     const sseToken = localStorage.getItem('vpack_token');
     const es = new EventSource(
       `${API_BASE}/api/events?stations=${stationIds}${sseToken ? '&token=' + encodeURIComponent(sseToken) : ''}`,
@@ -396,13 +387,28 @@ function App() {
       try {
         const data = JSON.parse(evt.data);
 
-        if (viewMode === 'grid') {
+        if (isGlobalSSE) {
           const isRecording = data.status === 'RECORDING';
           const waybill = data.waybill || '';
-          setStationStatuses((prev) => ({
-            ...prev,
-            [data.station_id]: { status: isRecording ? 'packing' : 'idle', waybill },
-          }));
+          setStationStatuses((prev) => {
+            const current = prev[data.station_id] || { status: 'idle', waybill: '', processingCount: 0 };
+            const nextStatus = isRecording
+              ? 'packing'
+              : data.status === 'PROCESSING' ||
+                  data.status === 'READY' ||
+                  data.status === 'FAILED' ||
+                  data.status === 'DELETED'
+                ? 'idle'
+                : current.status;
+            return {
+              ...prev,
+              [data.station_id]: {
+                status: nextStatus,
+                waybill: isRecording ? waybill : current.waybill,
+                processingCount: data.processing_count !== undefined ? data.processing_count : current.processingCount,
+              },
+            };
+          });
           if (data.station_id === activeStationId) {
             if (isRecording) {
               playScanStart();
@@ -534,8 +540,19 @@ function App() {
     try {
       const res = await axios.get(`${API_BASE}/api/stations`);
       setStations(res.data.data);
+      setStationStatuses((prev) => {
+        const newStatuses = { ...prev };
+        res.data.data.forEach((st) => {
+          if (!newStatuses[st.id])
+            newStatuses[st.id] = { status: 'idle', waybill: '', processingCount: st.processing_count || 0 };
+          else newStatuses[st.id].processingCount = st.processing_count || 0;
+        });
+        return newStatuses;
+      });
       if (res.data.data.length > 0 && !activeStationId) {
-        setActiveStationId(res.data.data[0].id);
+        if (currentUser?.role !== 'ADMIN') {
+          setActiveStationId(res.data.data[0].id);
+        }
       }
     } catch {
       showToast('Không thể tải danh sách trạm.', 'error');
@@ -656,7 +673,11 @@ function App() {
       setLoading(true);
       const params = new URLSearchParams();
       if (query) params.set('search', query);
-      if (sid) params.set('station_id', sid);
+      if (sid === 'orphaned') {
+        params.set('orphaned', 'true');
+      } else if (sid) {
+        params.set('station_id', sid);
+      }
       if (page > 1) params.set('page', String(page));
       if (dateFromRef.current) params.set('date_from', dateFromRef.current);
       if (dateToRef.current) params.set('date_to', dateToRef.current);
@@ -1312,7 +1333,7 @@ function App() {
 
           <div className="mt-4 md:mt-6 flex items-center gap-2 md:gap-3 w-full md:w-auto flex-wrap">
             {/* Station Selector Dropdown */}
-            {!(viewMode === 'grid' && stations.length >= 2) && (
+            {viewMode !== 'grid' && (
               <div className="relative group flex items-center border border-white/10 rounded-xl bg-white/5 h-10 min-h-[44px] px-2 md:px-3 shadow-lg">
                 <Monitor className="w-5 h-5 text-indigo-400 mr-2" />
                 <select
@@ -1382,14 +1403,14 @@ function App() {
               </div>
             )}
 
-            {/* View Mode Toggle */}
-            {stations.length >= 2 && currentUser?.role === 'ADMIN' && (
+            {/* Back to Tổng quan (Admin only) */}
+            {viewMode === 'single' && currentUser?.role === 'ADMIN' && (
               <button
-                onClick={() => setViewMode((prev) => (prev === 'single' ? 'grid' : 'single'))}
-                className="hidden md:flex h-10 w-10 items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/30 rounded-xl transition-all shadow-lg text-slate-400 hover:text-blue-400"
-                title={viewMode === 'single' ? 'Xem tổng quan tất cả trạm' : 'Xem trạm đơn lẻ'}
+                onClick={() => setViewMode('grid')}
+                className="hidden md:flex h-10 items-center justify-center px-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/30 rounded-xl transition-all shadow-lg text-slate-400 hover:text-blue-400 font-medium text-sm gap-2"
+                title="Quay lại giao diện tổng quan"
               >
-                {viewMode === 'single' ? <LayoutGrid className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+                ← Tổng quan
               </button>
             )}
 
@@ -1537,7 +1558,7 @@ function App() {
       )}
 
       {/* Main Content */}
-      {showDashboard ? (
+      {showDashboard && currentUser?.role !== 'ADMIN' ? (
         <Dashboard
           stations={stations}
           activeStationId={activeStationId}
@@ -1546,10 +1567,31 @@ function App() {
           analytics={analytics}
         />
       ) : (
-        <div className={`grid gap-4 md:gap-8 ${viewMode === 'grid' ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-3'}`}>
+        <div
+          className={`grid gap-4 md:gap-8 ${viewMode === 'grid' || currentUser?.role === 'ADMIN' ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-3'}`}
+        >
           {/* Left Column: Live Camera / Grid */}
-          <div className={`${viewMode === 'grid' ? 'lg:col-span-1' : 'lg:col-span-2'} flex flex-col gap-4`}>
-            {viewMode === 'grid' ? (
+          <div
+            className={`${viewMode === 'grid' || currentUser?.role === 'ADMIN' ? 'lg:col-span-1' : 'lg:col-span-2'} flex flex-col gap-4`}
+          >
+            {currentUser?.role === 'ADMIN' && viewMode === 'grid' ? (
+              <AdminDashboard
+                stations={stations}
+                stationStatuses={stationStatuses}
+                activeStationId={activeStationId}
+                storageInfo={storageInfo}
+                currentUser={currentUser}
+                analytics={analytics}
+                reconnectInfo={reconnectInfo}
+                mtxAvailable={mtxAvailable}
+                isDualCamStation={isDualCamStation}
+                MTX_HOST={MTX_HOST}
+                onStationClick={(id) => {
+                  setActiveStationId(id);
+                  setViewMode('single');
+                }}
+              />
+            ) : viewMode === 'grid' ? (
               <>
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -1642,7 +1684,7 @@ function App() {
                       <MonitorPlay className="w-5 h-5 text-red-400" />
                       Chế Độ Quan Sát Live
                     </h2>
-                    {stations.length >= 2 && currentUser?.role === 'ADMIN' && (
+                    {currentUser?.role === 'ADMIN' && (
                       <button
                         onClick={() => setViewMode('grid')}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-slate-400 hover:text-white transition"
@@ -1887,6 +1929,26 @@ function App() {
 
               {/* Filter Bar */}
               <div className="flex flex-wrap items-center gap-2 px-4 py-2 bg-white/5 border-b border-white/10 rounded-xl">
+                {currentUser?.role === 'ADMIN' && (
+                  <select
+                    value={activeStationId || ''}
+                    onChange={(e) => setActiveStationId(e.target.value)}
+                    className="bg-white/10 text-white text-xs rounded px-2 py-1 border border-white/20 focus:outline-none focus:border-blue-400"
+                    style={{ colorScheme: 'dark' }}
+                  >
+                    <option value="" className="bg-slate-800">
+                      Tất cả trạm
+                    </option>
+                    <option value="orphaned" className="bg-slate-800">
+                      (trạm đã xoá)
+                    </option>
+                    {stations.map((st) => (
+                      <option key={st.id} value={st.id} className="bg-slate-800">
+                        {st.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <input
                   type="date"
                   value={dateFrom}
@@ -1988,7 +2050,12 @@ function App() {
                               </span>
                             )}
                             <span className="px-2 py-1 bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded text-[10px] font-bold">
-                              Trạm: {record.station_name || 'Mặc định'}
+                              Trạm:{' '}
+                              {record.station_name
+                                ? record.station_name
+                                : record.station_id
+                                  ? '(trạm đã xoá)'
+                                  : 'Mặc định'}
                             </span>
                           </div>
                           {currentUser?.role === 'ADMIN' && (

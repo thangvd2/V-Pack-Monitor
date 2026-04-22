@@ -40,6 +40,11 @@ def register_routes(app):
     @app.get("/api/stations")
     def get_stations_api(current_user: CurrentUser):
         stations = database.get_stations()
+
+        with api._processing_lock:
+            for s in stations:
+                s["processing_count"] = api._processing_count.get(s["id"], 0)
+
         if current_user.get("role") != "ADMIN":
             for s in stations:
                 s.pop("safety_code", None)
