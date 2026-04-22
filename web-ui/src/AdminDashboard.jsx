@@ -6,15 +6,11 @@
 
 import React from 'react';
 import { MonitorPlay, LayoutGrid } from 'lucide-react';
-import Dashboard from './Dashboard';
 import MtxFallback from './MtxFallback';
 
 export default function AdminDashboard({
   stations,
   stationStatuses,
-  storageInfo,
-  currentUser,
-  analytics,
   reconnectInfo,
   mtxAvailable,
   isDualCamStation,
@@ -23,18 +19,7 @@ export default function AdminDashboard({
 }) {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* 1. Tổng Quan Hệ Thống (Reuses Dashboard) */}
-      <section>
-        <Dashboard
-          stations={stations}
-          activeStationId={''} // Pass empty so Dashboard shows 'all' by default
-          storageInfo={storageInfo}
-          currentUser={currentUser}
-          analytics={analytics}
-        />
-      </section>
-
-      {/* 2. Live Cameras Grid (Luôn hiện cho admin) */}
+      {/* Live Cameras Grid (Luôn hiện cho admin) */}
       <section className="bg-white/5 border border-white/10 rounded-2xl md:rounded-3xl p-4 md:p-6 backdrop-blur-md shadow-2xl">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold flex items-center gap-2">

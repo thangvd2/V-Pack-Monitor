@@ -621,7 +621,7 @@ def get_records_v2(
         params_before_fts = list(params) if search else []
 
         if orphaned:
-            where_clauses.append("p.station_id NOT IN (SELECT id FROM stations)")
+            where_clauses.append("(p.station_id IS NULL OR p.station_id NOT IN (SELECT id FROM stations))")
         elif station_id is not None:
             where_clauses.append("p.station_id = ?")
             params.append(station_id)
