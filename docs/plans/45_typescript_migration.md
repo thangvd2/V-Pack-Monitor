@@ -21,7 +21,7 @@ Khi backend thêm/xóa field → frontend crash silent hoặc hiển thị undef
 ## Scope
 
 ### Phase 1: Setup (1 giờ)
-- `npm install -D typescript @types/react @types/react-dom`
+- `npm install -D typescript` — NOTE: `@types/react` và `@types/react-dom` đã có trong devDependencies
 - `tsconfig.json` — `allowJs: true` (gradual migration)
 - `vite.config.ts` — TypeScript support
 - Rename `vite.config.js` → `vite.config.ts`

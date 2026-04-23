@@ -9,7 +9,7 @@
 ## Problem
 
 App.jsx là một "mega-component" duy nhất chứa toàn bộ logic:
-- 60+ `useState` hooks
+- 51+ `useState` hooks
 - 11 `useRef` + useEffect sync pairs
 - SSE event handling (3 event types, 140+ lines)
 - Auth flow (login/logout/token restore)

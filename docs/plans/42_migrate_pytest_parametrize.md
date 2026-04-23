@@ -9,8 +9,8 @@
 ## Problem
 
 `test_api_helpers.py` có 22 test methods viết tay cho camera brand RTSP URLs:
-- 12 methods cho `get_rtsp_url` (6 brands × 2 channels + edge cases)
-- 10 methods cho `get_rtsp_sub_url` (5 brands × 2 channels + edge cases)
+- 13 methods cho `get_rtsp_url` (6 brands × 2 channels + edge cases)
+- 9 methods cho `get_rtsp_sub_url` (5 brands × 2 channels + edge cases)
 
 Mỗi method lặp cùng pattern: setup → call → assert. Khi thêm brand mới → phải viết 2-4 methods mới. Dễ quên.
 
