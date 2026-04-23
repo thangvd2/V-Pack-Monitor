@@ -5,21 +5,20 @@
 
 ---
 
-## Concurrency
+## Classification Summary
 
-### Exponential Backoff
-**File:** `telegram_bot.py:96-105`
-
-Telegram bot polling retries with exponential backoff (3s → 6s → 12s → 24s → 48s → 60s cap). Resets to 3s on success.
-
-### Parallel Execution (ThreadPoolExecutor)
-**File:** `network.py:157-163`
-
-LAN ping sweep uses `ThreadPoolExecutor(max_workers=50)` to ping all 254 hosts in a /24 subnet in parallel with `as_completed(futures, timeout=17)`.
+| Category | Count | Description |
+|----------|-------|-------------|
+| Security | 4 | Input validation, encryption, access tokens, timer safety |
+| Frontend Conventions | 10 | State management, debouncing, polling, cleanup, React hooks |
+| Standard Techniques | 6 | Middleware, modals, CRUD, memoization, composition |
+| Testing | 2 | Test parameterization and organization |
+| Infrastructure | 4 | Docker, packaging, monorepo, feature flags |
+| Concurrency | 2 | Backoff, parallel execution |
 
 ---
 
-## Security
+## Security (4 items)
 
 ### Path Traversal Defense
 **Files:** `routes_records.py:272-275`, `recorder.py:173-178`, `routes_system.py:270-276`, `database.py:869-870`
@@ -46,7 +45,7 @@ Warning timer (540s) → SSE `recording_warning` event. Stop timer (600s) → au
 
 ---
 
-## Frontend Conventions
+## Frontend Conventions (10 items)
 
 ### Lift State Up
 **File:** `App.jsx` (55+ useState)
@@ -113,9 +112,18 @@ COOLDOWN_MS = 600                // notificationSounds.js:9
 
 Every useEffect with side effects has a cleanup function: SSE close, clearInterval, clearTimeout, removeEventListener, abort(), interceptor eject.
 
+### Memoization (useMemo / useCallback)
+**Files:** 15+ locations across all components
+
+- `stationsIdStr` memoized from stations array (`App.jsx:379`)
+- `activeStation` memoized lookup (`App.jsx:972`)
+- `showToast`, `showConfirmDialog`, `doChangePassword` in useCallback
+- `fetchHourly`, `fetchTrend`, `fetchStationsComparison` in Dashboard
+- `fetchData` in SystemHealth
+
 ---
 
-## Standard Techniques
+## Standard Techniques (6 items)
 
 ### Middleware (CORS + Exception Handler)
 **File:** `api.py:542-553, 658-664`
@@ -132,15 +140,6 @@ Shared structure: `if (!isOpen) return null` → backdrop click = close → `sto
 
 Full CRUD for users: Create (with validation) → Read (fetch on mount) → Update (inline editing) → Delete (with self-delete guard) → Toggle active → Reset password.
 
-### Memoization (useMemo / useCallback)
-**Files:** 15+ locations across all components
-
-- `stationsIdStr` memoized from stations array (`App.jsx:379`)
-- `activeStation` memoized lookup (`App.jsx:972`)
-- `showToast`, `showConfirmDialog`, `doChangePassword` in useCallback
-- `fetchHourly`, `fetchTrend`, `fetchStationsComparison` in Dashboard
-- `fetchData` in SystemHealth
-
 ### Promise.allSettled for Parallel Fetches
 **File:** `SystemHealth.jsx:54-58`
 
@@ -153,7 +152,7 @@ Fetches health + processes + network in parallel. Each result checked independen
 
 ---
 
-## Testing Conventions
+## Testing (2 items)
 
 ### Parameterized by Enumeration
 **File:** `test_api_helpers.py`
@@ -182,7 +181,21 @@ Fetches health + processes + network in parallel. Each result checked independen
 
 ---
 
-## Infrastructure & Tooling
+## Concurrency (2 items)
+
+### Exponential Backoff
+**File:** `telegram_bot.py:96-105`
+
+Telegram bot polling retries with exponential backoff (3s → 6s → 12s → 24s → 48s → 60s cap). Resets to 3s on success.
+
+### Parallel Execution (ThreadPoolExecutor)
+**File:** `network.py:157-163`
+
+LAN ping sweep uses `ThreadPoolExecutor(max_workers=50)` to ping all 254 hosts in a /24 subnet in parallel with `as_completed(futures, timeout=17)`.
+
+---
+
+## Infrastructure & Tooling (4 items)
 
 ### Docker Multi-Arch
 **File:** `Dockerfile`
