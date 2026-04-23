@@ -1,10 +1,11 @@
-# Design Patterns & Best Practices — V-Pack Monitor v3.4.0
+# Design Patterns — V-Pack Monitor v3.4.0
 
-> Audit date: 2026-04-24 | 75 patterns identified across backend, frontend, testing, and infrastructure.
+> Audit date: 2026-04-24 | 36 patterns identified.
+> Related: [BEST_PRACTICES.md](./BEST_PRACTICES.md) for coding conventions and standard techniques.
 
 ---
 
-## Backend Architecture (27 patterns)
+## Backend Architecture (20 patterns)
 
 ### 1. Repository Pattern
 **File:** `database.py` (entire file)
@@ -25,20 +26,21 @@ routes_system.register_routes(app)
 
 Keeps `api.py` clean (0 route definitions, only app factory + shared state).
 
-### 3. Singleton Pattern (Module-Level Shared State)
-**File:** `api.py:68-98`
+### 3. Singleton Pattern (Module-Level State + IIFE)
+**Files:** `api.py:68-98`, `config.js`, `notificationSounds.js`
 
-Python modules are singletons by default. All mutable shared state declared at module scope:
+Python modules are singletons by default — all mutable shared state declared at module scope:
 
 ```python
-active_recorders = {}       # L68
-active_waybills = {}        # L69
-active_record_ids = {}      # L70
-_processing_count = {}      # L71
-stream_managers = {}        # L74
-reconnect_status = {}       # L76
-_sse_clients = []           # L97
+active_recorders = {}       # api.py:68
+active_waybills = {}        # api.py:69
+active_record_ids = {}      # api.py:70
+_processing_count = {}      # api.py:71
+stream_managers = {}        # api.py:74
+_sse_clients = []           # api.py:97
 ```
+
+Frontend: `config.js` IIFE determines API_BASE at module load. `notificationSounds.js` lazy AudioContext singleton on first user gesture.
 
 ### 4. Per-Concern Locking (Lock Striping)
 **File:** `api.py:72-88`
@@ -58,8 +60,8 @@ _sse_clients = []           # L97
 
 Plus **per-station locks**: `_station_locks = {}` — dynamic locks per station to prevent double-scan race conditions.
 
-### 5. Observer / Pub-Sub Pattern (SSE Event Broadcasting)
-**File:** `api.py:101-111` (publisher), `routes_records.py:443-484` (endpoint)
+### 5. Observer / Pub-Sub Pattern (SSE)
+**Files:** `api.py:101-111` (publisher), `routes_records.py:443-484` (endpoint), `App.jsx:385-523` (frontend subscriber)
 
 Classic fan-out pub-sub. `notify_sse()` pushes to all subscriber queues:
 
@@ -71,7 +73,7 @@ def notify_sse(event_type, data):
             q.put_nowait(msg)
 ```
 
-Event types: `video_status`, `station_status`, `update_progress`, `recording_warning`. Dead subscribers auto-pruned.
+Frontend subscribes via `EventSource` with typed listeners: `video_status`, `update_progress`, `recording_warning`. Two modes: global SSE (admin grid) vs station-specific SSE (operator single view).
 
 ### 6. Strategy Pattern — Hardware Encoder Selection
 **File:** `recorder.py:39-74`
@@ -112,33 +114,11 @@ PIP mode (L265-331) is the most complex builder with `filter_complex`, dual inpu
 `ThreadPoolExecutor(max_workers=1)` serializes video processing. `_MAX_PENDING=10` backpressure — rejects submissions when overloaded. Callers check return value and mark records as FAILED.
 
 ### 12. Lifespan / Context Manager Pattern
-**File:** `api.py:538-636`
+**Files:** `api.py:538-636` (app lifespan), `database.py:136-158` (connection manager)
 
-Standard FastAPI async context manager:
+App lifecycle managed via `@asynccontextmanager` — startup (init DB, MediaMTX, recover pending) + shutdown (cleanup). Database connection manager `get_connection()` ensures consistent pragmas (foreign_keys=ON, WAL, busy_timeout) on every connection.
 
-```python
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # STARTUP: init_db(), recover_pending(), CameraStreamManager.start(), telegram_bot.start()
-    yield
-    # SHUTDOWN: cancel timers, stop managers, stop recorders, video_worker.shutdown(), telegram_bot.stop()
-```
-
-### 13. Connection Manager Pattern
-**File:** `database.py:136-158`
-
-`get_connection()` returns configured SQLite connection with consistent pragmas:
-
-```python
-def get_connection():
-    conn = sqlite3.connect(DB_FILE)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA busy_timeout = 5000")
-    conn.row_factory = sqlite3.Row
-    return conn
-```
-
-### 14. Migration Pattern — Encryption Upgrade
+### 13. Migration Pattern — Encryption Upgrade
 **File:** `database.py:59-123`
 
 Two-phase crypto migration:
@@ -146,7 +126,7 @@ Two-phase crypto migration:
 - `_migrate_v1_to_v2()` runs on startup, re-encrypts all v1 values with Fernet
 - `_encrypt_value()` always writes v2 format
 
-### 15. Dependency Injection (FastAPI Depends)
+### 14. Dependency Injection (FastAPI Depends)
 **File:** `auth.py:76-114`
 
 Reusable type aliases combining annotation + DI:
@@ -158,12 +138,12 @@ AdminUser = Annotated[dict, Depends(require_admin)]
 
 Routes declare `current_user: CurrentUser` — zero boilerplate auth.
 
-### 16. Chain of Responsibility — Barcode Scan Dispatch
+### 15. Chain of Responsibility — Barcode Scan Dispatch
 **File:** `routes_records.py:300-335`
 
 Sequential handler chain: EXIT → STOP → already_recording → START. Each handler either processes the request or falls through.
 
-### 17. Crash Recovery Pattern
+### 16. Crash Recovery Pattern
 **File:** `api.py:466-535`
 
 `_recover_pending_records()` runs in daemon thread on startup:
@@ -172,12 +152,12 @@ Sequential handler chain: EXIT → STOP → already_recording → START. Each ha
 3. Validate with ffprobe
 4. Mark READY or FAILED, send Telegram alerts for unrecoverable records
 
-### 18. Adapter Pattern — MediaMTX API Wrapper
+### 17. Adapter Pattern — MediaMTX API Wrapper
 **File:** `api.py:114-172`
 
 `_mtx_add_path()` / `_mtx_remove_path()` adapt MediaMTX REST API into simple Python functions with retry logic and fallback (replace → delete+add).
 
-### 19. Self-Healing Monitor Pattern
+### 18. Self-Healing Monitor Pattern
 **File:** `api.py:175-302`
 
 `CameraStreamManager._monitor_loop`:
@@ -186,18 +166,19 @@ Sequential handler chain: EXIT → STOP → already_recording → START. Each ha
 - Detects broken cam2 feeds, removes them
 - `_try_rediscover_camera()` scans LAN by MAC when camera goes offline, updates DB and reconnects
 
-### 20. Graceful Degradation — FTS5 → LIKE Fallback
-**File:** `database.py:589-682`
+### 19. Graceful Degradation
+**Files:** `database.py:589-682` (FTS5 → LIKE fallback), `MtxFallback.jsx` (MediaMTX down), `SystemHealth.jsx` (fetch error → retry), `App.jsx:179-202` (ErrorBoundary)
 
-Search queries attempt FTS5 trigram match first. If `MATCH` fails (special chars, FTS5 missing, query < 3 chars), catches `OperationalError` and falls back to `LIKE`.
+Multiple degradation layers:
+- Backend: FTS5 trigram MATCH fails → catches `OperationalError` → falls back to LIKE
+- Frontend: MediaMTX down → `MtxFallback` component (instructions instead of blank)
+- Frontend: SystemHealth fetch error → retry button
+- Frontend: React render crash → ErrorBoundary fallback UI
 
-### 21. Lazy Initialization
-**Files:** `video_worker.py:168-170`, `database.py:277,1004,1041`, `cloud_sync.py:52`
+### 20. Cache with TTL / Guard Mutex
+**Files:** `recorder.py:36`, `telegram_bot.py:23-41`, `routes_system.py:43-44`, `cloud_sync.py:40-58`, `notificationSounds.js:9-16`, `cloud_sync.py:61`, `routes_system.py:41-42`, `database.py:131`
 
-`ThreadPoolExecutor`, `bcrypt`, `Fernet`, `google.oauth2` — created/imported only on first use. Avoids startup cost for optional features.
-
-### 22. Cache with TTL
-**Files:** `recorder.py:36`, `telegram_bot.py:23-41`, `routes_system.py:43-44`, `cloud_sync.py:40-58`
+Cached values with different TTL strategies:
 
 | What | TTL | Location |
 |------|-----|----------|
@@ -205,65 +186,20 @@ Search queries attempt FTS5 trigram match first. If `MATCH` fails (special chars
 | Bot token | 5 minutes | `telegram_bot.py:25` |
 | GitHub update check | 1 hour | `routes_system.py:44` |
 | Google Drive creds | Until file modified (mtime) | `cloud_sync.py:40-58` |
+| Notification sounds | 600ms cooldown | `notificationSounds.js:9-16` |
 
-### 23. Guard / Mutex Pattern (Single-Execution)
-**Files:** `cloud_sync.py:61`, `routes_system.py:41-42`, `database.py:131`
-
-- `_sync_lock` prevents concurrent cloud syncs
-- `_update_lock` + `_is_updating` flag prevents concurrent system updates
-- `_init_lock` prevents concurrent DB initialization
-
-### 24. Exponential Backoff
-**File:** `telegram_bot.py:96-105`
-
-Classic pattern with 60s cap: 3s → 6s → 12s → 24s → 48s → 60s. Resets to 3s on success.
-
-### 25. Parallel Execution Pattern (LAN Ping Sweep)
-**File:** `network.py:157-163`
-
-```python
-with ThreadPoolExecutor(max_workers=50) as executor:
-    futures = {executor.submit(_ping_host, f"{prefix}.{i}"): i for i in range(1, 255)}
-    for future in as_completed(futures, timeout=17):
-        ...
-```
-
-254 hosts in parallel with 50 threads, 17s timeout.
-
-### 26. Path Traversal Defense
-**Files:** `routes_records.py:272-275`, `recorder.py:173-178`, `routes_system.py:270-276`
-
-- Waybill code sanitization (strip special chars)
-- Download path validation (prevent `../` traversal)
-- Zip Slip prevention (validate extracted paths stay within target dir)
-- SQL column whitelist (`database.py:869-870`)
-
-### 27. Middleware Pattern
-**File:** `api.py:542-553, 658-664`
-
-- CORS middleware with restricted methods
-- Custom async exception handler (suppress connection reset errors in SSE)
+Guard mutexes prevent concurrent execution: `_sync_lock` (cloud sync), `_update_lock` + `_is_updating` (system update), `_init_lock` (DB initialization).
 
 ---
 
-## Frontend Architecture (28 patterns)
+## Frontend Architecture (11 patterns)
 
-### 28. Container / Presentational Component
+### 21. Container / Presentational Component
 **File:** `App.jsx` (container) vs children (presentational)
 
 App.jsx holds ALL application state (~60 `useState` hooks). Children receive data and callbacks via props. Pure presentational components: `AdminDashboard`, `MtxFallback`. Semi-container: `Dashboard`, `SystemHealth` (fetch own chart/health data).
 
-### 29. Observer Pattern — SSE / EventSource
-**File:** `App.jsx:385-523`
-
-Typed event listeners on EventSource:
-- `video_status` → update station statuses, packing status, play sounds, refresh records
-- `update_progress` → show system update progress
-- `recording_warning` → show toast + play warning sound
-
-Two modes: global SSE (admin/operator grid) vs station-specific SSE (operator single view).
-
-### 30. Ref Synchronization (Stale Closure Prevention)
+### 22. Ref Synchronization (Stale Closure Prevention)
 **File:** `App.jsx:264-292`
 
 11 refs synced via useEffect, read inside SSE callbacks and event handlers:
@@ -282,7 +218,7 @@ Two modes: global SSE (admin/operator grid) vs station-specific SSE (operator si
 | `toastTimeoutRef` | Toast cleanup |
 | `barcodeSimInputRef` | Direct DOM access |
 
-### 31. Role-Based Access Control (RBAC)
+### 23. Role-Based Access Control (RBAC)
 **File:** `App.jsx` (23+ guard locations), `Dashboard.jsx`, `SystemHealth.jsx`
 
 - `requestAdminAccess()` gateway with password re-confirmation
@@ -290,7 +226,7 @@ Two modes: global SSE (admin/operator grid) vs station-specific SSE (operator si
 - Operator sees: assigned station only, barcode simulator, limited controls
 - `viewMode` auto-set to `'grid'` for admin on login
 
-### 32. State Machine (Recording Flow)
+### 24. State Machine (Recording Flow)
 **File:** `App.jsx`
 
 ```
@@ -301,7 +237,7 @@ packing → idle  (scan error response)
 
 Ref-based guard: `packingStatusRef.current` checked in barcode handler to prevent double-scan.
 
-### 33. AbortController Pattern (Cancellable Fetches)
+### 25. AbortController Pattern (Cancellable Fetches)
 **File:** `App.jsx:279, 667-684`
 
 Cancel previous fetch when filter changes:
@@ -312,12 +248,12 @@ abortControllerRef.current = new AbortController();
 // ... fetch with signal, detect axios.isCancel in catch
 ```
 
-### 34. Error Boundary
+### 26. Error Boundary
 **File:** `App.jsx:179-202`
 
 Class component wraps entire App. Catches React render errors, shows fallback UI.
 
-### 35. Guard / Protected Route Pattern
+### 27. Guard / Protected Route Pattern
 **File:** `App.jsx:1015-1112`
 
 Three sequential gates as early returns:
@@ -327,8 +263,10 @@ Three sequential gates as early returns:
 
 Plus: must-change-password enforcement, 401 interceptor auto-logout.
 
-### 36. Tab / Strategy UI
+### 28. Tab / Strategy UI
 **Files:** `App.jsx:227`, `Dashboard.jsx:94`, `UserManagementModal.jsx:55`
+
+State-driven tab switching changes rendered content strategy:
 
 | Component | State | Tabs |
 |-----------|-------|------|
@@ -336,24 +274,9 @@ Plus: must-change-password enforcement, 401 interceptor auto-logout.
 | Dashboard | `dashTab` | Analytics / Health |
 | UserManagementModal | `activeTab` | Users / Sessions / Logs |
 
-### 37. Lift State Up
-**File:** `App.jsx` (55+ useState)
+Combined with `viewMode` (single/grid) × `role` (ADMIN/OPERATOR) × `cameraMode` (single/dual/pip) for a multi-axis rendering matrix.
 
-ALL significant state lives in App.jsx. No child manages shared state. Everything flows via props.
-
-### 38. Fallback / Graceful Degradation
-**Files:** `MtxFallback.jsx`, `App.jsx`, `SystemHealth.jsx`
-
-- MediaMTX down → `MtxFallback` (shows instructions instead of blank)
-- SystemHealth fetch error → retry button
-- ErrorBoundary catches render crashes
-
-### 39. Modal Pattern
-**Files:** `VideoPlayerModal.jsx`, `SetupModal.jsx`, `UserManagementModal.jsx`
-
-Shared structure: `if (!isOpen) return null` → backdrop click = close → `stopPropagation` on inner content. Parent controls open/close via state.
-
-### 40. Form Validation (Touched-State Pattern)
+### 29. Form Validation (Touched-State Pattern)
 **File:** `SetupModal.jsx:125-206`
 
 - `touched` state tracks which fields user interacted with
@@ -362,125 +285,11 @@ Shared structure: `if (!isOpen) return null` → backdrop click = close → `sto
 - Server-side conflict check with debounce (300ms)
 - IP/MAC validators: `isValidIPv4`, `isValidIPv6`, `isValidMAC`
 
-### 41. CRUD Pattern
-**File:** `UserManagementModal.jsx`
-
-Full CRUD for users: Create (with validation) → Read (fetch on mount) → Update (inline editing) → Delete (with self-delete guard) → Toggle active → Reset password.
-
-### 42. Debouncing / Throttling
-**Files:** `App.jsx`, `SetupModal.jsx`, `VideoPlayerModal.jsx`
-
-| What | Delay | Location |
-|------|-------|----------|
-| Search input | 300ms | `App.jsx:49, 675` |
-| Barcode buffer | 100ms | `App.jsx:46, 954` |
-| Conflict check | 300ms | `SetupModal.jsx:157` |
-| Video controls auto-hide | 3000ms | `VideoPlayerModal.jsx:59` |
-
-### 43. Polling Pattern
-**Files:** `App.jsx`, `SystemHealth.jsx`, `UserManagementModal.jsx`
-
-| What | Interval | Location |
-|------|----------|----------|
-| Station status | 10s | `App.jsx:63` |
-| Session heartbeat | 30s | `App.jsx:353` |
-| Reconnect status | 10s | `App.jsx:609` |
-| System health | 5s | `SystemHealth.jsx:72` |
-| Sessions/logs auto-refresh | 30s | `UserManagementModal.jsx:132` |
-
-### 44. Axios Interceptor Pattern
-**File:** `App.jsx:364-377`
-
-401 response → auto-logout. Global timeout + Authorization header set on login.
-
-### 45. Rate Limiting / Cooldown
-**File:** `notificationSounds.js:9-16`
-
-600ms cooldown per sound type. `_lastPlayed` dict tracks last play time. Prevents duplicate rapid triggers.
-
-### 46. Confirmation Dialog Pattern
-**Files:** `App.jsx:296-298, 2204-2228`, `SetupModal.jsx:867-891`
-
-Reusable confirm dialog with `showConfirmDialog(message, onConfirm)` callback. Used for delete records, delete station, unsaved changes, conflict warnings.
-
-### 47. Component Composition
-**File:** `Dashboard.jsx:50-84`
-
-`StatCard` and `ChartCard` sub-components. Dashboard conditionally embeds `SystemHealth`. AdminDashboard composes `MtxFallback`.
-
-### 48. Memoization (useMemo / useCallback)
-**Files:** 15+ locations across all components
-
-- `stationsIdStr` memoized from stations array (`App.jsx:379`)
-- `activeStation` memoized lookup (`App.jsx:972`)
-- `showToast`, `showConfirmDialog`, `doChangePassword` in useCallback
-- `fetchHourly`, `fetchTrend`, `fetchStationsComparison` in Dashboard
-- `fetchData` in SystemHealth
-
-### 49. Cleanup Pattern (useEffect return)
-**Files:** 13 useEffect cleanups across all components
-
-| Effect | Cleanup |
-|--------|---------|
-| SSE EventSource | `es.close()` |
-| Station status polling | `clearInterval` |
-| Heartbeat interval | `clearInterval` |
-| Reconnect polling | `clearInterval` + `active` flag |
-| Search debounce | `clearTimeout` + `abort()` |
-| Barcode scanner | `removeEventListener` + `clearTimeout` |
-| Axios interceptor | `eject(interceptor)` |
-| Video keyboard handler | `removeEventListener` |
-| Video hide timer | `clearTimeout` |
-| Health polling | `clearInterval` |
-| Auto-refresh | `clearInterval` |
-| Escape handler | `removeEventListener` |
-| MTX status check | `active = false` flag |
-
-### 50. Named Constants
-**Files:** 6 files
-
-```javascript
-STATION_POLL_INTERVAL = 10000    // App.jsx:45
-BARCODE_TIMEOUT = 100            // App.jsx:46
-HEARTBEAT_INTERVAL = 30000       // App.jsx:47
-SEARCH_DEBOUNCE = 300            // App.jsx:49
-CHART_COLORS = [...]             // Dashboard.jsx:38
-STATUS_CONFIG = {...}            // SystemHealth.jsx:12
-ACTION_LABELS = {...}            // UserManagementModal.jsx:29
-COOLDOWN_MS = 600                // notificationSounds.js:9
-```
-
-### 51. Promise.allSettled for Parallel Fetches
-**File:** `SystemHealth.jsx:54-58`
-
-Fetches health + processes + network in parallel. Each result checked independently (`status === 'fulfilled'`).
-
-### 52. Race Guard (active flag)
-**File:** `App.jsx:337, 585`
-
-`let active = true` pattern prevents state updates after component unmount. Checked before `setState` calls.
-
-### 53. Content-Disposition Parsing
-**File:** `VideoPlayerModal.jsx:288-293`
-
-Regex extraction of filename from download headers. Handles both `filename=` and `filename*=UTF-8''` formats. Falls back to `{waybillCode}.mp4`.
-
-### 54. Singleton (IIFE / Lazy)
-**Files:** `config.js`, `notificationSounds.js`
-
-- `config.js` IIFE determines API_BASE at module load time
-- `notificationSounds.js` lazy `AudioContext` creation on first user gesture
-
-### 55. Multi-axis Conditional Rendering
-**File:** `App.jsx:1609-2201`
-
-5-axis rendering matrix: `viewMode` × `role` × `adminTab` × `cameraMode` × `showDashboard`.
-
 ---
 
-## Testing & CI/CD (20 patterns)
+## Testing & CI/CD (7 patterns)
 
-### 56. Shared Fixtures (conftest.py)
+### 30. Shared Fixtures (conftest.py)
 **File:** `tests/conftest.py`
 
 Layered fixture chain:
@@ -491,12 +300,12 @@ isolate_db → operator_user_id → operator_token → operator_headers
 isolate_db + client (monkeypatches api shared state + patches CameraStreamManager)
 ```
 
-### 57. Test Isolation (tmp_path + Fresh DB Per Test)
+### 31. Test Isolation (tmp_path + Fresh DB Per Test)
 **File:** `tests/conftest.py:28-34`
 
 `isolate_db` fixture redirects `database.DB_FILE` to `tmp_path/test.db`, resets ALL shared mutable state to empty dicts. `database.py:131-133` ensures re-init when DB path changes.
 
-### 58. Mock / Stub Pattern
+### 32. Mock / Stub Pattern
 **Files:** `test_recorder.py`, `test_video_worker.py`, `test_auto_stop_timer.py`, `test_cloud_sync.py`, `test_telegram.py`
 
 - `subprocess.Popen` / `subprocess.run` for FFmpeg mocking
@@ -504,37 +313,7 @@ isolate_db + client (monkeypatches api shared state + patches CameraStreamManage
 - `patch.object(api, "notify_sse")` captures SSE events for assertion
 - `patch("requests.post")` for Telegram API
 
-### 59. Spy Pattern
-**File:** `test_auto_stop_timer.py:86-89`
-
-`MagicMock(wraps=timer.cancel)` — verifies timer cancellation without preventing actual behavior.
-
-### 60. Parameterized by Enumeration
-**File:** `test_api_helpers.py`
-
-22 test methods covering all camera brands × channels × edge cases. Loop-based parameterization in `test_database_edge_cases.py:182-193` for SQL injection / unicode / spaces.
-
-### 61. Test Organization by Concern
-**Files:** 14 test files
-
-| File | Concern | Classes |
-|------|---------|---------|
-| `test_database.py` | DB layer | Encryption, Settings, Records, Stations, Users, Sessions, Audit, Analytics |
-| `test_database_edge_cases.py` | Boundary/security | SQL Injection, Boundary, Input Limits |
-| `test_auth.py` | Auth | JWT, Token Revocation, RBAC |
-| `test_api_routes.py` | API integration | Login, CRUD, Download, Export, Live Preview |
-| `test_api_hardening.py` | Input validation | Station Validation, Settings, Auto-Update, RBAC Edge Cases |
-| `test_security_regression.py` | Security | 18 tests covering 26 vulnerabilities |
-| `test_video_worker.py` | Worker + recovery | Worker lifecycle, crash recovery |
-| `test_recorder.py` | FFmpeg | HW encoder, SINGLE/DUAL/PIP modes |
-| `test_video_search.py` | Search/pagination | FTS5, Trigram, Pagination, Date/Status Filter, Sort |
-| `test_auto_stop_timer.py` | Timer lifecycle | 13 tests for timer create/cancel/fire |
-| `test_network.py` | Network | MAC validation, ARP scan, LAN discovery |
-| `test_cloud_sync.py` | Cloud backup | S3, GDrive upload |
-| `test_telegram.py` | Telegram | Send message |
-| `test_api_helpers.py` | RTSP URLs | All brands × channels |
-
-### 62. CI Pipeline with Gates
+### 33. CI Pipeline with Gates
 **File:** `.github/workflows/ci.yml`
 
 ```
@@ -548,75 +327,20 @@ changes (detect changed files)
 release-check (if PR dev→master)
 ```
 
-### 63. Path-Based CI Skip
-**File:** `.github/workflows/ci.yml:21-37`
+### 34. Path-Based CI Skip + Caching
+**File:** `.github/workflows/ci.yml:21-37, 92-97, 119-121`
 
-`dorny/paths-filter` detects python/frontend/docs-only groups. Docs-only changes skip all gates.
+`dorny/paths-filter` detects python/frontend/docs-only groups. Docs-only changes skip all gates. Pip cache keyed by `hashFiles('requirements*.txt')`. npm cache via `package-lock.json`.
 
-### 64. Dependency Caching
-**File:** `.github/workflows/ci.yml:92-97, 119-121`
-
-- Pip: `v1-${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}`
-- npm: `cache: "npm"` with `package-lock.json`
-
-### 65. Pre-commit Hook Chain
+### 35. Pre-commit Hook Chain
 **File:** `.pre-commit-config.yaml`
 
-5 stages: Ruff lint+format → detect-secrets → ai-sync enforcement → branch protection → pytest+eslint+prettier.
+5 stages: Ruff lint+format → detect-secrets → ai-sync enforcement → branch protection → pytest+eslint+prettier. Plus git-hooks `check-protected-branch.py` blocks pushes to master/dev.
 
-### 66. Version Consistency CI
-**File:** `scripts/check_version_consistency.py`
+### 36. Version Consistency CI
+**Files:** `scripts/check_version_consistency.py`, `scripts/bump_version.py`
 
-Cross-checks VERSION vs api.py header vs package.json vs README.md. Fails CI on mismatch.
-
-### 67. Auto Version Bump
-**File:** `scripts/bump_version.py`
-
-Updates all 4 version locations atomically.
-
-### 68. Branch Protection Hook
-**File:** `.git-hooks/check-protected-branch.py`
-
-Pre-push: blocks pushes to `master` and `dev`.
-
-### 69. Docker Multi-Arch
-**File:** `Dockerfile`
-
-Runtime arch detection for MediaMTX download. Dual-process CMD: `mediamtx & python -m uvicorn api:app`.
-
-### 70. PyInstaller Packaging
-**Files:** `build.py`, `V-Pack-Monitor.spec`
-
-3-step: `npm run build` → install PyInstaller → bundle backend + frontend dist into single executable. Runtime detection: `getattr(sys, 'frozen', False)`.
-
-### 71. Monorepo Organization
-**Project root**
-
-Backend (Python/FastAPI) + frontend (React/Vite) + Docker + CI + scripts in one repo. Build script orchestrates both.
-
-### 72. Auto-stop Timer State Machine
-**File:** `api.py:78-81, 334-409`
-
-Warning timer (540s) → SSE `recording_warning` event. Stop timer (600s) → auto-stop recording. Critical safety check at L353: `if current_record_id == record_id` prevents stopping wrong recording.
-
-### 73. Secret Management (Encryption at Rest)
-**File:** `database.py:27-56`
-
-Fernet encryption for sensitive settings (bot token, cloud credentials). Key derived from JWT secret. `_SENSITIVE_KEYS` whitelist determines which settings to encrypt.
-
-### 74. JWT + Token Revocation
-**File:** `auth.py`
-
-Access tokens (15min) + Refresh tokens (7days). Revocation list stored in DB. `get_current_user()` checks revocation on every request.
-
-### 75. Feature Flags / Configuration-Driven Behavior
-**Files:** `database.py`, `api.py`, `routes_system.py`
-
-- `_VALID_RECORD_STATUSES` whitelist (`database.py:476`)
-- `_VALID_ROLES` whitelist (`database.py:993`)
-- `LIVE_VIEW_STREAM` setting: main vs sub stream (`api.py:559`)
-- `RECORD_KEEP_DAYS` validated enum: 0/3/7/15/30/60/90/150/365 (`routes_system.py:414`)
-- `_MAX_RECORDING_SECONDS = 600` hard cap (`api.py:42`)
+Cross-checks VERSION vs api.py header vs package.json vs README.md. Fails CI on mismatch. `bump_version.py` updates all locations atomically.
 
 ---
 
