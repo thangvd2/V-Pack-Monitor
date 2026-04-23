@@ -1,7 +1,7 @@
 # Plan #24: System Hardening — Round 2 (130 Issues)
 
 **Created**: 2026-04-15
-**Status**: DRAFT — Awaiting user confirmation before implementation
+**Status**: DONE — Implemented in v3.x series. D1 (Fernet), D2 (per-concern locks), D3 (PRAGMA + SET NULL) all verified in codebase.
 **Scope**: 130 issues across all modules after Round 1 (22 issues fixed in v2.4.2)
 
 ## ARCHITECTURAL DECISIONS (Oracle Reviewed ✅)
