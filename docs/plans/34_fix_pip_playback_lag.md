@@ -1,5 +1,7 @@
 # Fix: PIP Mode Playback Lag + Encoder Quality Consistency
 
+**Status**: DONE — Implemented and merged.
+
 ## Overview
 
 2 bugs trong `recorder.py`, cùng 1 file, liên quan encoder selection:

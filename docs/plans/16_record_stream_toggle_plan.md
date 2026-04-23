@@ -1,5 +1,7 @@
 # Kế Hoạch #16: Record Stream Toggle (Main/Sub Stream Switcher)
 
+**Status**: DONE — Implemented in v3.x series.
+
 **Phiên bản:** v2.2.3
 **Ngày lập:** 2026-04-12
 **Ngày hoàn thành:** 2026-04-12

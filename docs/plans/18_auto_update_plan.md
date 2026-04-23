@@ -1,5 +1,7 @@
 # Kế Hoạch #18: Auto-Update System
 
+**Status**: DONE — Implemented in v3.x series.
+
 **Phiên bản:** v2.3.0
 **Ngày lập:** 2026-04-12
 **Mức ưu tiên:** HIGH

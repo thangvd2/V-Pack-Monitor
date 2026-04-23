@@ -1,5 +1,7 @@
 # Plan: Auto-detect and remove broken cam2 MediaMTX paths
 
+**Status**: DONE — Implemented and merged.
+
 **Ngày**: 2026-04-22
 **Mức độ**: Medium — Prevent log spam and UI confusion from broken cam2 paths
 **Loại**: Reliability improvement (backend)

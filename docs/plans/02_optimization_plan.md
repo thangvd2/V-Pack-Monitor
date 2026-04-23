@@ -1,5 +1,7 @@
 # Báo cáo Đánh giá và Đề xuất Tối ưu Hệ thống V-Pack
 
+**Status**: DONE — Implemented in v3.x series.
+
 Hệ thống cơ bản đã hoạt động trơn tru. Tuy nhiên để chạy ổn định trong kho bãi 24/7 với vài ngàn đơn hàng/ngày, tôi đã kiểm tra lại toàn bộ source code và phát hiện một số **"Nút thắt cổ chai" (Bottlenecks)** cần được tối ưu hóa như sau:
 
 ## 1. Tối ưu Luồng Video Kép (Camera Overload) - **Quan trọng nhất 🚨**

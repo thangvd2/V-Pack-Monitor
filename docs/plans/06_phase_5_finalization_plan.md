@@ -1,5 +1,7 @@
 # Kế hoạch Hoàn thiện V-Pack Monitor (Giai đoạn 5)
 
+**Status**: DONE — Implemented in v3.x series.
+
 Kế hoạch này nhắm tới việc hoàn thiện các lỗ hổng cuối cùng về bảo mật quản trị, cung cấp cái nhìn tổng quan về năng suất, và chuẩn bị sẵn sàng để chuyển giao phần mềm cho End-User (Chủ Kho) mà không cần họ phải biết code.
 
 ## 1. Bảo mật & Chống phá hoại (Security)

@@ -1,5 +1,7 @@
 # Bản Thiết Kế Giai Đoạn 7: Lưu Trữ Đám Mây (Cloud Backup)
 
+**Status**: DONE — Implemented in v3.x series.
+
 **Mục tiêu:** Ngăn chặn nguy cơ mất bằng chứng video do hư hỏng phần cứng/mất cắp/ổ cứng rác máy chủ. Đẩy các video Lịch Sử lên Đám Mây bằng cơ chế "Kích hoạt bằng tay" (Manual Trigger).
 
 ## 1. Cơ Chế Hoạt Động (Manual Upload)

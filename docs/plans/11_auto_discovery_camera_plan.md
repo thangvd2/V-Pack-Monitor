@@ -1,5 +1,7 @@
 # Plan: Auto-Discovery Camera by MAC Address
 
+**Status**: DONE — Implemented in v3.x series.
+
 **Version:** 1.3.1
 **Date:** 2026-04-08
 **Author:** VDT - Vu Duc Thang

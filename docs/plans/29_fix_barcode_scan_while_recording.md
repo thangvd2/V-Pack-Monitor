@@ -1,5 +1,7 @@
 # Fix: Barcode scan while recording silently overwrites waybill
 
+**Status**: DONE — Implemented and merged.
+
 ## Bug Description
 
 When an OPERATOR scans a new barcode while video recording is in progress for a previous barcode:

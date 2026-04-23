@@ -1,5 +1,7 @@
 # Bug Fix: Delete station fails with FK constraint error
 
+**Status**: DONE — Implemented and merged.
+
 **Ngày phát hiện**: 2026-04-22
 **Mức độ**: High — Không xóa được trạm khi có expired sessions
 **Loại**: Data integrity bug (backend)

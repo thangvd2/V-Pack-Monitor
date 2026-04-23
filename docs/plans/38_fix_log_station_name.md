@@ -1,5 +1,7 @@
 # Fix: Log Station Name Alongside Station ID
 
+**Status**: DONE — Implemented and merged.
+
 ## Problem
 
 Khi debug production, logs chỉ hiển thị `station_{id}` mà không có station name. Sau khi tạo/xóa nhiều stations, ID tăng lên (5, 6, 7...) và không map được với tên hiển thị trên UI ("số 1", "số 2"...).

@@ -1,5 +1,7 @@
 # Kế Hoạch Triển Khai Giai Đoạn 9: Hoàn Thiện & Đa Nhiệm (Maturity Phase)
 
+**Status**: DONE — Implemented in v3.x series.
+
 Chào bạn, đây là bản thiết kế cho hạng mục Dọn code, Nâng cấp Chatbot và Hoàn thiện tài liệu mà bạn vừa yêu cầu.
 
 ## Giải đáp: Tại sao chưa thấy file `.exe`?

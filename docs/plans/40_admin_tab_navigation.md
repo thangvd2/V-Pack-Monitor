@@ -1,5 +1,7 @@
 # Plan: Admin Tab Navigation
 
+**Status**: DONE — Implemented and merged.
+
 ## Goal
 
 Tách Admin UI thành 2 tabs: **[Vận hành]** (default) và **[Tổng quan]**. Tab Vận hành chứa live cameras + records. Tab Tổng quan chứa Dashboard stats + SystemHealth. Search bar giữ trong filter bar của records section.

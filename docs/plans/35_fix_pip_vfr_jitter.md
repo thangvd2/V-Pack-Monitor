@@ -1,5 +1,7 @@
 # Fix: PIP Playback Jitter — Variable Frame Rate Root Cause
 
+**Status**: DONE — Implemented and merged.
+
 ## Problem
 
 Video PIP playback bị giật sau khi fix encoder/bitrate (PR #45). Tốc độ xử lý (scan→stop) nhanh, nhưng file MP4 kết quả playback bị lag.
