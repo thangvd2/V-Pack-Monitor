@@ -1,5 +1,7 @@
 # Kế Hoạch #19: Setup Modal UI Upgrade
 
+**Status**: DONE — Implemented in v3.x series.
+
 **Phiên bản:** v2.3.1
 **Ngày lập:** 2026-04-14
 **Mức ưu tiên:** MEDIUM

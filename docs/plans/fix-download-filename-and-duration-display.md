@@ -1,5 +1,7 @@
 # Plan: Fix Download Filename + Add Duration Display
 
+**Status**: DONE — Implemented and merged.
+
 ## Goal
 1. Download filename phải giống tên gốc hiển thị trên UI (hiện đang bị ghi đè thành `video_42_0.mp4`)
 2. Hiển thị thời lượng video trong danh sách lịch sử ghi hình (hiện chỉ có ngày/giờ)

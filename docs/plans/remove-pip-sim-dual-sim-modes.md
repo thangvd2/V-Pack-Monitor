@@ -1,5 +1,7 @@
 # Plan: Xóa hoàn toàn camera modes PIP SIM và DUAL SIM
 
+**Status**: DONE — Implemented and merged.
+
 **Ngày**: 2026-04-22
 **Mức độ**: Medium — Remove unused camera modes
 **Loại**: Feature removal / Cleanup

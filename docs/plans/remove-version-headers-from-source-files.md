@@ -1,5 +1,7 @@
 # Plan: Remove version headers from individual source files
 
+**Status**: DONE — Implemented and merged.
+
 **Ngay**: 2026-04-22
 **Muc do**: Medium — Reduce version bump noise from 21 files to 3 files
 **Loai**: Cleanup / Developer experience

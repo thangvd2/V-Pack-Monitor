@@ -1,5 +1,7 @@
 # Plan: Extend Cleanup Options + Default 365 Days
 
+**Status**: DONE — Implemented and merged.
+
 ## Goal
 Add more auto-delete options (60, 90, 150, 365 days + "never delete") and change default from 7→365 days.
 

@@ -1,5 +1,7 @@
 # Plan #21: Video Search Nâng Cao — Pagination, FTS5, Date Range Filter
 
+**Status**: DONE — Implemented in v3.x series.
+
 **Created:** 2026-04-14
 **Status:** PLANNING
 **Priority:** P1 (UX Critical)

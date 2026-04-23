@@ -1,5 +1,7 @@
 # Plan #20 — Unit Test Suite
 
+**Status**: DONE — Implemented in v3.x series.
+
 **Created:** 2026-04-14
 **Status:** IN PROGRESS
 **Priority:** P0 (Production Hardening)

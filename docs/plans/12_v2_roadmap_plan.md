@@ -1,5 +1,7 @@
 # V-Pack Monitor v2.0 Roadmap Plan
 
+**Status**: DONE — Implemented in v3.x series.
+
 **Version:** 2.0
 **Author:** VDT - Vu Duc Thang (thangvd2)
 **Date:** 2026-04-09

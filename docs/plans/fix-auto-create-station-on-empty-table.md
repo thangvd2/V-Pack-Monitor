@@ -1,5 +1,7 @@
 # Plan: Fix Auto-Create Station When Table Is Empty
 
+**Status**: DONE — Implemented and merged.
+
 ## Problem
 
 **Severity**: High — data integrity bug

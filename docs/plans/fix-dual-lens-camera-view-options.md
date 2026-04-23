@@ -1,5 +1,7 @@
 # Bug Fix: Dual-lens camera (1 IP, 2 mắt) không hiển thị view options
 
+**Status**: DONE — Implemented and merged.
+
 **Ngày phát hiện**: 2026-04-22
 **Ngày review**: 2026-04-22
 **Mức độ**: Medium — Camera Dahua Hero Dual D1 (2 mắt, 1 IP) không dùng được Dual/PIP view

@@ -1,5 +1,7 @@
 # Kế Hoạch Fix Bug #15: Bảo Mật & Ổn Định Hệ Thống (Security & Stability Patch)
 
+**Status**: DONE — Implemented in v3.x series.
+
 **Phiên bản:** v2.2.2
 **Ngày lập:** 2026-04-12
 **Ngày hoàn thành:** 2026-04-12

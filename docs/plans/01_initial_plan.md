@@ -1,5 +1,7 @@
 # Kế hoạch Triển khai: Hệ thống Camera Đóng hàng TMĐT
 
+**Status**: DONE — Implemented in v3.x series.
+
 Dự án này nhằm xây dựng một hệ thống phần mềm và phần cứng kết hợp để tự động hóa việc ghi hình quá trình đóng gói đơn hàng. Video sẽ được lưu trữ và liên kết trực tiếp với mã vận đơn (Shopee, Lazada, TikTok Shop), giúp shop dễ dàng trích xuất bằng chứng khi có khiếu nại (refund, hoàn hàng hỏng).
 
 ## 1. Đề xuất Phần cứng (Phía bạn chuẩn bị)

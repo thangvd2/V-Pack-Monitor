@@ -1,5 +1,7 @@
 # Plan: Auto-migrate deprecated _sim camera modes
 
+**Status**: DONE — Implemented and merged.
+
 **Ngay**: 2026-04-22
 **Muc do**: Low — Cleanup, silent fallback → explicit migration
 **Loai**: Data migration + logging

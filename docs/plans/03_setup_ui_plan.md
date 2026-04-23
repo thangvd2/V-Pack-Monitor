@@ -1,5 +1,7 @@
 # Kế hoạch Triển khai Trình cài đặt Giao diện (Setup UI)
 
+**Status**: DONE — Implemented in v3.x series.
+
 Chuyển đổi V-Pack Monitor từ phần mềm cấu hình thủ công qua mã nguồn sang sản phẩm "Production-ready" có cơ chế cấu hình trực quan qua Frontend.
 
 ## Quyết định Thiết kế (Đã được phê duyệt)
