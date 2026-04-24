@@ -7,6 +7,17 @@ echo "Dang bat may chu Backend va Web..."
 ulimit -n 4096 2>/dev/null
 mkdir -p recordings
 
+# === Check if frontend needs rebuild ===
+if [ ! -f "web-ui/dist/index.html" ]; then
+    echo "[Frontend] Dang build giao dien Web lan dau..."
+    (cd web-ui && npm install && npm run build)
+    if [ $? -ne 0 ]; then
+        echo "LOI: Build frontend that bai!"
+        exit 1
+    fi
+    echo "[Frontend] Build hoan tat!"
+fi
+
 MTX_PID=""
 
 if [ -f "bin/mediamtx/mediamtx" ]; then
