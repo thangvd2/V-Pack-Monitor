@@ -145,3 +145,44 @@ jobs:
 
       - name: Lint
         run: ruff check .
+
+  frontend-e2e:
+    needs: [frontend-build, python-test]
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web-ui/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: v1-${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install Python dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Install Frontend dependencies
+        working-directory: web-ui
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        working-directory: web-ui
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        working-directory: web-ui
+        run: npm run test:e2e
+        env:
+          VPACK_SECRET: test-secret-key-for-ci

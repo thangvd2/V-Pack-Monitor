@@ -236,6 +236,24 @@ function App() {
   // Station switch race guard
   const [switchingStation, setSwitchingStation] = useState(false);
 
+  // Auth State
+  const { currentUser, setCurrentUser, authLoading, loginError, loginForm, setLoginForm, handleLogin, handleLogout } =
+    useAuth({
+      onLoginAdmin: () => {
+        setStationAssigned(true);
+        setViewMode('grid');
+      },
+      onRequirePasswordChange: () => setShowChangePassword(true),
+      onLogoutAction: async () => {
+        if (activeSessionId) {
+          await releaseStation(activeStationId);
+        }
+        setStationAssigned(false);
+        setActiveSessionId(null);
+        setAdminTab('operations');
+      },
+    });
+
   useEffect(() => {
     if (!currentUser) return;
     let active = true;
@@ -557,24 +575,6 @@ function App() {
   const { toast, showToast } = useToast();
 
   const { confirmDialog, setConfirmDialog, showConfirmDialog } = useConfirmDialog();
-
-  // Auth State
-  const { currentUser, setCurrentUser, authLoading, loginError, loginForm, setLoginForm, handleLogin, handleLogout } =
-    useAuth({
-      onLoginAdmin: () => {
-        setStationAssigned(true);
-        setViewMode('grid');
-      },
-      onRequirePasswordChange: () => setShowChangePassword(true),
-      onLogoutAction: async () => {
-        if (activeSessionId) {
-          await releaseStation(activeStationId);
-        }
-        setStationAssigned(false);
-        setActiveSessionId(null);
-        setAdminTab('operations');
-      },
-    });
 
   const {
     records,
