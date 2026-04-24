@@ -19,7 +19,7 @@ test.describe('Admin Grid View', () => {
 
     // 5. Click on station to go to Single View
     await stationCard.click();
-    
+
     // 6. Verify single view
     await expect(adminPage.locator('text=Chế độ Camera:')).toBeVisible();
 

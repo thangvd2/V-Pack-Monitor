@@ -576,8 +576,6 @@ function App() {
 
   const { confirmDialog, setConfirmDialog, showConfirmDialog } = useConfirmDialog();
 
-
-
   const {
     records,
     searchTerm,

@@ -22,7 +22,7 @@ export const test = base.extend<AuthFixtures>({
     // Operator will see Dashboard (which contains Thống kê)
     await expect(page.locator('text=Thống kê')).toBeVisible();
     await use(page);
-  }
+  },
 });
 
 export { expect } from '@playwright/test';

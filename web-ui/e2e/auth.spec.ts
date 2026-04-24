@@ -2,8 +2,8 @@ import { test, expect } from './test-helpers';
 
 test.describe('Auth Flow', () => {
   test('login with valid credentials, verify redirect and logout', async ({ page }) => {
-    page.on('console', msg => console.log('PAGE LOG:', msg.text()));
-    page.on('requestfailed', request => console.log('FAILED:', request.url(), request.failure()?.errorText));
+    page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
+    page.on('requestfailed', (request) => console.log('FAILED:', request.url(), request.failure()?.errorText));
 
     await page.goto('/');
 
@@ -19,7 +19,7 @@ test.describe('Auth Flow', () => {
 
     // Open user menu
     await page.click('button:has-text("e2e_admin")');
-    
+
     // Click logout
     await page.click('button:has-text("Đăng xuất")');
 

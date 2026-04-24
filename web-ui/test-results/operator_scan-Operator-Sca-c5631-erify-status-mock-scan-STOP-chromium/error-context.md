@@ -29,42 +29,42 @@ Call log:
 
 ```yaml
 - generic [ref=e3]:
-  - generic [ref=e4]:
-    - generic [ref=e5]:
-      - img [ref=e7]
-      - generic [ref=e12]:
-        - heading "V-Pack Monitor" [level=1] [ref=e13]
-        - paragraph [ref=e14]: Chọn trạm làm việc
-    - button "Đăng xuất" [ref=e15]:
-      - img [ref=e16]
-      - text: Đăng xuất
-  - generic [ref=e19]:
-    - generic [ref=e20]:
-      - img [ref=e22]
-      - heading "Chọn Trạm Làm Việc" [level=2] [ref=e24]
-      - paragraph [ref=e25]: Xin chào E2E Operator, vui lòng chọn trạm để bắt đầu
-    - 'button "🟢 Trống e2e_station_1 ID: 25 Nhấn để chọn →" [ref=e27] [cursor=pointer]':
-      - generic [ref=e28]:
-        - img [ref=e30]
-        - generic [ref=e32]:
-          - generic [ref=e33]: 🟢
-          - text: Trống
-      - heading "e2e_station_1" [level=3] [ref=e34]
-      - paragraph [ref=e35]: "ID: 25"
-      - paragraph [ref=e37]: Nhấn để chọn →
-    - paragraph [ref=e38]: Trạng thái tự động cập nhật mỗi 10 giây
+    - generic [ref=e4]:
+        - generic [ref=e5]:
+            - img [ref=e7]
+            - generic [ref=e12]:
+                - heading "V-Pack Monitor" [level=1] [ref=e13]
+                - paragraph [ref=e14]: Chọn trạm làm việc
+        - button "Đăng xuất" [ref=e15]:
+            - img [ref=e16]
+            - text: Đăng xuất
+    - generic [ref=e19]:
+        - generic [ref=e20]:
+            - img [ref=e22]
+            - heading "Chọn Trạm Làm Việc" [level=2] [ref=e24]
+            - paragraph [ref=e25]: Xin chào E2E Operator, vui lòng chọn trạm để bắt đầu
+        - 'button "🟢 Trống e2e_station_1 ID: 25 Nhấn để chọn →" [ref=e27] [cursor=pointer]':
+            - generic [ref=e28]:
+                - img [ref=e30]
+                - generic [ref=e32]:
+                    - generic [ref=e33]: 🟢
+                    - text: Trống
+            - heading "e2e_station_1" [level=3] [ref=e34]
+            - paragraph [ref=e35]: 'ID: 25'
+            - paragraph [ref=e37]: Nhấn để chọn →
+        - paragraph [ref=e38]: Trạng thái tự động cập nhật mỗi 10 giây
 ```
 
 # Test source
 
 ```ts
   1  | import { test as base, expect } from '@playwright/test';
-  2  | 
+  2  |
   3  | type AuthFixtures = {
   4  |   adminPage: import('@playwright/test').Page;
   5  |   operatorPage: import('@playwright/test').Page;
   6  | };
-  7  | 
+  7  |
   8  | export const test = base.extend<AuthFixtures>({
   9  |   adminPage: async ({ page }, use) => {
   10 |     await page.goto('/');
@@ -85,7 +85,7 @@ Call log:
   24 |     await use(page);
   25 |   }
   26 | });
-  27 | 
+  27 |
   28 | export { expect } from '@playwright/test';
-  29 | 
+  29 |
 ```

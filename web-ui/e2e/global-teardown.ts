@@ -8,7 +8,10 @@ async function globalTeardown() {
     execSync(`python "${scriptPath}" cleanup`, { stdio: 'inherit' });
   } catch (error) {
     try {
-      execSync(`uv run python "${scriptPath}" cleanup`, { stdio: 'inherit', cwd: path.resolve(import.meta.dirname, '../../') });
+      execSync(`uv run python "${scriptPath}" cleanup`, {
+        stdio: 'inherit',
+        cwd: path.resolve(import.meta.dirname, '../../'),
+      });
     } catch (e) {
       console.error('Failed to cleanup E2E data', e);
     }

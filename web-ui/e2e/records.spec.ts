@@ -8,10 +8,10 @@ test.describe('Records List', () => {
     await expect(adminPage.locator('text=Thống kê')).toBeVisible();
 
     // The user should see the record list. Search for a specific waybill.
-    // In our seed data, we might not have a specific E2E waybill created initially, 
+    // In our seed data, we might not have a specific E2E waybill created initially,
     // but we can type in the search box to verify it's working.
     await adminPage.fill('input[placeholder="Tìm kiếm mã vận đơn..."]', 'E2E_WAYBILL_TEST');
-    
+
     // Select the station filter
     const select = adminPage.locator('select');
     await select.selectOption({ label: 'e2e_station_1' });
