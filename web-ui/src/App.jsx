@@ -204,23 +204,6 @@ class ErrorBoundary extends React.Component {
 function App() {
   const [stations, setStations] = useState([]);
   const [activeStationId, setActiveStationId] = useState(null);
-  const {
-    records,
-    searchTerm,
-    recordsPage,
-    recordsTotal,
-    recordsTotalPages,
-    dateFrom,
-    setDateFrom,
-    dateTo,
-    setDateTo,
-    statusFilter,
-    setStatusFilter,
-    fetchRecords,
-    handleSearch,
-    searchTermRef,
-    recordsPageRef,
-  } = useRecords({ activeStationId, currentUser, setLoading, fetchAnalytics });
   const [loading, setLoading] = useState(true);
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [initialSettings, setInitialSettings] = useState({});
@@ -228,23 +211,6 @@ function App() {
   const [currentWaybill, setCurrentWaybill] = useState('');
   const [storageInfo, setStorageInfo] = useState({ size_str: '0 MB', file_count: 0 });
 
-  // Auth State
-  const { currentUser, setCurrentUser, authLoading, loginError, loginForm, setLoginForm, handleLogin, handleLogout } =
-    useAuth({
-      onLoginAdmin: () => {
-        setStationAssigned(true);
-        setViewMode('grid');
-      },
-      onRequirePasswordChange: () => setShowChangePassword(true),
-      onLogoutAction: async () => {
-        if (activeSessionId) {
-          await releaseStation(activeStationId);
-        }
-        setStationAssigned(false);
-        setActiveSessionId(null);
-        setAdminTab('operations');
-      },
-    });
   const [analytics, setAnalytics] = useState({ total_today: 0, station_today: 0 });
   const [reconnectInfo, setReconnectInfo] = useState(null);
   const [previousStationId, setPreviousStationId] = useState(null);
@@ -646,6 +612,42 @@ function App() {
     setCurrentWaybill,
     activeRecordIdRef,
   });
+
+  // Auth State
+  const { currentUser, setCurrentUser, authLoading, loginError, loginForm, setLoginForm, handleLogin, handleLogout } =
+    useAuth({
+      onLoginAdmin: () => {
+        setStationAssigned(true);
+        setViewMode('grid');
+      },
+      onRequirePasswordChange: () => setShowChangePassword(true),
+      onLogoutAction: async () => {
+        if (activeSessionId) {
+          await releaseStation(activeStationId);
+        }
+        setStationAssigned(false);
+        setActiveSessionId(null);
+        setAdminTab('operations');
+      },
+    });
+
+  const {
+    records,
+    searchTerm,
+    recordsPage,
+    recordsTotal,
+    recordsTotalPages,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    statusFilter,
+    setStatusFilter,
+    fetchRecords,
+    handleSearch,
+    searchTermRef,
+    recordsPageRef,
+  } = useRecords({ activeStationId, currentUser, setLoading, fetchAnalytics });
 
   const doChangePassword = useCallback(async () => {
     setChangePasswordError('');
