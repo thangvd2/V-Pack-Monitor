@@ -2,9 +2,6 @@ import { test, expect } from './test-helpers';
 
 test.describe('Auth Flow', () => {
   test('login with valid credentials, verify redirect and logout', async ({ page }) => {
-    page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
-    page.on('requestfailed', (request) => console.log('FAILED:', request.url(), request.failure()?.errorText));
-
     await page.goto('/');
 
     await expect(page.locator('h1', { hasText: 'V-Pack Monitor' })).toBeVisible();

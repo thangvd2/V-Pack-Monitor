@@ -23,14 +23,14 @@ test.describe('Operator Scan Flow', () => {
     });
 
     // Ensure it shows idle state first
-    await expect(operatorPage.locator('.bg-emerald-600\\/90')).toBeVisible();
+    await expect(operatorPage.locator('text=Sẵn sàng')).toBeVisible();
 
     // 1. Mock Scan START
     await operatorPage.keyboard.type('E2E_WAYBILL_TEST');
     await operatorPage.keyboard.press('Enter');
 
     // Verify status changes to recording
-    await expect(operatorPage.locator('.bg-red-600\\/90')).toBeVisible();
+    await expect(operatorPage.locator('text=Đang đóng hàng: E2E_WAYBILL_TEST')).toBeVisible();
 
     // Wait a bit to simulate packing
     await operatorPage.waitForTimeout(2000);
@@ -40,6 +40,6 @@ test.describe('Operator Scan Flow', () => {
     await operatorPage.click('button:has-text("Bắt Đầu Ghi")');
 
     // Verify it goes back to ready
-    await expect(operatorPage.locator('.bg-emerald-600\\/90')).toBeVisible({ timeout: 10000 });
+    await expect(operatorPage.locator('text=Sẵn sàng')).toBeVisible({ timeout: 10000 });
   });
 });

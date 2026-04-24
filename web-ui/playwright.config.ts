@@ -26,7 +26,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'uv run uvicorn api:app --host 127.0.0.1 --port 8001',
+      command: 'python -m uvicorn api:app --host 127.0.0.1 --port 8001',
       url: 'http://localhost:8001/api/system/health',
       reuseExistingServer: false,
       cwd: '../',
