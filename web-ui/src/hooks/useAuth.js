@@ -14,7 +14,6 @@ export function useAuth({ onLoginAdmin, onRequirePasswordChange, onLogoutAction 
     if (token && savedUser) {
       try {
         const user = JSON.parse(savedUser);
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCurrentUser(user);
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         if (user.role === 'ADMIN' && onLoginAdmin) {
@@ -30,7 +29,8 @@ export function useAuth({ onLoginAdmin, onRequirePasswordChange, onLogoutAction 
     }
     setAuthLoading(false);
     axios.defaults.timeout = 15000;
-  }, [onLoginAdmin, onRequirePasswordChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(

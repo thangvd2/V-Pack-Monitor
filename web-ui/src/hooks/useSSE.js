@@ -164,6 +164,6 @@ export function useSSE({
     es.onerror = () => {};
 
     return () => es.close();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: SSE reconnect controlled by activeStationId/viewMode
   }, [activeStationId, viewMode, stationsIdStr]);
 }

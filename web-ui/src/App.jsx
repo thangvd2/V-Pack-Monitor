@@ -46,7 +46,6 @@ const MTX_HOST = window.location.hostname;
 const STATION_POLL_INTERVAL = 10000;
 const BARCODE_TIMEOUT = 100;
 const HEARTBEAT_INTERVAL = 30000;
-const RESTART_DELAY = 5000;
 const SEARCH_DEBOUNCE = 300;
 const TOAST_DURATIONS = { info: 2000, error: 3000, warning: 5000 };
 
@@ -328,37 +327,6 @@ function App() {
   }, [activeSessionId, currentUser]);
 
   const stationsIdStr = useMemo(() => stations.map((s) => s.id).join(','), [stations]);
-
-  useSSE({
-    activeStationId,
-    viewMode,
-    stationsIdStr,
-    currentUser,
-    stationsRef,
-    setStationStatuses,
-    setPackingStatus,
-    setCurrentWaybill,
-    activeRecordIdRef,
-    fetchStorageInfo,
-    fetchRecords,
-    searchTermRef,
-    recordsPageRef,
-    setUpdateProgress,
-    showToast,
-  });
-
-  const { sendScanAction } = useBarcodeScanner({
-    currentUser,
-    activeStationId,
-    searchTerm,
-    packingStatusRef,
-    showToast,
-    fetchRecords,
-    recordsPageRef,
-    setPackingStatus,
-    setCurrentWaybill,
-    activeRecordIdRef,
-  });
 
   // Init fetch
   useEffect(() => {
@@ -647,6 +615,37 @@ function App() {
   };
 
   const hasCam2 = isDualCamStation(activeStation);
+
+  useSSE({
+    activeStationId,
+    viewMode,
+    stationsIdStr,
+    currentUser,
+    stationsRef,
+    setStationStatuses,
+    setPackingStatus,
+    setCurrentWaybill,
+    activeRecordIdRef,
+    fetchStorageInfo,
+    fetchRecords,
+    searchTermRef,
+    recordsPageRef,
+    setUpdateProgress,
+    showToast,
+  });
+
+  const { sendScanAction } = useBarcodeScanner({
+    currentUser,
+    activeStationId,
+    searchTerm,
+    packingStatusRef,
+    showToast,
+    fetchRecords,
+    recordsPageRef,
+    setPackingStatus,
+    setCurrentWaybill,
+    activeRecordIdRef,
+  });
 
   const doChangePassword = useCallback(async () => {
     setChangePasswordError('');
