@@ -9,6 +9,33 @@ if exist "bin\ffmpeg\bin" set PATH=%CD%\bin\ffmpeg\bin;%PATH%
 
 if not exist "recordings" mkdir recordings
 
+REM === Check if frontend needs rebuild ===
+if exist "web-ui\dist\index.html" goto :frontend_ok
+echo [Frontend] Dang build giao dien Web lan dau...
+if not exist "web-ui\node_modules" (
+    echo [Frontend] Cai dat thu vien npm...
+    pushd web-ui
+    call npm install
+    if !errorLevel! neq 0 (
+        echo LOI: npm install that bai! Kiem tra Node.js.
+        popd
+        pause
+        exit /b 1
+    )
+    popd
+)
+pushd web-ui
+call npm run build
+if !errorLevel! neq 0 (
+    echo LOI: Build frontend that bai!
+    popd
+    pause
+    exit /b 1
+)
+popd
+echo [Frontend] Build hoan tat!
+:frontend_ok
+
 if not exist "venv\Scripts\activate.bat" goto :no_venv
 goto :venv_ok
 
