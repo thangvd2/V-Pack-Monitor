@@ -37,7 +37,8 @@ import AdminDashboard from './AdminDashboard';
 import SystemHealth from './SystemHealth';
 import MtxFallback from './MtxFallback';
 import API_BASE from './config';
-import { playScanStart, playRecordingStop, playVideoReady, playRecordingWarning } from './utils/notificationSounds';
+
+import { useToast, useConfirmDialog, useAuth, useRecords, useSSE, useBarcodeScanner } from './hooks';
 
 const MTX_HOST = window.location.hostname;
 
@@ -45,7 +46,6 @@ const MTX_HOST = window.location.hostname;
 const STATION_POLL_INTERVAL = 10000;
 const BARCODE_TIMEOUT = 100;
 const HEARTBEAT_INTERVAL = 30000;
-const RESTART_DELAY = 5000;
 const SEARCH_DEBOUNCE = 300;
 const TOAST_DURATIONS = { info: 2000, error: 3000, warning: 5000 };
 
@@ -204,8 +204,6 @@ class ErrorBoundary extends React.Component {
 function App() {
   const [stations, setStations] = useState([]);
   const [activeStationId, setActiveStationId] = useState(null);
-  const [records, setRecords] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [initialSettings, setInitialSettings] = useState({});
@@ -213,11 +211,6 @@ function App() {
   const [currentWaybill, setCurrentWaybill] = useState('');
   const [storageInfo, setStorageInfo] = useState({ size_str: '0 MB', file_count: 0 });
 
-  // Auth State
-  const [currentUser, setCurrentUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [loginError, setLoginError] = useState('');
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [analytics, setAnalytics] = useState({ total_today: 0, station_today: 0 });
   const [reconnectInfo, setReconnectInfo] = useState(null);
   const [previousStationId, setPreviousStationId] = useState(null);
@@ -243,19 +236,12 @@ function App() {
   const [changePasswordError, setChangePasswordError] = useState('');
   const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
   const [mtxAvailable, setMtxAvailable] = useState(null);
-  const [toast, setToast] = useState(null);
 
   // Station Session State (OPERATOR)
   const [stationAssigned, setStationAssigned] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [pipCamSwap, setPipCamSwap] = useState(false);
   const [stationStatusList, setStationStatusList] = useState([]);
-  const [recordsPage, setRecordsPage] = useState(1);
-  const [recordsTotal, setRecordsTotal] = useState(0);
-  const [recordsTotalPages, setRecordsTotalPages] = useState(0);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [recordStreamType, setRecordStreamType] = useState('sub');
   const [updateInfo, setUpdateInfo] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -264,73 +250,16 @@ function App() {
   const activeRecordIdRef = useRef(null);
   const packingStatusRef = useRef(packingStatus);
   packingStatusRef.current = packingStatus;
-  const searchTermRef = useRef(searchTerm);
-  useEffect(() => {
-    searchTermRef.current = searchTerm;
-  }, [searchTerm]);
-  const recordsPageRef = useRef(recordsPage);
-  const dateFromRef = useRef(dateFrom);
-  const dateToRef = useRef(dateTo);
-  const statusFilterRef = useRef(statusFilter);
   const stationsRef = useRef(stations);
   useEffect(() => {
     stationsRef.current = stations;
   }, [stations]);
-  const abortControllerRef = useRef(null);
   const barcodeSimInputRef = useRef(null);
-  useEffect(() => {
-    recordsPageRef.current = recordsPage;
-  }, [recordsPage]);
-  useEffect(() => {
-    dateFromRef.current = dateFrom;
-  }, [dateFrom]);
-  useEffect(() => {
-    dateToRef.current = dateTo;
-  }, [dateTo]);
-  useEffect(() => {
-    statusFilterRef.current = statusFilter;
-  }, [statusFilter]);
 
   // Confirm dialog state
-  const [confirmDialog, setConfirmDialog] = useState({ show: false, message: '', onConfirm: null });
-  const showConfirmDialog = useCallback((message, onConfirm) => {
-    setConfirmDialog({ show: true, message, onConfirm });
-  }, []);
 
   // Station switch race guard
   const [switchingStation, setSwitchingStation] = useState(false);
-
-  // Toast helper (race-safe: clears previous timeout before setting new one)
-  const toastTimeoutRef = useRef(null);
-  const showToast = useCallback((msg, type = 'info') => {
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    setToast(msg);
-    toastTimeoutRef.current = setTimeout(() => setToast(null), TOAST_DURATIONS[type] ?? TOAST_DURATIONS.info);
-  }, []);
-
-  useEffect(() => {
-    const token = localStorage.getItem('vpack_token');
-    const savedUser = localStorage.getItem('vpack_user');
-    if (token && savedUser) {
-      try {
-        const user = JSON.parse(savedUser);
-        setCurrentUser(user);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        if (user.role === 'ADMIN') {
-          setStationAssigned(true);
-          setViewMode('grid');
-        }
-        if (user.must_change_password) {
-          setShowChangePassword(true);
-        }
-      } catch {
-        localStorage.removeItem('vpack_token');
-        localStorage.removeItem('vpack_user');
-      }
-    }
-    setAuthLoading(false);
-    axios.defaults.timeout = 15000;
-  }, []);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -360,169 +289,7 @@ function App() {
     return () => clearInterval(interval);
   }, [activeSessionId, currentUser]);
 
-  useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response && error.response.status === 401) {
-          localStorage.removeItem('vpack_token');
-          localStorage.removeItem('vpack_user');
-          setCurrentUser(null);
-          delete axios.defaults.headers.common['Authorization'];
-        }
-        return Promise.reject(error);
-      },
-    );
-    return () => axios.interceptors.response.eject(interceptor);
-  }, []);
-
   const stationsIdStr = useMemo(() => stations.map((s) => s.id).join(','), [stations]);
-
-  useEffect(() => {
-    const isGlobalSSE = viewMode === 'grid' || currentUser?.role === 'ADMIN';
-    const stationIds = isGlobalSSE ? stationsIdStr : String(activeStationId || '');
-    const sseToken = localStorage.getItem('vpack_token');
-    const es = new EventSource(
-      `${API_BASE}/api/events?stations=${stationIds}${sseToken ? '&token=' + encodeURIComponent(sseToken) : ''}`,
-    );
-
-    es.addEventListener('video_status', (evt) => {
-      try {
-        const data = JSON.parse(evt.data);
-
-        if (isGlobalSSE) {
-          const isRecording = data.status === 'RECORDING';
-          const waybill = data.waybill || '';
-          setStationStatuses((prev) => {
-            const current = prev[data.station_id] || { status: 'idle', waybill: '', processingCount: 0 };
-            const nextStatus = isRecording
-              ? 'packing'
-              : data.status === 'PROCESSING' ||
-                  data.status === 'READY' ||
-                  data.status === 'FAILED' ||
-                  data.status === 'DELETED'
-                ? 'idle'
-                : current.status;
-            return {
-              ...prev,
-              [data.station_id]: {
-                status: nextStatus,
-                waybill: isRecording ? waybill : current.waybill,
-                processingCount: data.processing_count !== undefined ? data.processing_count : current.processingCount,
-              },
-            };
-          });
-          // Station-specific UI (sounds, packing status) only when viewing that station
-          if (data.station_id === activeStationId) {
-            if (isRecording) {
-              playScanStart();
-              setPackingStatus('packing');
-              setCurrentWaybill(waybill);
-              activeRecordIdRef.current = data.record_id;
-            }
-            if (data.status === 'PROCESSING') {
-              playRecordingStop();
-            }
-            if (data.status === 'READY') {
-              playVideoReady();
-            }
-            if (
-              data.status === 'PROCESSING' ||
-              data.status === 'READY' ||
-              data.status === 'FAILED' ||
-              data.status === 'DELETED'
-            ) {
-              if (data.record_id === activeRecordIdRef.current) {
-                setPackingStatus('idle');
-                setCurrentWaybill('');
-                activeRecordIdRef.current = null;
-              }
-            }
-          }
-          // Always refresh records + storage for admin on any station status change
-          if (
-            data.status === 'PROCESSING' ||
-            data.status === 'READY' ||
-            data.status === 'FAILED' ||
-            data.status === 'DELETED'
-          ) {
-            fetchStorageInfo();
-          }
-          fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
-        } else {
-          if (data.station_id !== activeStationId) return;
-
-          if (data.status === 'RECORDING') {
-            playScanStart();
-            setPackingStatus('packing');
-            setCurrentWaybill(data.waybill || '');
-            activeRecordIdRef.current = data.record_id;
-            fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
-          } else if (data.status === 'PROCESSING') {
-            playRecordingStop();
-            if (data.record_id === activeRecordIdRef.current) {
-              setPackingStatus('idle');
-              setCurrentWaybill('');
-              activeRecordIdRef.current = null;
-            }
-            fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
-            fetchStorageInfo();
-          } else if (data.status === 'READY') {
-            playVideoReady();
-            if (data.record_id === activeRecordIdRef.current) {
-              setPackingStatus('idle');
-              setCurrentWaybill('');
-              activeRecordIdRef.current = null;
-            }
-            fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
-            fetchStorageInfo();
-          } else if (data.status === 'FAILED' || data.status === 'DELETED') {
-            if (data.record_id === activeRecordIdRef.current) {
-              setPackingStatus('idle');
-              setCurrentWaybill('');
-              activeRecordIdRef.current = null;
-            }
-            fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
-            fetchStorageInfo();
-          }
-        }
-      } catch {
-        // SSE parse failure - ignore
-      }
-    });
-
-    es.addEventListener('update_progress', (evt) => {
-      try {
-        const data = JSON.parse(evt.data);
-        setUpdateProgress(data);
-        if (data.stage === 'restarting') {
-          setTimeout(() => {
-            window.location.reload();
-          }, RESTART_DELAY);
-        }
-      } catch {
-        // SSE parse failure - ignore
-      }
-    });
-
-    es.addEventListener('recording_warning', (evt) => {
-      try {
-        const data = JSON.parse(evt.data);
-        const sec = data.remaining_seconds || 60;
-        const station = stationsRef.current.find((s) => s.id === data.station_id);
-        const name = station ? station.name : '';
-        showToast(`⚠️ ${name ? name + ': ' : ''}Tự động dừng sau ${sec}s`, 'warning');
-        playRecordingWarning();
-      } catch {
-        // SSE parse failure - ignore
-      }
-    });
-
-    es.onerror = () => {};
-
-    return () => es.close();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: SSE reconnect controlled by activeStationId/viewMode, not showToast identity
-  }, [activeStationId, viewMode, stationsIdStr]);
 
   // Init fetch
   useEffect(() => {
@@ -664,54 +431,6 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: rebuilds on viewMode/stations change, reads latest state from setters
   }, [viewMode, stations]);
 
-  // Fetch records (with AbortController)
-  useEffect(() => {
-    if (currentUser) {
-      setRecordsPage(1);
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      abortControllerRef.current = new AbortController();
-      const debounce = setTimeout(() => {
-        fetchRecords(searchTerm, activeStationId, 1, abortControllerRef.current.signal);
-      }, SEARCH_DEBOUNCE);
-      return () => {
-        clearTimeout(debounce);
-        if (abortControllerRef.current) abortControllerRef.current.abort();
-      };
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: debounced by searchTerm/activeStationId changes, fetchRecords reads fresh state
-  }, [searchTerm, activeStationId, currentUser, dateFrom, dateTo, statusFilter]);
-
-  const fetchRecords = async (query = '', sid = activeStationId, page = 1, signal) => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (query) params.set('search', query);
-      if (sid === 'orphaned') {
-        params.set('orphaned', 'true');
-      } else if (sid) {
-        params.set('station_id', sid);
-      }
-      if (page > 1) params.set('page', String(page));
-      if (dateFromRef.current) params.set('date_from', dateFromRef.current);
-      if (dateToRef.current) params.set('date_to', dateToRef.current);
-      if (statusFilterRef.current) params.set('status', statusFilterRef.current);
-      params.set('limit', '20');
-
-      const res = await axios.get(`${API_BASE}/api/records?${params.toString()}`, { signal });
-      setRecords(res.data.records);
-      setRecordsTotal(res.data.total);
-      setRecordsTotalPages(res.data.total_pages);
-      setRecordsPage(res.data.page);
-      setLoading(false);
-      fetchAnalytics(sid);
-    } catch (err) {
-      if (axios.isCancel(err) || err.name === 'CanceledError') return;
-      setLoading(false);
-    }
-  };
-
   const fetchStorageInfo = async () => {
     try {
       const res = await axios.get(`${API_BASE}/api/storage/info`);
@@ -790,40 +509,6 @@ function App() {
     }
   };
 
-  // --- Hàm gọi API Scan ---
-  const sendScanAction = async (finalBarcode) => {
-    if (!activeStationId) return;
-    try {
-      const res = await axios.post(`${API_BASE}/api/scan`, {
-        barcode: finalBarcode,
-        station_id: activeStationId,
-      });
-      if (res.data.status === 'recording') {
-        if (res.data.record_id) {
-          activeRecordIdRef.current = res.data.record_id;
-          setPackingStatus('packing');
-          setCurrentWaybill(finalBarcode);
-        } else {
-          showToast(res.data.message || 'Đang ghi đơn. Quét STOP trước khi quét mã mới.', 'warning');
-          playRecordingWarning();
-        }
-      } else if (res.data.status === 'error') {
-        if (res.data.message) {
-          showToast(res.data.message, 'error');
-        }
-        setPackingStatus('idle');
-        setCurrentWaybill('');
-        fetchRecords(searchTerm, activeStationId, recordsPageRef.current);
-      } else if (res.data.status === 'processing') {
-        setPackingStatus('idle');
-        setCurrentWaybill('');
-        fetchRecords(searchTerm, activeStationId, recordsPageRef.current);
-      }
-    } catch {
-      showToast('Lỗi quét mã vạch.', 'error');
-    }
-  };
-
   // --- Quản lý Bảo mật (Role Gateway) ---
   const requestAdminAccess = (action) => {
     if (currentUser?.role === 'ADMIN') {
@@ -846,46 +531,6 @@ function App() {
     } else if (action.type === 'cloud_sync') {
       doCloudSync();
     }
-  };
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoginError('');
-    try {
-      const res = await axios.post(`${API_BASE}/api/auth/login`, loginForm);
-      if (res.data.status === 'success') {
-        const { access_token, user } = res.data;
-        localStorage.setItem('vpack_token', access_token);
-        localStorage.setItem('vpack_user', JSON.stringify(user));
-        axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-        setCurrentUser(user);
-        if (user.role === 'ADMIN') {
-          setStationAssigned(true);
-          setViewMode('grid');
-        }
-        if (user.must_change_password) {
-          setShowChangePassword(true);
-        }
-        setLoginForm({ username: '', password: '' });
-      } else {
-        setLoginError(res.data.message || 'Đăng nhập thất bại.');
-      }
-    } catch {
-      setLoginError('Lỗi kết nối server.');
-    }
-  };
-
-  const handleLogout = async () => {
-    if (activeSessionId) {
-      await releaseStation(activeStationId);
-    }
-    localStorage.removeItem('vpack_token');
-    localStorage.removeItem('vpack_user');
-    delete axios.defaults.headers.common['Authorization'];
-    setCurrentUser(null);
-    setStationAssigned(false);
-    setActiveSessionId(null);
-    setAdminTab('operations');
   };
 
   // --- Hàm xoá bản ghi (Đã qua kiểm duyệt bảo mật) ---
@@ -920,55 +565,6 @@ function App() {
     }
   };
 
-  // --- BARCODE SCANNER LISTENER ---
-  useEffect(() => {
-    if (currentUser?.role === 'ADMIN') return;
-
-    let barcodeBuffer = '';
-    let timeoutId = null;
-
-    const handleKeyDown = async (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        return;
-      }
-
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const finalBarcode = barcodeBuffer.trim();
-        barcodeBuffer = '';
-
-        if (finalBarcode.length > 0) {
-          if (packingStatusRef.current === 'packing' && finalBarcode !== 'STOP' && finalBarcode !== 'EXIT') {
-            showToast('Đang ghi đơn. Quét STOP trước khi quét mã mới.', 'warning');
-            playRecordingWarning();
-          } else {
-            await sendScanAction(finalBarcode);
-          }
-        }
-      } else {
-        if (e.key.length === 1) {
-          barcodeBuffer += e.key;
-        }
-
-        if (timeoutId) clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          barcodeBuffer = '';
-        }, BARCODE_TIMEOUT);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: scanner bound to searchTerm/activeStationId, sendScanAction reads fresh state
-  }, [searchTerm, activeStationId, currentUser]);
-
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
   const activeStation = useMemo(
     () => stations.find((s) => s.id === activeStationId) || {},
     [stations, activeStationId],
@@ -982,6 +578,77 @@ function App() {
   };
 
   const hasCam2 = isDualCamStation(activeStation);
+
+  const { toast, showToast } = useToast();
+
+  const { confirmDialog, setConfirmDialog, showConfirmDialog } = useConfirmDialog();
+
+  // Auth State
+  const { currentUser, setCurrentUser, authLoading, loginError, loginForm, setLoginForm, handleLogin, handleLogout } =
+    useAuth({
+      onLoginAdmin: () => {
+        setStationAssigned(true);
+        setViewMode('grid');
+      },
+      onRequirePasswordChange: () => setShowChangePassword(true),
+      onLogoutAction: async () => {
+        if (activeSessionId) {
+          await releaseStation(activeStationId);
+        }
+        setStationAssigned(false);
+        setActiveSessionId(null);
+        setAdminTab('operations');
+      },
+    });
+
+  const {
+    records,
+    searchTerm,
+    recordsPage,
+    recordsTotal,
+    recordsTotalPages,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    statusFilter,
+    setStatusFilter,
+    fetchRecords,
+    handleSearch,
+    searchTermRef,
+    recordsPageRef,
+  } = useRecords({ activeStationId, currentUser, setLoading, fetchAnalytics });
+
+  useSSE({
+    activeStationId,
+    viewMode,
+    stationsIdStr,
+    currentUser,
+    stationsRef,
+    setStationStatuses,
+    setPackingStatus,
+    setCurrentWaybill,
+    activeRecordIdRef,
+    fetchStorageInfo,
+    fetchRecords,
+    searchTermRef,
+    recordsPageRef,
+    setUpdateProgress,
+    showToast,
+  });
+
+  const { sendScanAction } = useBarcodeScanner({
+    currentUser,
+    activeStationId,
+    searchTerm,
+    packingStatusRef,
+    showToast,
+    fetchRecords,
+    recordsPageRef,
+    setPackingStatus,
+    setCurrentWaybill,
+    activeRecordIdRef,
+  });
 
   const doChangePassword = useCallback(async () => {
     setChangePasswordError('');
