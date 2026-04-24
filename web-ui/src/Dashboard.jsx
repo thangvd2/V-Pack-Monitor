@@ -220,7 +220,9 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
       </div>
 
       {dashTab === 'health' ? (
-        <SystemHealth currentUser={currentUser} />
+        <ErrorBoundary sectionName="SystemHealth" fallback="Không thể tải thông tin hệ thống.">
+          <SystemHealth currentUser={currentUser} />
+        </ErrorBoundary>
       ) : (
         <>
           <div className="flex flex-col lg:flex-row gap-4 items-stretch">

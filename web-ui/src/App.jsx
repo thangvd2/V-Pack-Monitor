@@ -34,7 +34,6 @@ import VideoPlayerModal from './VideoPlayerModal';
 import UserManagementModal from './UserManagementModal';
 import Dashboard from './Dashboard';
 import AdminDashboard from './AdminDashboard';
-import SystemHealth from './SystemHealth';
 import ErrorBoundary from './ErrorBoundary';
 import MtxFallback from './MtxFallback';
 import API_BASE from './config';
@@ -1880,7 +1879,7 @@ function App() {
 }
 
 const AppWithErrorBoundary = () => (
-  <ErrorBoundary>
+  <ErrorBoundary fallback="Ứng dụng gặp lỗi nghiêm trọng." onReset={() => window.location.reload()}>
     <App />
   </ErrorBoundary>
 );
