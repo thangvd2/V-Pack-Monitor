@@ -19,8 +19,11 @@ export const test = base.extend<AuthFixtures>({
     await page.fill('input[type="text"]', 'e2e_operator');
     await page.fill('input[type="password"]', 'operator123');
     await page.click('button:has-text("Đăng Nhập")');
-    // Operator will see Dashboard (which contains Thống kê)
-    await expect(page.locator('text=Thống kê')).toBeVisible();
+    // Select station first
+    await expect(page.locator('h2:has-text("Chọn Trạm Làm Việc")')).toBeVisible();
+    await page.locator('button:has(h3:has-text("e2e_station_1"))').click();
+    // Operator will see Live View
+    await expect(page.locator('text=Chế Độ Quan Sát Live')).toBeVisible();
     await use(page);
   },
 });
