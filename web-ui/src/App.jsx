@@ -1640,7 +1640,8 @@ function App() {
                       const val = e.target.value;
                       setActiveStationId(val === '' || val === 'orphaned' ? val : Number(val));
                     }}
-                    className="bg-white/10 text-white text-xs rounded px-2 py-1 border border-white/20 focus:outline-none focus:border-blue-400"
+                    disabled={viewMode !== 'grid'}
+                    className="bg-white/10 text-white text-xs rounded px-2 py-1 border border-white/20 focus:outline-none focus:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ colorScheme: 'dark' }}
                   >
                     <option value="" className="bg-slate-800">
