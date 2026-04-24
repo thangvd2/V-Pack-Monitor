@@ -33,6 +33,7 @@ import {
 } from 'recharts';
 
 import SystemHealth from './SystemHealth';
+import ErrorBoundary from './ErrorBoundary';
 import API_BASE from './config';
 
 const CHART_COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#c084fc', '#fb7185', '#38bdf8', '#a3e635'];
@@ -78,7 +79,9 @@ function ChartCard({ title, icon: Icon, children, controls }) {
         </div>
         {controls}
       </div>
-      {children}
+      <ErrorBoundary sectionName={title} fallback="Lỗi hiển thị biểu đồ. Nhấn để thử lại.">
+        {children}
+      </ErrorBoundary>
     </div>
   );
 }

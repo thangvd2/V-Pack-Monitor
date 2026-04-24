@@ -35,6 +35,7 @@ import UserManagementModal from './UserManagementModal';
 import Dashboard from './Dashboard';
 import AdminDashboard from './AdminDashboard';
 import SystemHealth from './SystemHealth';
+import ErrorBoundary from './ErrorBoundary';
 import MtxFallback from './MtxFallback';
 import API_BASE from './config';
 
@@ -174,31 +175,6 @@ function StationSelectionScreen({ stations, stationStatusList, fetchStationStatu
       <p className="text-slate-600 text-xs mt-8">Trạng thái tự động cập nhật mỗi 10 giây</p>
     </div>
   );
-}
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-          <div className="text-center">
-            <p className="text-red-400 text-lg font-bold mb-2">Something went wrong</p>
-            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
-              Reload Page
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
 }
 
 function App() {
@@ -801,12 +777,18 @@ function App() {
         />
       )}
 
-      <VideoPlayerModal
-        isOpen={videoModalOpen}
-        videoUrl={selectedVideo.url}
-        waybillCode={selectedVideo.waybillCode}
-        onClose={() => setVideoModalOpen(false)}
-      />
+      <ErrorBoundary
+        sectionName="VideoPlayer"
+        fallback="Không thể phát video. Tải lại trang."
+        onReset={() => setVideoModalOpen(false)}
+      >
+        <VideoPlayerModal
+          isOpen={videoModalOpen}
+          videoUrl={selectedVideo.url}
+          waybillCode={selectedVideo.waybillCode}
+          onClose={() => setVideoModalOpen(false)}
+        />
+      </ErrorBoundary>
 
       <UserManagementModal
         isOpen={showUserModal}
