@@ -257,12 +257,9 @@ function App() {
   const barcodeSimInputRef = useRef(null);
 
   // Confirm dialog state
-  const { confirmDialog, setConfirmDialog, showConfirmDialog } = useConfirmDialog();
 
   // Station switch race guard
   const [switchingStation, setSwitchingStation] = useState(false);
-
-  const { toast, showToast } = useToast();
 
   useEffect(() => {
     if (!currentUser) return;
@@ -582,36 +579,9 @@ function App() {
 
   const hasCam2 = isDualCamStation(activeStation);
 
-  useSSE({
-    activeStationId,
-    viewMode,
-    stationsIdStr,
-    currentUser,
-    stationsRef,
-    setStationStatuses,
-    setPackingStatus,
-    setCurrentWaybill,
-    activeRecordIdRef,
-    fetchStorageInfo,
-    fetchRecords,
-    searchTermRef,
-    recordsPageRef,
-    setUpdateProgress,
-    showToast,
-  });
+  const { toast, showToast } = useToast();
 
-  const { sendScanAction } = useBarcodeScanner({
-    currentUser,
-    activeStationId,
-    searchTerm,
-    packingStatusRef,
-    showToast,
-    fetchRecords,
-    recordsPageRef,
-    setPackingStatus,
-    setCurrentWaybill,
-    activeRecordIdRef,
-  });
+  const { confirmDialog, setConfirmDialog, showConfirmDialog } = useConfirmDialog();
 
   // Auth State
   const { currentUser, setCurrentUser, authLoading, loginError, loginForm, setLoginForm, handleLogin, handleLogout } =
@@ -648,6 +618,37 @@ function App() {
     searchTermRef,
     recordsPageRef,
   } = useRecords({ activeStationId, currentUser, setLoading, fetchAnalytics });
+
+  useSSE({
+    activeStationId,
+    viewMode,
+    stationsIdStr,
+    currentUser,
+    stationsRef,
+    setStationStatuses,
+    setPackingStatus,
+    setCurrentWaybill,
+    activeRecordIdRef,
+    fetchStorageInfo,
+    fetchRecords,
+    searchTermRef,
+    recordsPageRef,
+    setUpdateProgress,
+    showToast,
+  });
+
+  const { sendScanAction } = useBarcodeScanner({
+    currentUser,
+    activeStationId,
+    searchTerm,
+    packingStatusRef,
+    showToast,
+    fetchRecords,
+    recordsPageRef,
+    setPackingStatus,
+    setCurrentWaybill,
+    activeRecordIdRef,
+  });
 
   const doChangePassword = useCallback(async () => {
     setChangePasswordError('');
