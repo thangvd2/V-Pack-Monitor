@@ -106,25 +106,35 @@ def _build_pip_encode_args(encoder):
     if encoder == "libx264":
         # CRF adapts quality to content complexity — good for PIP with mixed static/detail areas
         return [
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-crf", "23",
-            "-pix_fmt", "yuv420p",
-            "-threads", "0",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-crf",
+            "23",
+            "-pix_fmt",
+            "yuv420p",
+            "-threads",
+            "0",
         ]
     elif encoder == "h264_videotoolbox":
         # VideoToolbox does not support CRF — use higher bitrate for PIP composite
         return [
-            "-c:v", "h264_videotoolbox",
-            "-b:v", "6M",
-            "-pix_fmt", "yuv420p",
+            "-c:v",
+            "h264_videotoolbox",
+            "-b:v",
+            "6M",
+            "-pix_fmt",
+            "yuv420p",
         ]
     else:
         # GPU encoders (h264_qsv, h264_nvenc, h264_amf)
         return [
-            "-c:v", encoder,
-            "-b:v", "6M",
-            "-pix_fmt", "yuv420p",
+            "-c:v",
+            encoder,
+            "-b:v",
+            "6M",
+            # No -pix_fmt — QSV auto-selects nv12, NVENC/AMF handle yuv420p natively
         ]
 
 
@@ -271,8 +281,9 @@ class CameraRecorder:
 
             if self.rtsp_url_1 == self.rtsp_url_2:
                 command = ["ffmpeg", "-y", "-fflags", "+genpts+discardcorrupt"]
-                if hw_accel:
-                    command += hw_accel.split()
+                # NOTE: PIP filter_complex uses software filters (split, scale, overlay)
+                # -hwaccel qsv/nvenc would create GPU frames incompatible with software filters
+                # GPU encoder is still used for encoding via _build_pip_encode_args()
                 command += [
                     "-thread_queue_size",
                     "512",
@@ -281,7 +292,7 @@ class CameraRecorder:
                     "-i",
                     self.rtsp_url_1,
                     "-filter_complex",
-                    "[0:v]split=2[main][pip_raw]; [pip_raw]scale=iw/3:-1[pip]; [main][pip]overlay=main_w-overlay_w-10:main_h-overlay_h-10, setpts=PTS-STARTPTS[out]",
+                    "[0:v]split=2[main][pip_raw]; [pip_raw]scale=iw/3:-1[pip]; [main][pip]overlay=main_w-overlay_w-10:main_h-overlay_h-10, setpts=PTS-STARTPTS",
                     *_build_pip_encode_args(encoder),
                     "-fps_mode",
                     "cfr",
@@ -297,8 +308,8 @@ class CameraRecorder:
                 ]
             else:
                 command = ["ffmpeg", "-y", "-fflags", "+genpts+discardcorrupt"]
-                if hw_accel:
-                    command += hw_accel.split()
+                # NOTE: PIP filter_complex uses software filters
+                # Skip hw_accel as described above
                 command += [
                     "-thread_queue_size",
                     "512",
@@ -385,6 +396,11 @@ class CameraRecorder:
                         p.wait(timeout=10)
                     except subprocess.TimeoutExpired:
                         p.kill()
+            finally:
+                try:
+                    p.stdin.close()
+                except Exception:
+                    pass
 
         for pinfo in self.processes:
             final_path = pinfo["final_path"]
