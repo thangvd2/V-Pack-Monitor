@@ -1,88 +1,110 @@
+import pytest
+
 from api import get_rtsp_sub_url, get_rtsp_url
 
 
 class TestGetRtspUrl:
-    def test_imou_default(self):
-        url = get_rtsp_url("192.168.1.10", "CODE123", channel=1, brand="imou")
-        assert url == "rtsp://admin:CODE123@192.168.1.10:554/cam/realmonitor?channel=1&subtype=0"
+    @pytest.mark.parametrize(
+        "brand, channel, ip, code, expected",
+        [
+            (
+                "imou",
+                1,
+                "192.168.1.10",
+                "CODE123",
+                "rtsp://admin:CODE123@192.168.1.10:554/cam/realmonitor?channel=1&subtype=0",
+            ),
+            (
+                "imou",
+                2,
+                "192.168.1.10",
+                "CODE123",
+                "rtsp://admin:CODE123@192.168.1.10:554/cam/realmonitor?channel=2&subtype=0",
+            ),
+            ("dahua", 1, "10.0.0.1", "SECRET", "rtsp://admin:SECRET@10.0.0.1:554/cam/realmonitor?channel=1&subtype=0"),
+            ("tenda", 1, "10.0.0.2", "CODE", "rtsp://admin:CODE@10.0.0.2:554/ch=1&subtype=0"),
+            ("tenda", 2, "10.0.0.2", "CODE", "rtsp://admin:CODE@10.0.0.2:554/ch=2&subtype=0"),
+            ("ezviz", 1, "10.0.0.3", "CODE", "rtsp://admin:CODE@10.0.0.3:554/ch1/main"),
+            ("ezviz", 2, "10.0.0.3", "CODE", "rtsp://admin:CODE@10.0.0.3:554/ch2/main"),
+            ("tapo", 1, "10.0.0.4", "CODE", "rtsp://admin:CODE@10.0.0.4:554/stream1"),
+            ("tapo", 2, "10.0.0.4", "CODE", "rtsp://admin:CODE@10.0.0.4:554/stream2"),
+        ],
+        ids=[
+            "imou_ch1",
+            "imou_ch2",
+            "dahua_ch1",
+            "tenda_ch1",
+            "tenda_ch2",
+            "ezviz_ch1",
+            "ezviz_ch2",
+            "tapo_ch1",
+            "tapo_ch2",
+        ],
+    )
+    def test_get_rtsp_url_brands(self, brand, channel, ip, code, expected):
+        url = get_rtsp_url(ip, code, channel=channel, brand=brand)
+        assert url == expected
 
-    def test_imou_channel_2(self):
-        url = get_rtsp_url("192.168.1.10", "CODE123", channel=2, brand="imou")
-        assert "channel=2" in url
-        assert "subtype=0" in url
-
-    def test_dahua_same_as_imou(self):
-        url = get_rtsp_url("10.0.0.1", "SECRET", channel=1, brand="dahua")
-        assert url == "rtsp://admin:SECRET@10.0.0.1:554/cam/realmonitor?channel=1&subtype=0"
-
-    def test_tenda(self):
-        url = get_rtsp_url("10.0.0.2", "CODE", channel=1, brand="tenda")
-        assert url == "rtsp://admin:CODE@10.0.0.2:554/ch=1&subtype=0"
-
-    def test_tenda_channel_2(self):
-        url = get_rtsp_url("10.0.0.2", "CODE", channel=2, brand="tenda")
-        assert "ch=2" in url
-
-    def test_ezviz(self):
-        url = get_rtsp_url("10.0.0.3", "CODE", channel=1, brand="ezviz")
-        assert url == "rtsp://admin:CODE@10.0.0.3:554/ch1/main"
-
-    def test_ezviz_channel_2(self):
-        url = get_rtsp_url("10.0.0.3", "CODE", channel=2, brand="ezviz")
-        assert url == "rtsp://admin:CODE@10.0.0.3:554/ch2/main"
-
-    def test_tapo_channel_1(self):
-        url = get_rtsp_url("10.0.0.4", "CODE", channel=1, brand="tapo")
-        assert url == "rtsp://admin:CODE@10.0.0.4:554/stream1"
-
-    def test_tapo_channel_2(self):
-        url = get_rtsp_url("10.0.0.4", "CODE", channel=2, brand="tapo")
-        assert url == "rtsp://admin:CODE@10.0.0.4:554/stream2"
-
-    def test_empty_ip(self):
-        assert get_rtsp_url("", "CODE") == ""
-
-    def test_empty_safety_code(self):
-        assert get_rtsp_url("1.1.1.1", "") == ""
-
-    def test_none_ip(self):
-        assert get_rtsp_url(None, "CODE") == ""
-
-    def test_none_code(self):
-        assert get_rtsp_url("1.1.1.1", None) == ""
+    @pytest.mark.parametrize(
+        "ip, code",
+        [
+            ("", "CODE"),
+            ("1.1.1.1", ""),
+            (None, "CODE"),
+            ("1.1.1.1", None),
+        ],
+        ids=["empty_ip", "empty_code", "none_ip", "none_code"],
+    )
+    def test_get_rtsp_url_edge_cases(self, ip, code):
+        assert get_rtsp_url(ip, code) == ""
 
 
 class TestGetRtspSubUrl:
-    def test_imou_sub(self):
-        url = get_rtsp_sub_url("192.168.1.10", "CODE123", channel=1, brand="imou")
-        assert "subtype=1" in url
+    @pytest.mark.parametrize(
+        "brand, channel, ip, code, expected",
+        [
+            (
+                "imou",
+                1,
+                "192.168.1.10",
+                "CODE123",
+                "rtsp://admin:CODE123@192.168.1.10:554/cam/realmonitor?channel=1&subtype=1",
+            ),
+            (
+                "imou",
+                2,
+                "192.168.1.10",
+                "CODE123",
+                "rtsp://admin:CODE123@192.168.1.10:554/cam/realmonitor?channel=2&subtype=1",
+            ),
+            ("tenda", 1, "10.0.0.2", "CODE", "rtsp://admin:CODE@10.0.0.2:554/ch=1&subtype=1"),
+            ("ezviz", 1, "10.0.0.3", "CODE", "rtsp://admin:CODE@10.0.0.3:554/ch1/sub"),
+            ("ezviz", 2, "10.0.0.3", "CODE", "rtsp://admin:CODE@10.0.0.3:554/ch2/sub"),
+            ("tapo", 1, "10.0.0.4", "CODE", "rtsp://admin:CODE@10.0.0.4:554/stream2"),
+        ],
+        ids=[
+            "imou_sub_ch1",
+            "imou_sub_ch2",
+            "tenda_sub_ch1",
+            "ezviz_sub_ch1",
+            "ezviz_sub_ch2",
+            "tapo_sub_ch1",
+        ],
+    )
+    def test_get_rtsp_sub_url_brands(self, brand, channel, ip, code, expected):
+        url = get_rtsp_sub_url(ip, code, channel=channel, brand=brand)
+        assert url == expected
 
-    def test_imou_sub_channel_2(self):
-        url = get_rtsp_sub_url("192.168.1.10", "CODE123", channel=2, brand="imou")
-        assert "channel=2" in url
-        assert "subtype=1" in url
-
-    def test_tenda_sub(self):
-        url = get_rtsp_sub_url("10.0.0.2", "CODE", channel=1, brand="tenda")
-        assert "subtype=1" in url
-
-    def test_ezviz_sub(self):
-        url = get_rtsp_sub_url("10.0.0.3", "CODE", channel=1, brand="ezviz")
-        assert url == "rtsp://admin:CODE@10.0.0.3:554/ch1/sub"
-
-    def test_ezviz_sub_ch2(self):
-        url = get_rtsp_sub_url("10.0.0.3", "CODE", channel=2, brand="ezviz")
-        assert url == "rtsp://admin:CODE@10.0.0.3:554/ch2/sub"
-
-    def test_tapo_sub(self):
-        url = get_rtsp_sub_url("10.0.0.4", "CODE", channel=1, brand="tapo")
-        assert url == "rtsp://admin:CODE@10.0.0.4:554/stream2"
-
-    def test_empty_ip(self):
-        assert get_rtsp_sub_url("", "CODE") == ""
-
-    def test_empty_code(self):
-        assert get_rtsp_sub_url("1.1.1.1", "") == ""
+    @pytest.mark.parametrize(
+        "ip, code",
+        [
+            ("", "CODE"),
+            ("1.1.1.1", ""),
+        ],
+        ids=["empty_ip", "empty_code"],
+    )
+    def test_get_rtsp_sub_url_edge_cases(self, ip, code):
+        assert get_rtsp_sub_url(ip, code) == ""
 
     def test_main_and_sub_different(self):
         main = get_rtsp_url("1.1.1.1", "CODE", brand="imou")

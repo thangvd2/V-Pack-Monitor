@@ -176,20 +176,23 @@ class TestBoundaryConditions:
 class TestInputLimits:
     """Tests for handling extreme and edge-case inputs."""
 
-    def test_create_user_special_characters(self):
-        """Usernames with SQL metacharacters, spaces, and unicode are stored literally
-        via parameterized queries — no injection possible."""
-        test_cases = [
+    @pytest.mark.parametrize(
+        "name, label",
+        [
             ("user'; DROP TABLE users; --", "sql injection"),
             ("user with spaces", "spaces"),
             ("Người_dùng", "unicode"),
-        ]
-        for name, label in test_cases:
-            uid = create_user(name, "Password123!", "OPERATOR")
-            assert uid is not None, f"Failed to create user ({label}): {name!r}"
-            user = get_user_by_username(name)
-            assert user is not None, f"Failed to retrieve user ({label}): {name!r}"
-            assert user["username"] == name
+        ],
+        ids=["sql_injection", "spaces", "unicode"],
+    )
+    def test_create_user_special_characters(self, name, label):
+        """Usernames with SQL metacharacters, spaces, and unicode are stored literally
+        via parameterized queries — no injection possible."""
+        uid = create_user(name, "Password123!", "OPERATOR")
+        assert uid is not None, f"Failed to create user ({label}): {name!r}"
+        user = get_user_by_username(name)
+        assert user is not None, f"Failed to retrieve user ({label}): {name!r}"
+        assert user["username"] == name
 
     def test_create_user_very_long_username_rejected(self):
         """A 300-character username should be rejected by the 50-char limit."""
