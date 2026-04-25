@@ -332,16 +332,17 @@ function App() {
   };
 
   useEffect(() => {
-    if (activeStationId) {
+    if (activeStationId && activeStationId !== 'orphaned') {
       fetchStatus(activeStationId);
     }
     if (currentUser) {
-      fetchAnalytics(activeStationId || '');
+      const sid = activeStationId && activeStationId !== 'orphaned' ? activeStationId : '';
+      fetchAnalytics(sid);
     }
   }, [activeStationId, currentUser]);
 
   useEffect(() => {
-    if (!activeStationId) return;
+    if (!activeStationId || activeStationId === 'orphaned') return;
     let active = true;
     let intervalId = null;
 
