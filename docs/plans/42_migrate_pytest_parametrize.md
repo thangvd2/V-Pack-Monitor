@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Done — PR #64 merged to dev
+
 ## Problem
 
 `test_api_helpers.py` có 22 test methods viết tay cho camera brand RTSP URLs:

@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Skipped — SSE is stable, no 2-way need. Keep in backlog.
+
 ## Problem
 
 SSE là 1 chiều (server → client). Các limitation:

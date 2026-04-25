@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Done — PR #70 merged to dev (2 rounds)
+
 ## Problem
 
 Frontend viết bằng JSX (JavaScript). Không có type safety cho:

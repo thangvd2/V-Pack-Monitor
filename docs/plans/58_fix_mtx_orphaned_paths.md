@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Done — PR #75 merged to dev
+
 ## Problem
 
 Sau khi xóa station với camera IP không hợp lệ (VD: `192.168.1.99`), MediaMTX vẫn log liên tục:

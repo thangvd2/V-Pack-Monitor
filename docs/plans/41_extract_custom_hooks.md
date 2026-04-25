@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Done — PR #63 merged to dev
+
 ## Problem
 
 App.jsx là một "mega-component" duy nhất chứa toàn bộ logic:

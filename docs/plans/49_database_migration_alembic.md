@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Plan created, not yet implemented
+
 ## Problem
 
 Database schema migration hiện viết tay trong `database.py`:

@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Done — PR #65 merged to dev
+
 ## Problem
 
 Hiện `ErrorBoundary` (App.jsx:179-202) chỉ wrap App root. Khi bất kỳ section nào crash:

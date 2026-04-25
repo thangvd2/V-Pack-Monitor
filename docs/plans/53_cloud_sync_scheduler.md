@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Plan created, not yet implemented
+
 ## Problem
 
 README ghi: "☁️ Đồng Bộ Hoá Điện Toán Đám Mây (Cloud Sync): Backup dữ liệu hàng ngày lên Google Drive hoặc S3"

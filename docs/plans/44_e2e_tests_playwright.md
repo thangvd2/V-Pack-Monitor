@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Done — PR #66 merged to dev
+
 ## Problem
 
 Hệ thống có 326 unit tests nhưng chưa có end-to-end test. Các user flow quan trọng chưa được test tự động:

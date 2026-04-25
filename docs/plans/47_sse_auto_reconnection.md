@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Done — PR #73 merged to dev
+
 ## Problem
 
 Hiện EventSource (App.jsx:385) không có reconnection logic:

@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Plan created, not yet implemented
+
 ## Problem
 
 Session lock hiện dùng HTTP polling:

@@ -1,8 +1,9 @@
 # Plan 46: API Response Models (Pydantic)
 
-**Ngày**: 2026-04-24
+**Ngày**: 2026-04-26
 **Mức độ**: Medium — Backend trả dict tự do, frontend không biết field nào tồn tại
 **Loại**: Refactor (backward compatible)
+**Status**: ✅ Done — PR #72 merged to dev
 
 ---
 
@@ -10,55 +11,59 @@
 
 Backend routes trả `dict` trực tiếp:
 ```python
-return {"stations": stations, "processing_counts": processing_counts}
+return {"data": stations}
 ```
 
 Frontend phải guess field names. Không có:
 - Self-documenting API (phải đọc code để biết response shape)
 - Response validation (field missing → frontend crash)
-- Consistent naming (snake_case backend → camelCase frontend)
 
 ---
 
 ## Scope
 
-### Files to change:
-- `web-ui/src/types/api.ts` — Frontend types (if Plan #45 done) hoặc inline JSDoc
-- `routes_*.py` — Add Pydantic response models
+### Files changed:
+- `routes_stations.py` — StationModel, StationsResponse
+- `routes_records.py` — RecordModel, RecordsResponse
+- `routes_auth.py` — UserAuthModel, LoginResponse, UserFullModel, UsersResponse
+- `routes_system.py` — SettingsResponse, AnalyticsTodayResponse, CpuComponent, MemoryComponent, DiskComponent, HealthResponse
+- `database.py` — Added `p.station_id` to get_records_v2() query
 
-### Response models cần define:
+### Response models defined:
 
-| Endpoint | Current | Response Model |
-|----------|---------|----------------|
-| `GET /api/stations` | `{"stations": [...]}` | `StationsResponse` |
-| `GET /api/records` | `{"records": [...], "total": N}` | `RecordsResponse` |
+| Endpoint | Response Shape | Response Model |
+|----------|----------------|----------------|
+| `GET /api/stations` | `{"data": [{id, name, ip_camera_1, ip_camera_2, safety_code?, camera_mode, camera_brand, mac_address, processing_count?}]}` | `StationsResponse` |
+| `GET /api/records` | `{"records": [...], "total", "page", "limit", "total_pages", "has_more"}` | `RecordsResponse` |
 | `GET /api/records/{id}/download` | File response | No change needed |
-| `GET /api/settings` | `{"settings": {...}}` | `SettingsResponse` |
-| `GET /api/analytics/today` | `{"total_records": N, ...}` | `AnalyticsResponse` |
-| `GET /api/system/health` | `{"status": "...", ...}` | `HealthResponse` |
-| `POST /api/auth/login` | `{"token": "...", "user": {...}}` | `LoginResponse` |
-| `GET /api/users` | `{"users": [...]}` | `UsersResponse` |
-| `POST /api/stations/{id}/scan` | `{"status": "...", ...}` | `ScanResponse` |
+| `GET /api/settings` | `{"data": {key: value, ...}}` | `SettingsResponse` |
+| `GET /api/analytics/today` | `{"data": {"total_today": N, "station_today": N}}` | `AnalyticsTodayResponse` |
+| `GET /api/system/health` | `{"cpu": {...}, "memory": {...}, "disk": {...}, "uptime", "uptime_seconds"}` | `HealthResponse` |
+| `POST /api/auth/login` | `{"status", "access_token", "token_type", "user": {id, username, role, full_name, must_change_password}}` | `LoginResponse` |
+| `GET /api/users` | `{"data": [{id, username, role, full_name, is_active, created_at?}]}` | `UsersResponse` |
+| `POST /api/scan` | Dynamic (13 return paths) | **Not modeled** — too dynamic, high risk |
 
 ### Example:
 ```python
-class StationResponse(BaseModel):
+class StationModel(BaseModel):
     id: int
     name: str
-    ip: str | None
-    brand: str | None
-    camera_mode: str | None
-    # ...
+    ip_camera_1: str
+    ip_camera_2: str
+    safety_code: str | None = None
+    camera_mode: str
+    camera_brand: str
+    mac_address: str
+    processing_count: int | None = None
 
 class StationsResponse(BaseModel):
-    stations: list[StationResponse]
-    processing_counts: dict[int, int]
+    data: list[StationModel]
 ```
 
 ### FastAPI `response_model`:
 ```python
-@router.get("/api/stations", response_model=StationsResponse)
-async def get_stations(current_user: CurrentUser):
+@app.get("/api/stations", response_model=StationsResponse, response_model_exclude_none=True)
+def get_stations_api(current_user: CurrentUser):
     ...
 ```
 
@@ -68,15 +73,16 @@ async def get_stations(current_user: CurrentUser):
 
 - **Backward compatible** — response shape không đổi, chỉ thêm validation
 - Không đổi field names (giữ snake_case cho consistency)
-- Response models optional — FastAPI filter out extra fields automatically
-- Nếu Plan #45 chưa làm → dùng JSDoc comments cho frontend types
+- `response_model_exclude_none=True` cho stations để tự động bỏ `safety_code` khi non-ADMIN
+- `/api/scan` không modeled vì quá dynamic (13 return paths)
+- `database.py` fix: added `p.station_id` to `get_records_v2()` base_select query
 
 ---
 
 ## Verification
 
-- [ ] `pytest tests/ -q` pass
-- [ ] `npm run build` pass
-- [ ] All API responses match their response_model
-- [ ] FastAPI /docs shows response schemas
-- [ ] Frontend không bị break
+- [x] `pytest tests/ -q` pass
+- [x] `npm run build` pass (no frontend changes)
+- [x] All API responses match their response_model
+- [x] FastAPI /docs shows response schemas
+- [x] Frontend không bị break
