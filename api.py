@@ -168,8 +168,29 @@ def _mtx_remove_path(station_id, suffix="", station_name=""):
     except urllib.error.HTTPError as e:
         if e.code != 404:
             logger.error(f"[MTX] delete {name} failed: {e}")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[MTX] Failed to remove path {name}: {e}")
+
+
+def _mtx_cleanup_orphaned_paths(station_ids):
+    """Remove MediaMTX paths for stations that no longer exist in DB."""
+    import re
+
+    try:
+        req = urllib.request.Request(f"{MTX_API}/v3/paths/list", method="GET")
+        resp = urllib.request.urlopen(req, timeout=5)
+        paths = json.loads(resp.read())
+        items = paths.get("items", [])
+        pattern = re.compile(r"^station_(\d+)(?:_cam2)?$")
+        for p in items:
+            name = p.get("name", "")
+            m = pattern.match(name)
+            if m and int(m.group(1)) not in station_ids:
+                suffix = name.removeprefix(f"station_{m.group(1)}")
+                _mtx_remove_path(int(m.group(1)), suffix=suffix)
+                logger.info(f"[MTX] Cleaned orphaned path: {name}")
+    except Exception as e:
+        logger.debug(f"[MTX] Cleanup scan skipped (MediaMTX not available): {e}")
 
 
 class CameraStreamManager:
@@ -556,6 +577,11 @@ async def lifespan(app: FastAPI):
     recovery_thread = threading.Thread(target=_recover_pending_records, daemon=True)
     recovery_thread.start()
     stations = database.get_stations()
+
+    # Cleanup orphaned MediaMTX paths from previous sessions
+    station_ids = {st["id"] for st in stations}
+    _mtx_cleanup_orphaned_paths(station_ids)
+
     live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
     for st in stations:
         brand = st.get("camera_brand", "imou")
