@@ -579,7 +579,7 @@ def get_records_v2(
     sort_col = _SORT_COLUMNS.get(sort_by, "p.recorded_at")
     sort_dir = "DESC" if sort_order.lower() == "desc" else "ASC"
 
-    base_select = "p.id, p.waybill_code, p.video_paths, p.record_mode, datetime(p.recorded_at, 'localtime') AS recorded_at, s.name, p.status, p.duration"
+    base_select = "p.id, p.waybill_code, p.video_paths, p.record_mode, datetime(p.recorded_at, 'localtime') AS recorded_at, s.name, p.status, p.duration, p.station_id"
 
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -696,6 +696,7 @@ def get_records_v2(
                 "station_name": r[5],
                 "status": r[6],
                 "duration": r[7] if len(r) > 7 else 0,
+                "station_id": r[8] if len(r) > 8 else None,
             }
         )
 

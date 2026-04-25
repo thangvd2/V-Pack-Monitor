@@ -34,10 +34,26 @@ def _resolve_cam2_url(payload, url_fn):
     return None
 
 
+class StationModel(BaseModel):
+    id: int
+    name: str
+    ip_camera_1: str
+    ip_camera_2: str
+    safety_code: str | None = None
+    camera_mode: str
+    camera_brand: str
+    mac_address: str
+    processing_count: int | None = None
+
+
+class StationsResponse(BaseModel):
+    data: list[StationModel]
+
+
 def register_routes(app):
     # --- STATIONS CRUD API ---
 
-    @app.get("/api/stations")
+    @app.get("/api/stations", response_model=StationsResponse, response_model_exclude_none=True)
     def get_stations_api(current_user: CurrentUser):
         stations = database.get_stations()
 
