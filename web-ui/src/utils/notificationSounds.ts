@@ -3,27 +3,27 @@
  * No external audio files needed — all sounds are synthesized.
  */
 
-let audioCtx = null;
+let audioCtx: AudioContext | null = null;
 
-const _lastPlayed = {};
+const _lastPlayed: Record<string, number> = {};
 const COOLDOWN_MS = 600;
 
-function _shouldPlay(soundType) {
+function _shouldPlay(soundType: string): boolean {
   const now = Date.now();
   if (now - (_lastPlayed[soundType] || 0) < COOLDOWN_MS) return false;
   _lastPlayed[soundType] = now;
   return true;
 }
 
-async function getAudioContext() {
+async function getAudioContext(): Promise<AudioContext> {
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   }
   // Resume if suspended (browser autoplay policy)
-  if (audioCtx.state === 'suspended') {
-    await audioCtx.resume();
+  if (audioCtx!.state === 'suspended') {
+    await audioCtx!.resume();
   }
-  return audioCtx;
+  return audioCtx!;
 }
 
 /**
@@ -49,8 +49,10 @@ export async function playScanStart() {
     };
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.2);
-  } catch (err) {
-    console.warn('[notificationSounds]', err.message);
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.warn('[notificationSounds]', err.message);
+    }
   }
 }
 
@@ -77,8 +79,10 @@ export async function playRecordingStop() {
     };
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.2);
-  } catch (err) {
-    console.warn('[notificationSounds]', err.message);
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.warn('[notificationSounds]', err.message);
+    }
   }
 }
 
@@ -122,8 +126,10 @@ export async function playVideoReady() {
     };
     osc2.start(ctx.currentTime + 0.15);
     osc2.stop(ctx.currentTime + 0.35);
-  } catch (err) {
-    console.warn('[notificationSounds]', err.message);
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.warn('[notificationSounds]', err.message);
+    }
   }
 }
 
@@ -167,17 +173,19 @@ export async function playRecordingWarning() {
     };
     osc2.start(ctx.currentTime + 0.2);
     osc2.stop(ctx.currentTime + 0.35);
-  } catch (err) {
-    console.warn('[notificationSounds]', err.message);
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.warn('[notificationSounds]', err.message);
+    }
   }
 }
 
 // Warm up AudioContext on first user gesture so resume() is a no-op later
 function _initOnGesture() {
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (audioCtx!.state === 'suspended') audioCtx!.resume();
   document.removeEventListener('click', _initOnGesture);
   document.removeEventListener('keydown', _initOnGesture);
 }

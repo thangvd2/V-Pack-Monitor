@@ -3,6 +3,8 @@ import axios from 'axios';
 import API_BASE from '../config';
 import { playRecordingWarning } from '../utils/notificationSounds';
 
+import { User } from '../types/api';
+
 const BARCODE_TIMEOUT = 100;
 
 export function useBarcodeScanner({
@@ -16,8 +18,19 @@ export function useBarcodeScanner({
   setPackingStatus,
   setCurrentWaybill,
   activeRecordIdRef,
+}: {
+  currentUser: User | null;
+  activeStationId: number | null | 'orphaned';
+  searchTerm: string;
+  packingStatusRef: React.MutableRefObject<string>;
+  showToast: (msg: string, type?: 'info' | 'error' | 'warning') => void;
+  fetchRecords: (query: string, sid: number | null | 'orphaned', page: number) => void;
+  recordsPageRef: React.MutableRefObject<number>;
+  setPackingStatus: (status: 'idle' | 'packing') => void;
+  setCurrentWaybill: (waybill: string) => void;
+  activeRecordIdRef: React.MutableRefObject<number | null>;
 }) {
-  const sendScanAction = async (finalBarcode) => {
+  const sendScanAction = async (finalBarcode: string) => {
     if (!activeStationId) return;
     try {
       const res = await axios.post(`${API_BASE}/api/scan`, {
@@ -54,10 +67,11 @@ export function useBarcodeScanner({
     if (currentUser?.role === 'ADMIN') return;
 
     let barcodeBuffer = '';
-    let timeoutId = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    const handleKeyDown = async (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
         return;
       }
 

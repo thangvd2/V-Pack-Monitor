@@ -2,10 +2,22 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import API_BASE from '../config';
 
+import { PackingRecord, User } from '../types/api';
+
 const SEARCH_DEBOUNCE = 300;
 
-export function useRecords({ activeStationId, currentUser, setLoading, fetchAnalytics }) {
-  const [records, setRecords] = useState([]);
+export function useRecords({ 
+  activeStationId, 
+  currentUser, 
+  setLoading, 
+  fetchAnalytics 
+}: { 
+  activeStationId: number | null | 'orphaned';
+  currentUser: User | null;
+  setLoading?: (v: boolean) => void;
+  fetchAnalytics?: (id: number | null | 'orphaned') => void;
+}) {
+  const [records, setRecords] = useState<PackingRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [recordsPage, setRecordsPage] = useState(1);
   const [recordsTotal, setRecordsTotal] = useState(0);
@@ -39,17 +51,17 @@ export function useRecords({ activeStationId, currentUser, setLoading, fetchAnal
     statusFilterRef.current = statusFilter;
   }, [statusFilter]);
 
-  const abortControllerRef = useRef(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const fetchRecords = async (query = '', sid = activeStationId, page = 1, signal) => {
+  const fetchRecords = async (query = '', sid = activeStationId, page = 1, signal?: AbortSignal) => {
     try {
       if (setLoading) setLoading(true);
       const params = new URLSearchParams();
       if (query) params.set('search', query);
       if (sid === 'orphaned') {
         params.set('orphaned', 'true');
-      } else if (sid) {
-        params.set('station_id', sid);
+      } else if (sid !== null) {
+        params.set('station_id', String(sid));
       }
       if (page > 1) params.set('page', String(page));
       if (dateFromRef.current) params.set('date_from', dateFromRef.current);
@@ -64,8 +76,8 @@ export function useRecords({ activeStationId, currentUser, setLoading, fetchAnal
       setRecordsPage(res.data.page);
       if (setLoading) setLoading(false);
       if (fetchAnalytics) fetchAnalytics(sid);
-    } catch (err) {
-      if (axios.isCancel(err) || err.name === 'CanceledError') return;
+    } catch (err: unknown) {
+      if (axios.isCancel(err) || (err as Error).name === 'CanceledError') return;
       if (setLoading) setLoading(false);
     }
   };
@@ -78,7 +90,9 @@ export function useRecords({ activeStationId, currentUser, setLoading, fetchAnal
       }
       abortControllerRef.current = new AbortController();
       const debounce = setTimeout(() => {
-        fetchRecords(searchTerm, activeStationId, 1, abortControllerRef.current.signal);
+        if (abortControllerRef.current) {
+          fetchRecords(searchTerm, activeStationId, 1, abortControllerRef.current.signal);
+        }
       }, SEARCH_DEBOUNCE);
       return () => {
         clearTimeout(debounce);
@@ -88,7 +102,7 @@ export function useRecords({ activeStationId, currentUser, setLoading, fetchAnal
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, activeStationId, currentUser, dateFrom, dateTo, statusFilter]);
 
-  const handleSearch = (e) => {
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
   };
 

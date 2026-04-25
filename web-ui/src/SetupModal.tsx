@@ -21,7 +21,9 @@ import {
 } from 'lucide-react';
 import API_BASE from './config';
 
-const isValidIPv4 = (ip) => {
+import { SetupModalProps } from './types/props';
+
+const isValidIPv4 = (ip: string): boolean => {
   const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (!m) return false;
   return [m[1], m[2], m[3], m[4]].every((o) => {
@@ -30,7 +32,7 @@ const isValidIPv4 = (ip) => {
   });
 };
 
-const isValidIPv6 = (ip) => {
+const isValidIPv6 = (ip: string): boolean => {
   const s = ip.trim();
   if (!s) return false;
   const parts = s.split(':');
@@ -45,9 +47,9 @@ const isValidIPv6 = (ip) => {
   return true;
 };
 
-const isValidIP = (ip) => isValidIPv4(ip) || isValidIPv6(ip);
+const isValidIP = (ip: string): boolean => isValidIPv4(ip) || isValidIPv6(ip);
 
-const isReservedIP = (ip) => {
+const isReservedIP = (ip: string): boolean => {
   if (isValidIPv4(ip)) {
     const [a] = ip.split('.').map(Number);
     return ip === '0.0.0.0' || a === 127 || ip === '255.255.255.255';
@@ -55,14 +57,14 @@ const isReservedIP = (ip) => {
   return ip === '::' || ip === '::1';
 };
 
-const isValidMAC = (mac) => {
+const isValidMAC = (mac: string): boolean => {
   const raw = mac.replace(/[\s:.-]/g, '').toUpperCase();
   if (raw.length !== 12 || !/^[0-9A-F]{12}$/.test(raw)) return false;
   if (raw === '000000000000' || raw === 'FFFFFFFFFFFF') return false;
   return true;
 };
 
-const CAMERA_MODE_DESC = {
+const CAMERA_MODE_DESC: Record<string, string> = {
   single: 'Ghi 1 luồng từ 1 camera',
   pip: 'Ghép hình-in-picture từ 2 camera (hoặc 1 camera 2 mắt)',
   dual_file: 'Ghi 2 file riêng từ 2 camera (hoặc 1 camera 2 mắt)',
@@ -70,12 +72,12 @@ const CAMERA_MODE_DESC = {
 
 const MODES_NEED_IP2 = ['dual_file', 'pip'];
 
-function ErrorHint({ show, msg }) {
+function ErrorHint({ show, msg }: { show: boolean | string | undefined | null; msg: string }) {
   if (!show) return null;
   return <p className="mt-1 text-xs text-red-400">{msg}</p>;
 }
 
-function WarningHints({ warnings }) {
+function WarningHints({ warnings }: { warnings: string[] }) {
   if (!warnings || warnings.length === 0) return null;
   return (
     <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-300 space-y-0.5">
@@ -86,52 +88,52 @@ function WarningHints({ warnings }) {
   );
 }
 
-export default function SetupModal({
+const SetupModal: React.FC<SetupModalProps> = ({
   isOpen,
   onSaved,
   onCancel,
   currentStation = {},
   isNewStation = false,
   initialSettings = {},
-}) {
-  const [name, setName] = useState(currentStation.name || '');
-  const [ip1, setIp1] = useState(currentStation.ip_camera_1 || '');
-  const [ip2, setIp2] = useState(currentStation.ip_camera_2 || '');
-  const [safetyCode, setSafetyCode] = useState(currentStation.safety_code || '');
-  const [cameraBrand, setCameraBrand] = useState(currentStation.camera_brand || 'imou');
-  const [cameraMode, setCameraMode] = useState(currentStation.camera_mode || 'single');
-  const [macAddress, setMacAddress] = useState(currentStation.mac_address || '');
+}) => {
+  const [name, setName] = useState<string>(currentStation?.name || '');
+  const [ip1, setIp1] = useState(currentStation?.ip_camera_1 || '');
+  const [ip2, setIp2] = useState(currentStation?.ip_camera_2 || '');
+  const [safetyCode, setSafetyCode] = useState(currentStation?.safety_code || '');
+  const [cameraBrand, setCameraBrand] = useState(currentStation?.camera_brand || 'imou');
+  const [cameraMode, setCameraMode] = useState(currentStation?.camera_mode || 'single');
+  const [macAddress, setMacAddress] = useState(currentStation?.mac_address || '');
   const [discovering, setDiscovering] = useState(false);
   const [discoverResult, setDiscoverResult] = useState('');
-  const [keepDays, setKeepDays] = useState(initialSettings.RECORD_KEEP_DAYS || 365);
-  const [cloudProvider, setCloudProvider] = useState(initialSettings.CLOUD_PROVIDER || 'NONE');
-  const [gDriveFolderId, setGDriveFolderId] = useState(initialSettings.GDRIVE_FOLDER_ID || '');
+  const [keepDays, setKeepDays] = useState<number>(initialSettings?.RECORD_KEEP_DAYS || 365);
+  const [cloudProvider, setCloudProvider] = useState(initialSettings?.CLOUD_PROVIDER || 'NONE');
+  const [gDriveFolderId, setGDriveFolderId] = useState(initialSettings?.GDRIVE_FOLDER_ID || '');
   const [gDriveCreds, setGDriveCreds] = useState('');
-  const [s3Endpoint, setS3Endpoint] = useState(initialSettings.S3_ENDPOINT || '');
-  const [s3Access, setS3Access] = useState(initialSettings.S3_ACCESS_KEY || '');
-  const [s3Secret, setS3Secret] = useState(initialSettings.S3_SECRET_KEY || '');
-  const [s3Bucket, setS3Bucket] = useState(initialSettings.S3_BUCKET_NAME || '');
-  const [tgBotToken, setTgBotToken] = useState(initialSettings.TELEGRAM_BOT_TOKEN || '');
-  const [tgChatId, setTgChatId] = useState(initialSettings.TELEGRAM_CHAT_ID || '');
+  const [s3Endpoint, setS3Endpoint] = useState(initialSettings?.S3_ENDPOINT || '');
+  const [s3Access, setS3Access] = useState(initialSettings?.S3_ACCESS_KEY || '');
+  const [s3Secret, setS3Secret] = useState(initialSettings?.S3_SECRET_KEY || '');
+  const [s3Bucket, setS3Bucket] = useState(initialSettings?.S3_BUCKET_NAME || '');
+  const [tgBotToken, setTgBotToken] = useState(initialSettings?.TELEGRAM_BOT_TOKEN || '');
+  const [tgChatId, setTgChatId] = useState(initialSettings?.TELEGRAM_CHAT_ID || '');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showSafetyCode, setShowSafetyCode] = useState(false);
   const [testingIp, setTestingIp] = useState(false);
-  const [testIpResult, setTestIpResult] = useState(null);
+  const [testIpResult, setTestIpResult] = useState<{ok: boolean, msg: string} | null>(null);
   const [collapsed, setCollapsed] = useState({ system: false, telegram: false });
   const [dirty, setDirty] = useState(false);
-  const [warnings, setWarnings] = useState([]);
-  const [touched, setTouched] = useState({});
-  const conflictTimerRef = useRef(null);
-  const [confirmDialog, setConfirmDialog] = useState({ show: false, message: '', onConfirm: null });
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const conflictTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ show: boolean; message?: string; onConfirm?: () => void }>({ show: false });
 
   useEffect(() => {
     if (!isOpen) {
       if (conflictTimerRef.current) clearTimeout(conflictTimerRef.current);
       return;
     }
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') handleCancel();
     };
     window.addEventListener('keydown', handler);
@@ -147,8 +149,8 @@ export default function SetupModal({
 
   const markDirty = useCallback(() => setDirty(true), []);
 
-  const touch = useCallback((field) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
+  const touch = useCallback((field: string) => {
+      setTouched((prev) => ({ ...prev, [field]: true }));
   }, []);
 
   const excludeId = currentStation?.id || 0;
@@ -162,7 +164,7 @@ export default function SetupModal({
         if (ip2 && ip2.trim()) params.set('ip2', ip2);
         if (macAddress) params.set('mac', macAddress);
         if (name) params.set('name', name);
-        params.set('exclude_id', excludeId);
+        params.set('exclude_id', String(excludeId));
         const res = await axios.get(`${API_BASE}/api/stations/check-conflict?${params}`);
         setWarnings(res.data.warnings || []);
       } catch {
@@ -200,7 +202,7 @@ export default function SetupModal({
   const errors = validate();
   const hasErrors = errors.length > 0;
 
-  const fieldBorder = (fieldName, hasError) => {
+  const fieldBorder = (fieldName: string, hasError: boolean) => {
     if (!touched[fieldName]) return 'border-white/10';
     return hasError ? 'border-red-500/60' : 'border-emerald-500/40';
   };
@@ -226,7 +228,7 @@ export default function SetupModal({
   const doSaveStation = async () => {
     try {
       await axios.post(`${API_BASE}/api/settings`, {
-        RECORD_KEEP_DAYS: parseInt(keepDays),
+        RECORD_KEEP_DAYS: Number(keepDays),
         CLOUD_PROVIDER: cloudProvider,
         GDRIVE_FOLDER_ID: gDriveFolderId,
         S3_ENDPOINT: s3Endpoint,
@@ -257,7 +259,7 @@ export default function SetupModal({
       if (isNewStation) {
         await axios.post(`${API_BASE}/api/stations`, payload);
       } else {
-        await axios.put(`${API_BASE}/api/stations/${currentStation.id}`, payload);
+        await axios.put(`${API_BASE}/api/stations/${currentStation?.id}`, payload);
       }
 
       onSaved();
@@ -284,7 +286,7 @@ export default function SetupModal({
       if (ip2 && ip2.trim()) params.set('ip2', ip2);
       if (macAddress) params.set('mac', macAddress);
       if (name) params.set('name', name);
-      params.set('exclude_id', excludeId);
+      params.set('exclude_id', String(excludeId));
       const conflictRes = await axios.get(`${API_BASE}/api/stations/check-conflict?${params}`);
       const freshWarnings = conflictRes.data.warnings || [];
       setWarnings(freshWarnings);
@@ -316,7 +318,7 @@ export default function SetupModal({
       onConfirm: async () => {
         try {
           setLoading(true);
-          await axios.delete(`${API_BASE}/api/stations/${currentStation.id}`);
+          await axios.delete(`${API_BASE}/api/stations/${currentStation?.id}`);
           onSaved();
         } catch {
           setLoading(false);
@@ -338,9 +340,9 @@ export default function SetupModal({
     }
   };
 
-  const formatMac = (val) => {
+  const formatMac = (val: string) => {
     const raw = val.replace(/[\s:.-]/g, '').toUpperCase();
-    if (raw.length === 12) return raw.match(/.{2}/g).join(':');
+    if (raw.length === 12) return raw.match(/.{2}/g)!.join(':');
     return val;
   };
 
@@ -488,10 +490,10 @@ export default function SetupModal({
                     touch('ip2');
                     checkConflicts();
                   }}
-                  className={`w-full bg-black/40 border rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 ${fieldBorder('ip2', ip2 && ip2.trim() && !isValidIP(ip2))}`}
+                  className={`w-full bg-black/40 border rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 ${fieldBorder('ip2', !!(ip2 && ip2.trim() && !isValidIP(ip2)))}`}
                 />
                 <ErrorHint
-                  show={touched.ip2 && ip2?.trim() && !isValidIP(ip2)}
+                  show={!!(touched.ip2 && ip2?.trim() && !isValidIP(ip2))}
                   msg="IP không hợp lệ (cần IPv4 hoặc IPv6)"
                 />
               </div>
@@ -562,7 +564,7 @@ export default function SetupModal({
                     if (formatted !== e.target.value) setMacAddress(formatted);
                     checkConflicts();
                   }}
-                  className={`flex-1 bg-black/40 border rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 ${fieldBorder('mac', macAddress && macAddress.trim() && !isValidMAC(macAddress))}`}
+                  className={`flex-1 bg-black/40 border rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 ${fieldBorder('mac', !!(macAddress && macAddress.trim() && !isValidMAC(macAddress)))}`}
                 />
                 {macAddress && (
                   <button
@@ -576,7 +578,7 @@ export default function SetupModal({
                       setDiscovering(true);
                       setDiscoverResult('');
                       try {
-                        const formattedMac = raw.match(/.{2}/g).join(':');
+                        const formattedMac = raw.match(/.{2}/g)!.join(':');
                         const res = await axios.get(
                           `${API_BASE}/api/discover-mac?mac=${encodeURIComponent(formattedMac)}`,
                         );
@@ -650,7 +652,7 @@ export default function SetupModal({
                   <select
                     value={keepDays}
                     onChange={(e) => {
-                      setKeepDays(e.target.value);
+                      setKeepDays(Number(e.target.value));
                       markDirty();
                     }}
                     className="w-full bg-[#1e293b] border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none appearance-none"
@@ -838,15 +840,13 @@ export default function SetupModal({
         </div>
 
         <div className="flex gap-3 p-6 pt-3">
-          {onCancel && (
-            <button
-              onClick={handleCancel}
-              disabled={loading}
-              className="flex-1 bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-50"
-            >
-              HỦY BỎ
-            </button>
-          )}
+          <button
+            onClick={handleCancel}
+            disabled={loading}
+            className="flex-1 bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-50"
+          >
+            HỦY BỎ
+          </button>
           <button
             onClick={handleSave}
             disabled={loading}
@@ -891,4 +891,6 @@ export default function SetupModal({
       )}
     </div>
   );
-}
+};
+
+export default SetupModal;
