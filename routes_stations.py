@@ -142,6 +142,11 @@ def register_routes(app):
             api.reconnect_status.pop(station_id, None)
         if sm:
             sm.stop()
+
+        # Safety net — always cleanup MediaMTX path even if sm is missing
+        api._mtx_remove_path(station_id)
+        api._mtx_remove_path(station_id, suffix="_cam2")
+
         with api._recorders_lock:
             rec = api.active_recorders.pop(station_id, None)
             api.active_waybills.pop(station_id, None)
