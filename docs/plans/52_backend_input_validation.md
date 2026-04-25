@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Plan created, not yet implemented
+
 ## Problem
 
 3 backend validation gaps documented in `tests/test_api_hardening.py`:

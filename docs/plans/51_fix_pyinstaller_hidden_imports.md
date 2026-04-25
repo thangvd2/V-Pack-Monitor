@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Plan created, not yet implemented
+
 ## Problem
 
 `build.py` thiếu 3 hidden imports cho PyInstaller:

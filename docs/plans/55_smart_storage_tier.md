@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Plan created, not yet implemented
+
 ## Problem
 
 Video hiện lưu tại 1 nơi (`recordings/`), chỉ có auto-cleanup by days. Không có:

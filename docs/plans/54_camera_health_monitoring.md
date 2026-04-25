@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Plan created, not yet implemented
+
 ## Problem
 
 Khi camera offline (đổi IP, mất mạng, restart):
