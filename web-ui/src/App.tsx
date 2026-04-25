@@ -610,7 +610,7 @@ const App: React.FC = () => {
     recordsPageRef,
   } = recordsState;
 
-  useSSE({
+  const { sseStatus, forceReconnect } = useSSE({
     activeStationId,
     viewMode,
     stationsIdStr,
@@ -626,6 +626,14 @@ const App: React.FC = () => {
     recordsPageRef,
     setUpdateProgress,
     showToast,
+    onReconnect: () => {
+      fetchStations();
+      fetchStorageInfo();
+      fetchRecords(searchTermRef.current, activeStationId, recordsPageRef.current);
+      if (activeStationId !== null && activeStationId !== 'orphaned') {
+        fetchStatus(activeStationId as number);
+      }
+    },
   });
 
   const { sendScanAction } = useBarcodeScanner({
@@ -1004,6 +1012,23 @@ const App: React.FC = () => {
       <header className="flex flex-col mb-4 md:mb-8">
         <div className="flex flex-col md:flex-row items-center justify-between pb-6 border-b border-white/10">
           <div className="flex items-center gap-3">
+            <div
+              className={`w-3 h-3 rounded-full cursor-pointer transition-colors ${
+                sseStatus === 'connected'
+                  ? 'bg-green-500'
+                  : sseStatus === 'reconnecting'
+                    ? 'bg-yellow-500 animate-pulse'
+                    : 'bg-red-500'
+              }`}
+              onClick={forceReconnect}
+              title={
+                sseStatus === 'connected'
+                  ? 'Đã kết nối (Click để thử lại)'
+                  : sseStatus === 'reconnecting'
+                    ? 'Đang kết nối lại...'
+                    : 'Mất kết nối (Click để thử lại)'
+              }
+            />
             <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center border border-blue-400/30">
               <PackageCheck className="text-blue-400 w-7 h-7" />
             </div>
