@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Done — PR #68 merged to dev
+
 ## Problem
 
 Khi admin click vào station card → chuyển sang single view, dropdown lọc trạm trong "Lịch sử ghi hình" vẫn changeable. Admin có thể đổi filter sang trạm khác → records hiển thị sai với trạm đang xem live.

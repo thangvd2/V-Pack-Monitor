@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Done — PR #69 merged to dev
+
 ## Problem
 
 Khi admin chọn option "(trạm đã xóa)" trong records filter, `activeStationId` được set thành string `'orphaned'`. Giá trị này được pass cho các API endpoints expect `station_id: int | None` → 422 Unprocessable Content.

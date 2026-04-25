@@ -6,6 +6,8 @@
 
 ---
 
+**Status**: Done — PR #67 merged to dev
+
 ## Problem
 
 PIP mode recording crash trên Windows với Intel GPU (h264_qsv). FFmpeg exit ngay lập tức, không tạo video file.
