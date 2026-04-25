@@ -72,7 +72,7 @@ const CAMERA_MODE_DESC: Record<string, string> = {
 
 const MODES_NEED_IP2 = ['dual_file', 'pip'];
 
-function ErrorHint({ show, msg }: { show: any; msg: string }) {
+function ErrorHint({ show, msg }: { show: boolean | string | undefined | null; msg: string }) {
   if (!show) return null;
   return <p className="mt-1 text-xs text-red-400">{msg}</p>;
 }
@@ -96,25 +96,25 @@ const SetupModal: React.FC<SetupModalProps> = ({
   isNewStation = false,
   initialSettings = {},
 }) => {
-  const [name, setName] = useState<string>(currentStation.name || '');
-  const [ip1, setIp1] = useState(currentStation.ip_camera_1 || '');
-  const [ip2, setIp2] = useState(currentStation.ip_camera_2 || '');
-  const [safetyCode, setSafetyCode] = useState(currentStation.safety_code || '');
-  const [cameraBrand, setCameraBrand] = useState(currentStation.camera_brand || 'imou');
-  const [cameraMode, setCameraMode] = useState(currentStation.camera_mode || 'single');
-  const [macAddress, setMacAddress] = useState(currentStation.mac_address || '');
+  const [name, setName] = useState<string>(currentStation?.name || '');
+  const [ip1, setIp1] = useState(currentStation?.ip_camera_1 || '');
+  const [ip2, setIp2] = useState(currentStation?.ip_camera_2 || '');
+  const [safetyCode, setSafetyCode] = useState(currentStation?.safety_code || '');
+  const [cameraBrand, setCameraBrand] = useState(currentStation?.camera_brand || 'imou');
+  const [cameraMode, setCameraMode] = useState(currentStation?.camera_mode || 'single');
+  const [macAddress, setMacAddress] = useState(currentStation?.mac_address || '');
   const [discovering, setDiscovering] = useState(false);
   const [discoverResult, setDiscoverResult] = useState('');
-  const [keepDays, setKeepDays] = useState(initialSettings.RECORD_KEEP_DAYS || 365);
-  const [cloudProvider, setCloudProvider] = useState(initialSettings.CLOUD_PROVIDER || 'NONE');
-  const [gDriveFolderId, setGDriveFolderId] = useState(initialSettings.GDRIVE_FOLDER_ID || '');
+  const [keepDays, setKeepDays] = useState<number>(initialSettings?.RECORD_KEEP_DAYS || 365);
+  const [cloudProvider, setCloudProvider] = useState(initialSettings?.CLOUD_PROVIDER || 'NONE');
+  const [gDriveFolderId, setGDriveFolderId] = useState(initialSettings?.GDRIVE_FOLDER_ID || '');
   const [gDriveCreds, setGDriveCreds] = useState('');
-  const [s3Endpoint, setS3Endpoint] = useState(initialSettings.S3_ENDPOINT || '');
-  const [s3Access, setS3Access] = useState(initialSettings.S3_ACCESS_KEY || '');
-  const [s3Secret, setS3Secret] = useState(initialSettings.S3_SECRET_KEY || '');
-  const [s3Bucket, setS3Bucket] = useState(initialSettings.S3_BUCKET_NAME || '');
-  const [tgBotToken, setTgBotToken] = useState(initialSettings.TELEGRAM_BOT_TOKEN || '');
-  const [tgChatId, setTgChatId] = useState(initialSettings.TELEGRAM_CHAT_ID || '');
+  const [s3Endpoint, setS3Endpoint] = useState(initialSettings?.S3_ENDPOINT || '');
+  const [s3Access, setS3Access] = useState(initialSettings?.S3_ACCESS_KEY || '');
+  const [s3Secret, setS3Secret] = useState(initialSettings?.S3_SECRET_KEY || '');
+  const [s3Bucket, setS3Bucket] = useState(initialSettings?.S3_BUCKET_NAME || '');
+  const [tgBotToken, setTgBotToken] = useState(initialSettings?.TELEGRAM_BOT_TOKEN || '');
+  const [tgChatId, setTgChatId] = useState(initialSettings?.TELEGRAM_CHAT_ID || '');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -164,7 +164,7 @@ const SetupModal: React.FC<SetupModalProps> = ({
         if (ip2 && ip2.trim()) params.set('ip2', ip2);
         if (macAddress) params.set('mac', macAddress);
         if (name) params.set('name', name);
-        params.set('exclude_id', excludeId);
+        params.set('exclude_id', String(excludeId));
         const res = await axios.get(`${API_BASE}/api/stations/check-conflict?${params}`);
         setWarnings(res.data.warnings || []);
       } catch {
@@ -228,7 +228,7 @@ const SetupModal: React.FC<SetupModalProps> = ({
   const doSaveStation = async () => {
     try {
       await axios.post(`${API_BASE}/api/settings`, {
-        RECORD_KEEP_DAYS: parseInt(keepDays),
+        RECORD_KEEP_DAYS: Number(keepDays),
         CLOUD_PROVIDER: cloudProvider,
         GDRIVE_FOLDER_ID: gDriveFolderId,
         S3_ENDPOINT: s3Endpoint,
@@ -259,7 +259,7 @@ const SetupModal: React.FC<SetupModalProps> = ({
       if (isNewStation) {
         await axios.post(`${API_BASE}/api/stations`, payload);
       } else {
-        await axios.put(`${API_BASE}/api/stations/${currentStation.id}`, payload);
+        await axios.put(`${API_BASE}/api/stations/${currentStation?.id}`, payload);
       }
 
       onSaved();
@@ -286,7 +286,7 @@ const SetupModal: React.FC<SetupModalProps> = ({
       if (ip2 && ip2.trim()) params.set('ip2', ip2);
       if (macAddress) params.set('mac', macAddress);
       if (name) params.set('name', name);
-      params.set('exclude_id', excludeId);
+      params.set('exclude_id', String(excludeId));
       const conflictRes = await axios.get(`${API_BASE}/api/stations/check-conflict?${params}`);
       const freshWarnings = conflictRes.data.warnings || [];
       setWarnings(freshWarnings);
@@ -318,7 +318,7 @@ const SetupModal: React.FC<SetupModalProps> = ({
       onConfirm: async () => {
         try {
           setLoading(true);
-          await axios.delete(`${API_BASE}/api/stations/${currentStation.id}`);
+          await axios.delete(`${API_BASE}/api/stations/${currentStation?.id}`);
           onSaved();
         } catch {
           setLoading(false);
@@ -490,10 +490,10 @@ const SetupModal: React.FC<SetupModalProps> = ({
                     touch('ip2');
                     checkConflicts();
                   }}
-                  className={`w-full bg-black/40 border rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 ${fieldBorder('ip2', ip2 && ip2.trim() && !isValidIP(ip2))}`}
+                  className={`w-full bg-black/40 border rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 ${fieldBorder('ip2', !!(ip2 && ip2.trim() && !isValidIP(ip2)))}`}
                 />
                 <ErrorHint
-                  show={touched.ip2 && ip2?.trim() && !isValidIP(ip2)}
+                  show={!!(touched.ip2 && ip2?.trim() && !isValidIP(ip2))}
                   msg="IP không hợp lệ (cần IPv4 hoặc IPv6)"
                 />
               </div>
@@ -564,7 +564,7 @@ const SetupModal: React.FC<SetupModalProps> = ({
                     if (formatted !== e.target.value) setMacAddress(formatted);
                     checkConflicts();
                   }}
-                  className={`flex-1 bg-black/40 border rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 ${fieldBorder('mac', macAddress && macAddress.trim() && !isValidMAC(macAddress))}`}
+                  className={`flex-1 bg-black/40 border rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50 ${fieldBorder('mac', !!(macAddress && macAddress.trim() && !isValidMAC(macAddress)))}`}
                 />
                 {macAddress && (
                   <button
@@ -578,7 +578,7 @@ const SetupModal: React.FC<SetupModalProps> = ({
                       setDiscovering(true);
                       setDiscoverResult('');
                       try {
-                        const formattedMac = raw.match(/.{2}/g).join(':');
+                        const formattedMac = raw.match(/.{2}/g)!.join(':');
                         const res = await axios.get(
                           `${API_BASE}/api/discover-mac?mac=${encodeURIComponent(formattedMac)}`,
                         );
@@ -652,7 +652,7 @@ const SetupModal: React.FC<SetupModalProps> = ({
                   <select
                     value={keepDays}
                     onChange={(e) => {
-                      setKeepDays(e.target.value);
+                      setKeepDays(Number(e.target.value));
                       markDirty();
                     }}
                     className="w-full bg-[#1e293b] border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none appearance-none"

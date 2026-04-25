@@ -11,6 +11,51 @@ import API_BASE from './config';
 
 import { SystemHealthProps } from './types/props';
 
+export interface HealthData {
+  cpu_percent: number;
+  memory_percent: number;
+  disk_percent: number;
+  cpu_temp?: number;
+  db_size_mb: number;
+  uptime_str: string;
+  uptime?: string;
+  cpu?: { percent: number; count?: number; status: 'ok' | 'warning' | 'critical' };
+  memory?: { percent: number; used_gb: number; total_gb: number; status: 'ok' | 'warning' | 'critical' };
+  disk?: { percent: number; used_gb: number; total_gb: number; status: 'ok' | 'warning' | 'critical' };
+  db?: { size_mb: string | number; status: 'ok' | 'warning' | 'critical' };
+}
+
+export interface FfmpegProcess {
+  pid: number;
+  cmdline_short: string;
+  cpu_percent: number;
+  memory_percent: number;
+}
+
+export interface ProcessData {
+  cpu_percent: number;
+  memory_mb: number;
+  threads: number;
+  open_files: number;
+  ffmpeg_count: number;
+  ffmpeg_processes: FfmpegProcess[];
+}
+
+export interface CameraData {
+  station_id: number;
+  station_name: string;
+  ip: string;
+  reachable: boolean;
+}
+
+export interface NetworkData {
+  bytes_sent: number;
+  bytes_recv: number;
+  hostname: string;
+  local_ip: string;
+  cameras: CameraData[];
+}
+
 const STATUS_CONFIG = {
   ok: { color: '#34d399', bar: 'bg-emerald-500', dot: '🟢', label: 'Bình thường' },
   warning: { color: '#fbbf24', bar: 'bg-amber-500', dot: '🟡', label: 'Cảnh báo' },
@@ -54,9 +99,9 @@ const StatusCard: React.FC<StatusCardProps> = ({ title, icon: Icon, value, subti
 };
 
 const SystemHealth: React.FC<SystemHealthProps> = ({ currentUser: _currentUser }) => {
-  const [health, setHealth] = useState<any>(null);
-  const [processes, setProcesses] = useState<any>(null);
-  const [network, setNetwork] = useState<any>(null);
+  const [health, setHealth] = useState<HealthData | null>(null);
+  const [processes, setProcesses] = useState<ProcessData | null>(null);
+  const [network, setNetwork] = useState<NetworkData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -192,13 +237,13 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ currentUser: _currentUser }
             <Monitor className="w-5 h-5 text-blue-400" />
             <h3 className="font-semibold text-slate-200">Tiến Trình FFmpeg</h3>
           </div>
-          {processes?.ffmpeg_count > 0 && (
+          {(processes?.ffmpeg_count ?? 0) > 0 && (
             <span className="px-3 py-1 bg-blue-500/15 text-blue-400 rounded-full text-xs font-medium border border-blue-500/20">
-              {processes.ffmpeg_count} tiến trình
+              {processes?.ffmpeg_count} tiến trình
             </span>
           )}
         </div>
-        {processes?.ffmpeg_processes?.length > 0 ? (
+        {(processes?.ffmpeg_processes?.length ?? 0) > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -210,7 +255,7 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ currentUser: _currentUser }
                 </tr>
               </thead>
               <tbody>
-                {processes.ffmpeg_processes.map((proc: any, idx: number) => (
+                {processes?.ffmpeg_processes?.map((proc, idx: number) => (
                   <tr key={proc.pid || idx} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-2.5 px-3 text-slate-300 font-mono text-xs">{proc.pid}</td>
                     <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate" title={proc.cmdline_short}>
@@ -238,7 +283,7 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ currentUser: _currentUser }
           <Wifi className="w-5 h-5 text-emerald-400" />
           <h3 className="font-semibold text-slate-200">Trạng Thái Camera</h3>
         </div>
-        {network?.cameras?.length > 0 ? (
+        {(network?.cameras?.length ?? 0) > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -249,7 +294,7 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ currentUser: _currentUser }
                 </tr>
               </thead>
               <tbody>
-                {network.cameras.map((cam: any, idx: number) => (
+                {network?.cameras?.map((cam, idx: number) => (
                   <tr
                     key={cam.station_id || idx}
                     className="border-b border-white/5 hover:bg-white/5 transition-colors"

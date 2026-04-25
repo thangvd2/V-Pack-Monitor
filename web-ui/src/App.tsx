@@ -43,12 +43,13 @@ const MTX_HOST = window.location.hostname;
 const STATION_POLL_INTERVAL = 10000;
 const HEARTBEAT_INTERVAL = 30000;
 
-import { Station, User as UserModel } from './types/api';
+import { Station, User as UserModel, PackingRecord, Settings as SettingsModel, StorageInfo, AnalyticsInfo } from './types/api';
+import { StationStatus, ReconnectInfo } from './types/props';
 
 interface StationSelectionScreenProps {
   stations: Station[];
-  stationStatusList: any[];
-  fetchStationStatus: () => Promise<any[]>;
+  stationStatusList: StationStatus[];
+  fetchStationStatus: () => Promise<StationStatus[]>;
   acquireStation: (stationId: number) => void;
   currentUser: UserModel;
 }
@@ -185,13 +186,13 @@ const App: React.FC = () => {
   const [activeStationId, setActiveStationId] = useState<number | null | 'orphaned'>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [showSetupModal, setShowSetupModal] = useState<boolean>(false);
-  const [initialSettings, setInitialSettings] = useState<any>({});
-  const [packingStatus, setPackingStatus] = useState<string>('idle');
+  const [initialSettings, setInitialSettings] = useState<SettingsModel | null>(null);
+  const [packingStatus, setPackingStatus] = useState<'idle' | 'packing'>('idle');
   const [currentWaybill, setCurrentWaybill] = useState<string>('');
-  const [storageInfo, setStorageInfo] = useState<any>({ size_str: '0 MB', file_count: 0 });
+  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>({ size_str: '0 MB', file_count: 0 });
 
-  const [analytics, setAnalytics] = useState<any>({ total_today: 0, station_today: 0 });
-  const [reconnectInfo, setReconnectInfo] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsInfo | null>({ total_today: 0, station_today: 0 });
+  const [reconnectInfo, setReconnectInfo] = useState<ReconnectInfo | null>(null);
   const [previousStationId, setPreviousStationId] = useState<number | null>(null);
 
   // Grid View State
@@ -199,7 +200,7 @@ const App: React.FC = () => {
   const [adminTab, setAdminTab] = useState<string>('operations'); // 'operations' | 'overview'
   const [cameraMode, setCameraMode] = useState<string>('single-cam'); // 'single-cam' | 'dual' | 'pip'
   const [showDashboard, setShowDashboard] = useState<boolean>(false);
-  const [stationStatuses, setStationStatuses] = useState<Record<string, any>>({}); // { [stationId]: { status, waybill } }
+  const [stationStatuses, setStationStatuses] = useState<Record<string, StationStatus>>({}); // { [stationId]: { status, waybill, processingCount } }
 
   // Custom Video Player State
   const [videoModalOpen, setVideoModalOpen] = useState<boolean>(false);
@@ -220,11 +221,11 @@ const App: React.FC = () => {
   const [stationAssigned, setStationAssigned] = useState<boolean>(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [pipCamSwap, setPipCamSwap] = useState<boolean>(false);
-  const [stationStatusList, setStationStatusList] = useState<any[]>([]);
+  const [stationStatusList, setStationStatusList] = useState<StationStatus[]>([]);
   const [recordStreamType, setRecordStreamType] = useState<string>('sub');
-  const [updateInfo, setUpdateInfo] = useState<any>(null);
+  const [updateInfo, setUpdateInfo] = useState<{ current_version: string; latest_version: string; update_available: boolean; mode?: string; changelog?: string } | null>(null);
   const [showUpdateModal, setShowUpdateModal] = useState<boolean>(false);
-  const [updateProgress, setUpdateProgress] = useState<any>(null);
+  const [updateProgress, setUpdateProgress] = useState<{ percentage?: number; status?: string; message?: string; progress?: number; stage?: string } | null>(null);
   const [updating, setUpdating] = useState<boolean>(false);
   const activeRecordIdRef = useRef(null);
   const packingStatusRef = useRef(packingStatus);
@@ -241,7 +242,7 @@ const App: React.FC = () => {
   const [switchingStation, setSwitchingStation] = useState<boolean>(false);
 
   // Auth State
-  const authState: any = useAuth({
+  const authState = useAuth({
     onLoginAdmin: () => {
       setStationAssigned(true);
       setViewMode('grid');
@@ -318,7 +319,7 @@ const App: React.FC = () => {
       setStations(res.data.data);
       setStationStatuses((prev) => {
         const newStatuses = { ...prev };
-        res.data.data.forEach((st: any) => {
+        res.data.data.forEach((st: Station) => {
           if (!newStatuses[st.id])
             newStatuses[st.id] = { status: 'idle', waybill: '', processingCount: st.processing_count || 0 };
           else newStatuses[st.id].processingCount = st.processing_count || 0;
@@ -340,7 +341,7 @@ const App: React.FC = () => {
       fetchStatus(activeStationId);
     }
     if (currentUser) {
-      const sid = activeStationId && activeStationId !== 'orphaned' ? activeStationId : '';
+      const sid = activeStationId && activeStationId !== 'orphaned' ? activeStationId : null;
       fetchAnalytics(sid);
     }
   }, [activeStationId, currentUser]);
@@ -378,7 +379,7 @@ const App: React.FC = () => {
     };
   }, [activeStationId]);
 
-  const fetchAnalytics = async (sid: any) => {
+  const fetchAnalytics = async (sid: number | null | 'orphaned') => {
     try {
       const url = sid ? `${API_BASE}/api/analytics/today?station_id=${sid}` : `${API_BASE}/api/analytics/today`;
       const res = await axios.get(url);
@@ -391,7 +392,7 @@ const App: React.FC = () => {
   };
 
   // Lấy trạng thái ghi hình ban đầu
-  const fetchStatus = async (sid: any) => {
+  const fetchStatus = async (sid: number) => {
     try {
       const res = await axios.get(`${API_BASE}/api/status?station_id=${sid}`);
       if (res.data.status === 'recording') {
@@ -411,7 +412,11 @@ const App: React.FC = () => {
     setStationStatuses((prev) => {
       const next = { ...prev };
       if (activeStationId && activeStationId !== 'orphaned') {
-        next[activeStationId] = { status: packingStatus, waybill: currentWaybill };
+        next[activeStationId] = { 
+          status: packingStatus, 
+          waybill: currentWaybill,
+          processingCount: stationStatuses[activeStationId]?.processingCount || 0
+        };
       }
       return next;
     });
@@ -453,8 +458,9 @@ const App: React.FC = () => {
       } else {
         showToast(res.data.message || 'Không thể chọn trạm.', 'error');
       }
-    } catch (err: any) {
-      showToast(err.response?.data?.message || 'Lỗi khi chọn trạm.', 'error');
+    } catch (err: unknown) {
+      const error = err as Error & { response?: { data?: { message?: string } } };
+      showToast(error.response?.data?.message || 'Lỗi khi chọn trạm.', 'error');
     }
   };
 
@@ -511,7 +517,7 @@ const App: React.FC = () => {
   };
 
   // --- Quản lý Bảo mật (Role Gateway) ---
-  const requestAdminAccess = (action: any) => {
+  const requestAdminAccess = (action: { type: string; isNew?: boolean; id?: number; waybill?: string }) => {
     if (currentUser?.role === 'ADMIN') {
       executeSecureAction(action);
     } else {
@@ -519,7 +525,7 @@ const App: React.FC = () => {
     }
   };
 
-  const executeSecureAction = async (action: any) => {
+  const executeSecureAction = async (action: { type: string; isNew?: boolean; id?: number; waybill?: string }) => {
     if (action.type === 'setup') {
       if (action.isNew) {
         setPreviousStationId(activeStationId === 'orphaned' ? null : activeStationId);
@@ -528,7 +534,7 @@ const App: React.FC = () => {
       await checkSettings();
       setShowSetupModal(true);
     } else if (action.type === 'delete') {
-      doDeleteRecord(action.id, action.waybill);
+      doDeleteRecord(action.id!, action.waybill!);
     } else if (action.type === 'cloud_sync') {
       doCloudSync();
     }
@@ -567,11 +573,11 @@ const App: React.FC = () => {
   };
 
   const activeStation = useMemo(
-    () => stations.find((s) => s.id === activeStationId) || {},
+    () => stations.find((s) => s.id === activeStationId) ?? null,
     [stations, activeStationId],
   );
 
-  const isDualCamStation = (station: any) => {
+  const isDualCamStation = (station: Station | null) => {
     if (!station) return false;
     const hasIp2 = station.ip_camera_2 && station.ip_camera_2.trim() !== '';
     const isDualMode = ['pip', 'dual_file'].includes(station.camera_mode?.toLowerCase());
@@ -582,10 +588,10 @@ const App: React.FC = () => {
 
   const { toast, showToast } = useToast();
 
-  const confirmDialogState: any = useConfirmDialog();
+  const confirmDialogState = useConfirmDialog();
   const { confirmDialog, setConfirmDialog, showConfirmDialog } = confirmDialogState;
 
-  const recordsState: any = useRecords({ activeStationId, currentUser, setLoading, fetchAnalytics });
+  const recordsState = useRecords({ activeStationId, currentUser, setLoading, fetchAnalytics });
   const {
     records,
     searchTerm,
@@ -652,11 +658,14 @@ const App: React.FC = () => {
       });
       setChangePasswordSuccess('Đổi mật khẩu thành công!');
       setChangePasswordForm({ old_password: '', new_password: '', confirm_password: '' });
-      const updatedUser = { ...currentUser, must_change_password: 0 };
+      if (!currentUser) return;
+      if (!currentUser) return;
+      const updatedUser = { ...currentUser, must_change_password: 0 } as UserModel;
       setCurrentUser(updatedUser);
       localStorage.setItem('vpack_user', JSON.stringify(updatedUser));
-    } catch (err: any) {
-      setChangePasswordError(err.response?.data?.detail || 'Mật khẩu cũ không đúng.');
+    } catch (err: unknown) {
+      const error = err as Error & { response?: { data?: { detail?: string } } };
+      setChangePasswordError(error.response?.data?.detail || 'Mật khẩu cũ không đúng.');
     }
   }, [changePasswordForm, currentUser]);
 
@@ -699,7 +708,7 @@ const App: React.FC = () => {
               <input
                 type="text"
                 value={loginForm.username}
-                onChange={(e) => setLoginForm((f: any) => ({ ...f, username: e.target.value }))}
+                onChange={(e) => setLoginForm((f: typeof loginForm) => ({ ...f, username: e.target.value }))}
                 className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
                 placeholder="Nhập tên đăng nhập"
                 autoFocus
@@ -710,7 +719,7 @@ const App: React.FC = () => {
               <input
                 type="password"
                 value={loginForm.password}
-                onChange={(e) => setLoginForm((f: any) => ({ ...f, password: e.target.value }))}
+                onChange={(e) => setLoginForm((f: typeof loginForm) => ({ ...f, password: e.target.value }))}
                 className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
                 placeholder="Nhập mật khẩu"
               />
@@ -770,7 +779,7 @@ const App: React.FC = () => {
           isOpen={showSetupModal}
           initialSettings={initialSettings}
           currentStation={activeStation}
-          isNewStation={!(activeStation as any)?.id}
+          isNewStation={!activeStation?.id}
           onSaved={() => {
             setShowSetupModal(false);
             window.location.reload();
@@ -1020,7 +1029,7 @@ const App: React.FC = () => {
                       setSwitchingStation(true);
                       try {
                         const statusRes = await axios.get(`${API_BASE}/api/sessions/station-status`);
-                        const targetStatus = (statusRes.data.data || []).find((s: any) => s.station_id === newId);
+                        const targetStatus = (statusRes.data.data || []).find((s: StationStatus & { station_id: number; occupied: boolean; occupied_by: string; occupied_by_name: string }) => s.station_id === newId);
                         if (targetStatus?.occupied && targetStatus?.occupied_by !== currentUser.username) {
                           showToast(
                             'Trạm này đang được sử dụng bởi ' +
@@ -1540,7 +1549,7 @@ const App: React.FC = () => {
                       <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
                         <div className="flex gap-2">
                           <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-mono text-white/90">
-                            {(activeStation as any)?.name || 'Đang tải'}
+                            {activeStation?.name || 'Đang tải'}
                           </div>
                           {currentUser?.role !== 'ADMIN' && packingStatus === 'packing' && (
                             <div className="px-3 py-1.5 rounded-full bg-red-600/90 backdrop-blur-md border border-red-400 text-xs font-bold text-white flex items-center gap-2 animate-pulse transition-all">
@@ -1731,7 +1740,7 @@ const App: React.FC = () => {
                   </div>
                 ) : (
                   <>
-                    {records.map((record: any) => (
+                    {records.map((record: PackingRecord) => (
                       <div
                         key={record.id}
                         className="group p-3 md:p-5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-400/30 backdrop-blur-md transition-all duration-300 shadow-lg cursor-pointer min-h-[44px]"
@@ -1792,10 +1801,10 @@ const App: React.FC = () => {
 
                         <div className="flex items-center gap-3 mb-3 md:mb-4 text-xs text-slate-400 font-mono">
                           <span>{new Date(record.recorded_at).toLocaleString('vi-VN')}</span>
-                          {record.duration > 0 && (
+                          {(record.duration ?? 0) > 0 && (
                             <span className="px-2 py-0.5 bg-white/5 rounded text-emerald-400 border border-emerald-500/20">
-                              ⏱ {Math.floor(record.duration / 60)}:
-                              {Math.floor(record.duration % 60)
+                              ⏱ {(Math.floor((record.duration ?? 0) / 60))}:
+                              {Math.floor((record.duration ?? 0) % 60)
                                 .toString()
                                 .padStart(2, '0')}
                             </span>
@@ -1867,7 +1876,7 @@ const App: React.FC = () => {
             <p className="text-white mb-4">{confirmDialog.message}</p>
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setConfirmDialog({ show: false })}
+                onClick={() => setConfirmDialog({ show: false, message: '', onConfirm: null })}
                 className="px-4 py-2 text-zinc-400 hover:text-white"
               >
                 Huỷ
@@ -1875,7 +1884,7 @@ const App: React.FC = () => {
               <button
                 onClick={() => {
                   confirmDialog.onConfirm?.();
-                  setConfirmDialog({ show: false });
+                  setConfirmDialog({ show: false, message: '', onConfirm: null });
                 }}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg"
               >

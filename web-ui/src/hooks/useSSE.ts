@@ -2,6 +2,9 @@ import { useEffect } from 'react';
 import API_BASE from '../config';
 import { playScanStart, playRecordingStop, playVideoReady, playRecordingWarning } from '../utils/notificationSounds';
 
+import { StationStatus } from '../types/props';
+import { User, Station } from '../types/api';
+
 const RESTART_DELAY = 5000;
 
 export function useSSE({
@@ -20,6 +23,22 @@ export function useSSE({
   recordsPageRef,
   setUpdateProgress,
   showToast,
+}: {
+  activeStationId: number | null | 'orphaned';
+  viewMode: string;
+  stationsIdStr: string;
+  currentUser: User | null;
+  stationsRef: React.MutableRefObject<Station[]>;
+  setStationStatuses: React.Dispatch<React.SetStateAction<Record<string, StationStatus>>>;
+  setPackingStatus: (status: 'idle' | 'packing') => void;
+  setCurrentWaybill: (waybill: string) => void;
+  activeRecordIdRef: React.MutableRefObject<number | null>;
+  fetchStorageInfo: () => void;
+  fetchRecords: (query: string, sid: number | null | 'orphaned', page: number) => void;
+  searchTermRef: React.MutableRefObject<string>;
+  recordsPageRef: React.MutableRefObject<number>;
+  setUpdateProgress: (progress: { percentage: number; status: string } | null) => void;
+  showToast: (msg: string, type?: 'info' | 'error' | 'warning') => void;
 }) {
   useEffect(() => {
     const isGlobalSSE = viewMode === 'grid' || currentUser?.role === 'ADMIN';

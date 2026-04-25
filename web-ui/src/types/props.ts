@@ -1,12 +1,12 @@
-import { User, Station } from './api';
+import { User, Station, Settings, StorageInfo, AnalyticsInfo } from './api';
 
 export interface SetupModalProps {
   isOpen: boolean;
   onSaved: () => void;
   onCancel: () => void;
-  currentStation?: any;
+  currentStation?: Station | null;
   isNewStation?: boolean;
-  initialSettings?: any;
+  initialSettings?: Settings | null;
 }
 
 export interface UserManagementModalProps {
@@ -26,15 +26,19 @@ export interface VideoPlayerModalProps {
 export interface DashboardProps {
   stations: Station[];
   activeStationId: number | null | 'orphaned';
-  storageInfo: any;
+  storageInfo: StorageInfo | null;
   currentUser: User;
-  analytics: any;
+  analytics: AnalyticsInfo | null;
 }
 
 export interface StationStatus {
   status: 'idle' | 'packing';
   waybill: string;
   processingCount: number;
+  station_id?: number;
+  occupied?: boolean;
+  occupied_by?: string;
+  occupied_by_name?: string;
 }
 
 export interface ReconnectInfo {
@@ -57,7 +61,3 @@ export interface SystemHealthProps {
   currentUser: User;
 }
 
-export interface MtxFallbackProps {
-  url: string;
-  className?: string;
-}

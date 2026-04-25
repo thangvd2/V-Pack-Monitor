@@ -23,8 +23,8 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import API_BASE from './config';
-
 import { UserManagementModalProps } from './types/props';
+import { User } from './types/api';
 
 const ACTION_LABELS: Record<string, string> = {
   LOGIN: 'Đăng nhập',
@@ -53,9 +53,9 @@ const timeAgo = (dateStr: string): string => {
 
 const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClose, currentUser, showConfirmDialog }) => {
   const [activeTab, setActiveTab] = useState<string>('users');
-  const [users, setUsers] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [sessions, setSessions] = useState<{ id: number; username: string; full_name?: string; ip_address: string; started_at: string; is_active: boolean; station_name?: string; last_heartbeat?: string }[]>([]);
+  const [logs, setLogs] = useState<{ id: number; username: string; user?: string; action: string; details?: string; station_id?: string; ip_address: string; created_at: string }[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
@@ -170,12 +170,13 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClo
       setShowAddForm(false);
       setAddForm({ username: '', password: '', full_name: '', role: 'OPERATOR' });
       fetchUsers();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Lỗi khi tạo user.');
+    } catch (err: unknown) {
+      const error = err as Error & { response?: { data?: { detail?: string } } };
+      setError(error.response?.data?.detail || 'Lỗi khi tạo user.');
     }
   };
 
-  const handleDeleteUser = async (user: any) => {
+  const handleDeleteUser = async (user: User) => {
     if (user.id === currentUser?.id) {
       alert('Không thể xoá tài khoản của chính bạn.');
       return;
@@ -190,7 +191,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClo
     });
   };
 
-  const handleToggleActive = async (user: any) => {
+  const handleToggleActive = async (user: User) => {
     try {
       await axios.put(`${API_BASE}/api/users/${user.id}`, { is_active: user.is_active ? 0 : 1 });
       fetchUsers();
@@ -199,9 +200,9 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClo
     }
   };
 
-  const handleStartEdit = (user: any) => {
+  const handleStartEdit = (user: User) => {
     setEditingId(user.id);
-    setEditForm({ full_name: user.full_name, role: user.role });
+    setEditForm({ full_name: user.full_name || '', role: user.role || 'OPERATOR' });
   };
 
   const handleSaveEdit = async (userId: number) => {
@@ -233,7 +234,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClo
   };
 
   // --- Sessions handlers ---
-  const handleKillSession = async (sessionId: string, username: string) => {
+  const handleKillSession = async (sessionId: number, username: string) => {
     showConfirmDialog(`Kết thúc phiên của "${username}"?`, async () => {
       try {
         await axios.delete(`${API_BASE}/api/sessions/${sessionId}`);

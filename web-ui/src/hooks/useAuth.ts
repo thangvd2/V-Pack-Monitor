@@ -2,8 +2,18 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import API_BASE from '../config';
 
-export function useAuth({ onLoginAdmin, onRequirePasswordChange, onLogoutAction }) {
-  const [currentUser, setCurrentUser] = useState(null);
+import { User } from '../types/api';
+
+export function useAuth({ 
+  onLoginAdmin, 
+  onRequirePasswordChange, 
+  onLogoutAction 
+}: { 
+  onLoginAdmin?: () => void;
+  onRequirePasswordChange?: () => void;
+  onLogoutAction?: () => Promise<void> | void;
+}) {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [loginError, setLoginError] = useState('');
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
@@ -48,7 +58,7 @@ export function useAuth({ onLoginAdmin, onRequirePasswordChange, onLogoutAction 
     return () => axios.interceptors.response.eject(interceptor);
   }, []);
 
-  const handleLogin = async (e) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
     try {

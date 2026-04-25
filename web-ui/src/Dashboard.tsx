@@ -103,9 +103,9 @@ const ChartCard: React.FC<ChartCardProps> = ({ title, icon: Icon, children, cont
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ stations, activeStationId, storageInfo, currentUser, analytics }) => {
-  const [hourlyData, setHourlyData] = useState<any[]>([]);
-  const [trendData, setTrendData] = useState<any[]>([]);
-  const [stationsComparison, setStationsComparison] = useState<any[]>([]);
+  const [hourlyData, setHourlyData] = useState<{ label: string; count: number }[]>([]);
+  const [trendData, setTrendData] = useState<{ date: string; count: number }[]>([]);
+  const [stationsComparison, setStationsComparison] = useState<{ station_name: string; count: number }[]>([]);
   const [loading, setLoading] = useState({ hourly: true, trend: true, comparison: true });
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedStation, setSelectedStation] = useState('all');
@@ -132,7 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stations, activeStationId, storag
     try {
       const res = await axios.get(`${API_BASE}/api/analytics/trend?days=7`);
       setTrendData(
-        (res.data?.data || []).map((d: any) => ({
+        (res.data?.data || []).map((d: { date?: string; count: number }) => ({
           ...d,
           date: d.date ? d.date.slice(5) : d.date,
         })),
