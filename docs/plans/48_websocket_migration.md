@@ -23,15 +23,19 @@ WebSocket cho phép 2 chiều, nhưng:
 ## Scope
 
 ### Phase 1: WebSocket Server (backend)
-- Add `websockets` hoặc dùng FastAPI WebSocket
-- New endpoint `WS /api/ws` — authenticate via query param token
-- Message format: `{"type": "video_status", "data": {...}}`
-- Keep SSE endpoint working (backward compatible)
+- Sử dụng `FastAPI WebSocket` (`@app.websocket("/api/ws")` trong `routes_records.py`).
+- Quản lý state: Thêm mảng `api._ws_clients` và hàm `api.notify_ws(event_type, data)` tương tự `notify_sse`. Hàm này cần thread-safe (dùng lock) vì được gọi từ các background threads.
+- New endpoint `WS /api/ws` — authenticate via query param `token` (decode JWT, check is_active, revoked state).
+- Đẩy message JSON qua `websocket.send_text()`. Message format: `{"type": "event_name", "data": {...}}`.
+- Keep SSE endpoint (`/api/events`) working (backward compatible). Hệ thống gọi cả `notify_sse` và `notify_ws` đồng thời.
 
 ### Phase 2: WebSocket Client (frontend)
-- Replace `EventSource` with WebSocket client
-- Auto-reconnect với exponential backoff
-- Heartbeat ping/pong every 30s
+- Tạo hook mới `useWebSocket.ts` (fork từ `useSSE.ts`).
+- Thay thế đối tượng `EventSource` bằng `WebSocket`.
+- Cấu trúc nhận event: parser `event.data` JSON (chứa `type` và `data`), thay vì `addEventListener` theo tên sự kiện như SSE.
+- Auto-reconnect với exponential backoff (1s → 30s cap, tối đa 10 lần retry).
+- Gọi callback `onReconnect` để auto re-fetch data (tránh kẹt state) như kiến trúc của Plan 47.
+- Heartbeat ping/pong every 30s hoặc xử lý `onclose` để phát hiện rớt mạng.
 
 ### Phase 3: New capabilities (future)
 - Admin → Operator: push notification, force stop recording
