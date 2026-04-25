@@ -28,8 +28,37 @@ _LOGIN_MAX = 5
 _LOGIN_WINDOW = 300
 
 
+class UserAuthModel(BaseModel):
+    id: int
+    username: str
+    role: str
+    full_name: str
+    must_change_password: int | None = 0
+
+
+class LoginResponse(BaseModel):
+    status: str
+    access_token: str | None = None
+    token_type: str | None = None
+    user: UserAuthModel | None = None
+    message: str | None = None
+
+
+class UserFullModel(BaseModel):
+    id: int
+    username: str
+    role: str
+    full_name: str
+    is_active: int
+    created_at: str | None = None
+
+
+class UsersResponse(BaseModel):
+    data: list[UserFullModel]
+
+
 def register_routes(app):
-    @app.post("/api/auth/login")
+    @app.post("/api/auth/login", response_model=LoginResponse)
     def login(payload: LoginPayload, request: Request):
         ip = request.client.host if request.client else "unknown"
         now = time.time()
@@ -128,7 +157,7 @@ def register_routes(app):
 
     # --- USER MANAGEMENT API (ADMIN ONLY) ---
 
-    @app.get("/api/users")
+    @app.get("/api/users", response_model=UsersResponse)
     def list_users(admin: AdminUser):
         return {"data": database.get_all_users()}
 

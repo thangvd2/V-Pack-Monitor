@@ -419,6 +419,47 @@ class SettingsUpdate(BaseModel):
         return v
 
 
+class SettingsResponse(BaseModel):
+    data: dict[str, str | int | float | None]
+
+
+class AnalyticsTodayData(BaseModel):
+    total_today: int
+    station_today: int
+
+
+class AnalyticsTodayResponse(BaseModel):
+    data: AnalyticsTodayData
+
+
+class CpuComponent(BaseModel):
+    percent: float
+    status: str
+    count: int
+
+
+class MemoryComponent(BaseModel):
+    total_gb: float
+    used_gb: float
+    percent: float
+    status: str
+
+
+class DiskComponent(BaseModel):
+    total_gb: float
+    used_gb: float
+    percent: float
+    status: str
+
+
+class HealthResponse(BaseModel):
+    cpu: CpuComponent
+    memory: MemoryComponent
+    disk: DiskComponent
+    uptime: str
+    uptime_seconds: int
+
+
 def register_routes(app):
     # --- SYSTEM HEALTH API ---
 
@@ -435,7 +476,7 @@ def register_routes(app):
 
     # --- SYSTEM SETTINGS API ---
 
-    @app.get("/api/settings")
+    @app.get("/api/settings", response_model=SettingsResponse)
     def get_settings(admin: AdminUser):
         settings = database.get_all_settings()
         for k in _SENSITIVE_KEYS:
@@ -531,7 +572,7 @@ def register_routes(app):
 
     # --- ANALYTICS DASHBOARD API ---
 
-    @app.get("/api/analytics/today")
+    @app.get("/api/analytics/today", response_model=AnalyticsTodayResponse)
     def get_analytics_today(current_user: CurrentUser, station_id: int | None = None):
         conn = database.get_connection()
         with conn:
@@ -614,7 +655,7 @@ def register_routes(app):
 
     # --- SYSTEM HEALTH PRO API ---
 
-    @app.get("/api/system/health")
+    @app.get("/api/system/health", response_model=HealthResponse)
     def get_system_health(admin: AdminUser):
         cpu_percent = psutil.cpu_percent(interval=0.5)
         memory = psutil.virtual_memory()

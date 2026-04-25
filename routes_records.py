@@ -233,6 +233,27 @@ def _handle_scan_start(sid, barcode, station, current_user):
     }
 
 
+class RecordModel(BaseModel):
+    id: int
+    station_id: int | None = None
+    waybill_code: str
+    video_paths: list[str]
+    record_mode: str
+    recorded_at: str
+    station_name: str | None = None
+    status: str
+    duration: int | float | None = 0
+
+
+class RecordsResponse(BaseModel):
+    records: list[RecordModel]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+    has_more: bool
+
+
 def register_routes(app):
     # --- VIDEO DOWNLOAD API ---
 
@@ -351,7 +372,7 @@ def register_routes(app):
 
     # --- RECORDS & STORAGE API ---
 
-    @app.get("/api/records")
+    @app.get("/api/records", response_model=RecordsResponse)
     def get_records(
         current_user: CurrentUser,
         station_id: int = None,
