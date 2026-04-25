@@ -15,7 +15,6 @@ import {
   PackageCheck,
   Settings,
   Trash2,
-  HardDrive,
   Plus,
   Monitor,
   ShieldCheck,
@@ -25,8 +24,6 @@ import {
   User,
   Users,
   LayoutGrid,
-  Maximize2,
-  Activity,
   RefreshCw,
 } from 'lucide-react';
 import SetupModal from './SetupModal';
@@ -44,14 +41,21 @@ const MTX_HOST = window.location.hostname;
 
 // Named constants
 const STATION_POLL_INTERVAL = 10000;
-const BARCODE_TIMEOUT = 100;
 const HEARTBEAT_INTERVAL = 30000;
-const SEARCH_DEBOUNCE = 300;
-const TOAST_DURATIONS = { info: 2000, error: 3000, warning: 5000 };
 
-function StationSelectionScreen({ stations, stationStatusList, fetchStationStatus, acquireStation, currentUser }) {
-  const [loading, setLoading] = useState(true);
-  const [selecting, setSelecting] = useState(null);
+import { Station, User as UserModel } from './types/api';
+
+interface StationSelectionScreenProps {
+  stations: Station[];
+  stationStatusList: any[];
+  fetchStationStatus: () => Promise<any[]>;
+  acquireStation: (stationId: number) => void;
+  currentUser: UserModel;
+}
+
+const StationSelectionScreen: React.FC<StationSelectionScreenProps> = ({ stations, stationStatusList, fetchStationStatus, acquireStation, currentUser }) => {
+  const [loading, setLoading] = useState<boolean>(true);
+  const [selecting, setSelecting] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -65,7 +69,7 @@ function StationSelectionScreen({ stations, stationStatusList, fetchStationStatu
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: polling interval — adding fetchStationStatus would reset interval every render
   }, []);
 
-  const getStatusForStation = (stationId) => {
+  const getStatusForStation = (stationId: number) => {
     return stationStatusList.find((s) => s.station_id === stationId);
   };
 
@@ -176,52 +180,52 @@ function StationSelectionScreen({ stations, stationStatusList, fetchStationStatu
   );
 }
 
-function App() {
-  const [stations, setStations] = useState([]);
-  const [activeStationId, setActiveStationId] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [showSetupModal, setShowSetupModal] = useState(false);
-  const [initialSettings, setInitialSettings] = useState({});
-  const [packingStatus, setPackingStatus] = useState('idle');
-  const [currentWaybill, setCurrentWaybill] = useState('');
-  const [storageInfo, setStorageInfo] = useState({ size_str: '0 MB', file_count: 0 });
+const App: React.FC = () => {
+  const [stations, setStations] = useState<Station[]>([]);
+  const [activeStationId, setActiveStationId] = useState<number | null | 'orphaned'>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [showSetupModal, setShowSetupModal] = useState<boolean>(false);
+  const [initialSettings, setInitialSettings] = useState<any>({});
+  const [packingStatus, setPackingStatus] = useState<string>('idle');
+  const [currentWaybill, setCurrentWaybill] = useState<string>('');
+  const [storageInfo, setStorageInfo] = useState<any>({ size_str: '0 MB', file_count: 0 });
 
-  const [analytics, setAnalytics] = useState({ total_today: 0, station_today: 0 });
-  const [reconnectInfo, setReconnectInfo] = useState(null);
-  const [previousStationId, setPreviousStationId] = useState(null);
+  const [analytics, setAnalytics] = useState<any>({ total_today: 0, station_today: 0 });
+  const [reconnectInfo, setReconnectInfo] = useState<any>(null);
+  const [previousStationId, setPreviousStationId] = useState<number | null>(null);
 
   // Grid View State
-  const [viewMode, setViewMode] = useState('single'); // 'single' | 'grid'
-  const [adminTab, setAdminTab] = useState('operations'); // 'operations' | 'overview'
-  const [cameraMode, setCameraMode] = useState('single-cam'); // 'single-cam' | 'dual' | 'pip'
-  const [showDashboard, setShowDashboard] = useState(false);
-  const [stationStatuses, setStationStatuses] = useState({}); // { [stationId]: { status, waybill } }
+  const [viewMode, setViewMode] = useState<string>('single'); // 'single' | 'grid'
+  const [adminTab, setAdminTab] = useState<string>('operations'); // 'operations' | 'overview'
+  const [cameraMode, setCameraMode] = useState<string>('single-cam'); // 'single-cam' | 'dual' | 'pip'
+  const [showDashboard, setShowDashboard] = useState<boolean>(false);
+  const [stationStatuses, setStationStatuses] = useState<Record<string, any>>({}); // { [stationId]: { status, waybill } }
 
   // Custom Video Player State
-  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [videoModalOpen, setVideoModalOpen] = useState<boolean>(false);
   const [selectedVideo, setSelectedVideo] = useState({ url: '', waybillCode: '' });
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showUserModal, setShowUserModal] = useState<boolean>(false);
+  const [showUserDropdown, setShowUserDropdown] = useState<boolean>(false);
+  const [showChangePassword, setShowChangePassword] = useState<boolean>(false);
   const [changePasswordForm, setChangePasswordForm] = useState({
     old_password: '',
     new_password: '',
     confirm_password: '',
   });
-  const [changePasswordError, setChangePasswordError] = useState('');
-  const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
-  const [mtxAvailable, setMtxAvailable] = useState(null);
+  const [changePasswordError, setChangePasswordError] = useState<string>('');
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState<string>('');
+  const [mtxAvailable, setMtxAvailable] = useState<boolean | null>(null);
 
   // Station Session State (OPERATOR)
-  const [stationAssigned, setStationAssigned] = useState(false);
-  const [activeSessionId, setActiveSessionId] = useState(null);
-  const [pipCamSwap, setPipCamSwap] = useState(false);
-  const [stationStatusList, setStationStatusList] = useState([]);
-  const [recordStreamType, setRecordStreamType] = useState('sub');
-  const [updateInfo, setUpdateInfo] = useState(null);
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [updateProgress, setUpdateProgress] = useState(null);
-  const [updating, setUpdating] = useState(false);
+  const [stationAssigned, setStationAssigned] = useState<boolean>(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [pipCamSwap, setPipCamSwap] = useState<boolean>(false);
+  const [stationStatusList, setStationStatusList] = useState<any[]>([]);
+  const [recordStreamType, setRecordStreamType] = useState<string>('sub');
+  const [updateInfo, setUpdateInfo] = useState<any>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState<boolean>(false);
+  const [updateProgress, setUpdateProgress] = useState<any>(null);
+  const [updating, setUpdating] = useState<boolean>(false);
   const activeRecordIdRef = useRef(null);
   const packingStatusRef = useRef(packingStatus);
   packingStatusRef.current = packingStatus;
@@ -234,25 +238,25 @@ function App() {
   // Confirm dialog state
 
   // Station switch race guard
-  const [switchingStation, setSwitchingStation] = useState(false);
+  const [switchingStation, setSwitchingStation] = useState<boolean>(false);
 
   // Auth State
-  const { currentUser, setCurrentUser, authLoading, loginError, loginForm, setLoginForm, handleLogin, handleLogout } =
-    useAuth({
-      onLoginAdmin: () => {
-        setStationAssigned(true);
-        setViewMode('grid');
-      },
-      onRequirePasswordChange: () => setShowChangePassword(true),
-      onLogoutAction: async () => {
-        if (activeSessionId) {
-          await releaseStation(activeStationId);
-        }
-        setStationAssigned(false);
-        setActiveSessionId(null);
-        setAdminTab('operations');
-      },
-    });
+  const authState: any = useAuth({
+    onLoginAdmin: () => {
+      setStationAssigned(true);
+      setViewMode('grid');
+    },
+    onRequirePasswordChange: () => setShowChangePassword(true),
+    onLogoutAction: async () => {
+      if (activeSessionId) {
+        await releaseStation(activeStationId);
+      }
+      setStationAssigned(false);
+      setActiveSessionId(null);
+      setAdminTab('operations');
+    },
+  });
+  const { currentUser, setCurrentUser, authLoading, loginError, loginForm, setLoginForm, handleLogin, handleLogout } = authState;
 
   useEffect(() => {
     if (!currentUser) return;
@@ -314,7 +318,7 @@ function App() {
       setStations(res.data.data);
       setStationStatuses((prev) => {
         const newStatuses = { ...prev };
-        res.data.data.forEach((st) => {
+        res.data.data.forEach((st: any) => {
           if (!newStatuses[st.id])
             newStatuses[st.id] = { status: 'idle', waybill: '', processingCount: st.processing_count || 0 };
           else newStatuses[st.id].processingCount = st.processing_count || 0;
@@ -344,7 +348,7 @@ function App() {
   useEffect(() => {
     if (!activeStationId || activeStationId === 'orphaned') return;
     let active = true;
-    let intervalId = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const fetchReconnect = async () => {
       try {
@@ -374,7 +378,7 @@ function App() {
     };
   }, [activeStationId]);
 
-  const fetchAnalytics = async (sid) => {
+  const fetchAnalytics = async (sid: any) => {
     try {
       const url = sid ? `${API_BASE}/api/analytics/today?station_id=${sid}` : `${API_BASE}/api/analytics/today`;
       const res = await axios.get(url);
@@ -387,7 +391,7 @@ function App() {
   };
 
   // Lấy trạng thái ghi hình ban đầu
-  const fetchStatus = async (sid) => {
+  const fetchStatus = async (sid: any) => {
     try {
       const res = await axios.get(`${API_BASE}/api/status?station_id=${sid}`);
       if (res.data.status === 'recording') {
@@ -404,10 +408,13 @@ function App() {
 
   useEffect(() => {
     if (viewMode !== 'grid' || stations.length === 0) return;
-    setStationStatuses((prev) => ({
-      ...prev,
-      [activeStationId]: { status: packingStatus, waybill: currentWaybill },
-    }));
+    setStationStatuses((prev) => {
+      const next = { ...prev };
+      if (activeStationId && activeStationId !== 'orphaned') {
+        next[activeStationId] = { status: packingStatus, waybill: currentWaybill };
+      }
+      return next;
+    });
     stations.forEach((st) => {
       axios
         .get(`${API_BASE}/api/status?station_id=${st.id}`)
@@ -436,7 +443,7 @@ function App() {
     }
   };
 
-  const acquireStation = async (stationId) => {
+  const acquireStation = async (stationId: number) => {
     try {
       const res = await axios.post(`${API_BASE}/api/sessions/acquire?station_id=${stationId}`);
       if (res.data.status === 'success') {
@@ -446,12 +453,12 @@ function App() {
       } else {
         showToast(res.data.message || 'Không thể chọn trạm.', 'error');
       }
-    } catch (err) {
+    } catch (err: any) {
       showToast(err.response?.data?.message || 'Lỗi khi chọn trạm.', 'error');
     }
   };
 
-  const releaseStation = async (stationId) => {
+  const releaseStation = async (stationId: number | null | 'orphaned') => {
     if (!stationId) return;
     try {
       await axios.post(`${API_BASE}/api/sessions/release?station_id=${stationId}`);
@@ -504,7 +511,7 @@ function App() {
   };
 
   // --- Quản lý Bảo mật (Role Gateway) ---
-  const requestAdminAccess = (action) => {
+  const requestAdminAccess = (action: any) => {
     if (currentUser?.role === 'ADMIN') {
       executeSecureAction(action);
     } else {
@@ -512,10 +519,10 @@ function App() {
     }
   };
 
-  const executeSecureAction = async (action) => {
+  const executeSecureAction = async (action: any) => {
     if (action.type === 'setup') {
       if (action.isNew) {
-        setPreviousStationId(activeStationId);
+        setPreviousStationId(activeStationId === 'orphaned' ? null : activeStationId);
         setActiveStationId(0);
       }
       await checkSettings();
@@ -528,11 +535,11 @@ function App() {
   };
 
   // --- Hàm xoá bản ghi (Đã qua kiểm duyệt bảo mật) ---
-  const handleDeleteRecord = (id, waybill_code) => {
+  const handleDeleteRecord = (id: number, waybill_code: string) => {
     requestAdminAccess({ type: 'delete', id, waybill: waybill_code });
   };
 
-  const doDeleteRecord = async (id, waybill_code) => {
+  const doDeleteRecord = async (id: number, waybill_code: string) => {
     showConfirmDialog(`Bạn có chắc chắn muốn xoá bản ghi "${waybill_code}" không?`, async () => {
       try {
         await axios.delete(`${API_BASE}/api/records/${id}`);
@@ -564,7 +571,7 @@ function App() {
     [stations, activeStationId],
   );
 
-  const isDualCamStation = (station) => {
+  const isDualCamStation = (station: any) => {
     if (!station) return false;
     const hasIp2 = station.ip_camera_2 && station.ip_camera_2.trim() !== '';
     const isDualMode = ['pip', 'dual_file'].includes(station.camera_mode?.toLowerCase());
@@ -575,8 +582,10 @@ function App() {
 
   const { toast, showToast } = useToast();
 
-  const { confirmDialog, setConfirmDialog, showConfirmDialog } = useConfirmDialog();
+  const confirmDialogState: any = useConfirmDialog();
+  const { confirmDialog, setConfirmDialog, showConfirmDialog } = confirmDialogState;
 
+  const recordsState: any = useRecords({ activeStationId, currentUser, setLoading, fetchAnalytics });
   const {
     records,
     searchTerm,
@@ -593,7 +602,7 @@ function App() {
     handleSearch,
     searchTermRef,
     recordsPageRef,
-  } = useRecords({ activeStationId, currentUser, setLoading, fetchAnalytics });
+  } = recordsState;
 
   useSSE({
     activeStationId,
@@ -646,7 +655,7 @@ function App() {
       const updatedUser = { ...currentUser, must_change_password: 0 };
       setCurrentUser(updatedUser);
       localStorage.setItem('vpack_user', JSON.stringify(updatedUser));
-    } catch (err) {
+    } catch (err: any) {
       setChangePasswordError(err.response?.data?.detail || 'Mật khẩu cũ không đúng.');
     }
   }, [changePasswordForm, currentUser]);
@@ -690,7 +699,7 @@ function App() {
               <input
                 type="text"
                 value={loginForm.username}
-                onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))}
+                onChange={(e) => setLoginForm((f: any) => ({ ...f, username: e.target.value }))}
                 className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
                 placeholder="Nhập tên đăng nhập"
                 autoFocus
@@ -701,7 +710,7 @@ function App() {
               <input
                 type="password"
                 value={loginForm.password}
-                onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
+                onChange={(e) => setLoginForm((f: any) => ({ ...f, password: e.target.value }))}
                 className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
                 placeholder="Nhập mật khẩu"
               />
@@ -761,7 +770,7 @@ function App() {
           isOpen={showSetupModal}
           initialSettings={initialSettings}
           currentStation={activeStation}
-          isNewStation={!activeStation.id}
+          isNewStation={!(activeStation as any)?.id}
           onSaved={() => {
             setShowSetupModal(false);
             window.location.reload();
@@ -1003,7 +1012,7 @@ function App() {
               <div className="relative group flex items-center border border-white/10 rounded-xl bg-white/5 h-10 min-h-[44px] px-2 md:px-3 shadow-lg">
                 <Monitor className="w-5 h-5 text-indigo-400 mr-2" />
                 <select
-                  value={activeStationId}
+                  value={activeStationId || ''}
                   onChange={async (e) => {
                     const newId = Number(e.target.value);
                     if (switchingStation) return;
@@ -1011,7 +1020,7 @@ function App() {
                       setSwitchingStation(true);
                       try {
                         const statusRes = await axios.get(`${API_BASE}/api/sessions/station-status`);
-                        const targetStatus = (statusRes.data.data || []).find((s) => s.station_id === newId);
+                        const targetStatus = (statusRes.data.data || []).find((s: any) => s.station_id === newId);
                         if (targetStatus?.occupied && targetStatus?.occupied_by !== currentUser.username) {
                           showToast(
                             'Trạm này đang được sử dụng bởi ' +
@@ -1277,7 +1286,7 @@ function App() {
                   stations={stations}
                   stationStatuses={stationStatuses}
                   reconnectInfo={reconnectInfo}
-                  mtxAvailable={mtxAvailable}
+                  mtxAvailable={mtxAvailable || false}
                   isDualCamStation={isDualCamStation}
                   MTX_HOST={MTX_HOST}
                   onStationClick={(id) => {
@@ -1289,7 +1298,7 @@ function App() {
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <Dashboard
                     stations={stations}
-                    activeStationId={''}
+                    activeStationId={null}
                     storageInfo={storageInfo}
                     currentUser={currentUser}
                     analytics={analytics}
@@ -1531,7 +1540,7 @@ function App() {
                       <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
                         <div className="flex gap-2">
                           <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-mono text-white/90">
-                            {activeStation?.name || 'Đang tải'}
+                            {(activeStation as any)?.name || 'Đang tải'}
                           </div>
                           {currentUser?.role !== 'ADMIN' && packingStatus === 'packing' && (
                             <div className="px-3 py-1.5 rounded-full bg-red-600/90 backdrop-blur-md border border-red-400 text-xs font-bold text-white flex items-center gap-2 animate-pulse transition-all">
@@ -1583,17 +1592,17 @@ function App() {
                         ref={barcodeSimInputRef}
                         inputMode="text"
                         enterKeyHint="send"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && e.target.value.trim()) {
-                            sendScanAction(e.target.value.trim());
-                            e.target.value = '';
+                        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                          if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
+                            sendScanAction((e.target as HTMLInputElement).value.trim());
+                            (e.target as HTMLInputElement).value = '';
                           }
                         }}
                       />
                       <div className="flex gap-2 sm:gap-3">
                         <button
                           onClick={() => {
-                            const inputUI = barcodeSimInputRef.current;
+                            const inputUI = barcodeSimInputRef.current as HTMLInputElement | null;
                             if (inputUI && inputUI.value.trim()) {
                               sendScanAction(inputUI.value.trim());
                               inputUI.value = '';
@@ -1637,9 +1646,9 @@ function App() {
                 {currentUser?.role === 'ADMIN' && (
                   <select
                     value={activeStationId || ''}
-                    onChange={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                       const val = e.target.value;
-                      setActiveStationId(val === '' || val === 'orphaned' ? val : Number(val));
+                      setActiveStationId(val === '' ? null : val === 'orphaned' ? 'orphaned' : Number(val));
                     }}
                     disabled={viewMode !== 'grid'}
                     className="bg-white/10 text-white text-xs rounded px-2 py-1 border border-white/20 focus:outline-none focus:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1722,7 +1731,7 @@ function App() {
                   </div>
                 ) : (
                   <>
-                    {records.map((record) => (
+                    {records.map((record: any) => (
                       <div
                         key={record.id}
                         className="group p-3 md:p-5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-400/30 backdrop-blur-md transition-all duration-300 shadow-lg cursor-pointer min-h-[44px]"
@@ -1795,7 +1804,7 @@ function App() {
 
                         {/* Danh sách các file video lưu trữ */}
                         <div className="space-y-2">
-                          {record.video_paths.map((path, idx) => {
+                          {record.video_paths?.map((path: string, idx: number) => {
                             const fileName = path.split(/[/\\]/).pop();
                             const videoUrl = `${API_BASE}/api/records/${record.id}/download/${idx}?token=${encodeURIComponent(localStorage.getItem('vpack_token') || '')}`;
                             return (

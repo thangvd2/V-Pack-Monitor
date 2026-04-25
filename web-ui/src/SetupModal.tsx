@@ -21,7 +21,9 @@ import {
 } from 'lucide-react';
 import API_BASE from './config';
 
-const isValidIPv4 = (ip) => {
+import { SetupModalProps } from './types/props';
+
+const isValidIPv4 = (ip: string): boolean => {
   const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (!m) return false;
   return [m[1], m[2], m[3], m[4]].every((o) => {
@@ -30,7 +32,7 @@ const isValidIPv4 = (ip) => {
   });
 };
 
-const isValidIPv6 = (ip) => {
+const isValidIPv6 = (ip: string): boolean => {
   const s = ip.trim();
   if (!s) return false;
   const parts = s.split(':');
@@ -45,9 +47,9 @@ const isValidIPv6 = (ip) => {
   return true;
 };
 
-const isValidIP = (ip) => isValidIPv4(ip) || isValidIPv6(ip);
+const isValidIP = (ip: string): boolean => isValidIPv4(ip) || isValidIPv6(ip);
 
-const isReservedIP = (ip) => {
+const isReservedIP = (ip: string): boolean => {
   if (isValidIPv4(ip)) {
     const [a] = ip.split('.').map(Number);
     return ip === '0.0.0.0' || a === 127 || ip === '255.255.255.255';
@@ -55,14 +57,14 @@ const isReservedIP = (ip) => {
   return ip === '::' || ip === '::1';
 };
 
-const isValidMAC = (mac) => {
+const isValidMAC = (mac: string): boolean => {
   const raw = mac.replace(/[\s:.-]/g, '').toUpperCase();
   if (raw.length !== 12 || !/^[0-9A-F]{12}$/.test(raw)) return false;
   if (raw === '000000000000' || raw === 'FFFFFFFFFFFF') return false;
   return true;
 };
 
-const CAMERA_MODE_DESC = {
+const CAMERA_MODE_DESC: Record<string, string> = {
   single: 'Ghi 1 luồng từ 1 camera',
   pip: 'Ghép hình-in-picture từ 2 camera (hoặc 1 camera 2 mắt)',
   dual_file: 'Ghi 2 file riêng từ 2 camera (hoặc 1 camera 2 mắt)',
@@ -70,12 +72,12 @@ const CAMERA_MODE_DESC = {
 
 const MODES_NEED_IP2 = ['dual_file', 'pip'];
 
-function ErrorHint({ show, msg }) {
+function ErrorHint({ show, msg }: { show: any; msg: string }) {
   if (!show) return null;
   return <p className="mt-1 text-xs text-red-400">{msg}</p>;
 }
 
-function WarningHints({ warnings }) {
+function WarningHints({ warnings }: { warnings: string[] }) {
   if (!warnings || warnings.length === 0) return null;
   return (
     <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-300 space-y-0.5">
@@ -86,15 +88,15 @@ function WarningHints({ warnings }) {
   );
 }
 
-export default function SetupModal({
+const SetupModal: React.FC<SetupModalProps> = ({
   isOpen,
   onSaved,
   onCancel,
   currentStation = {},
   isNewStation = false,
   initialSettings = {},
-}) {
-  const [name, setName] = useState(currentStation.name || '');
+}) => {
+  const [name, setName] = useState<string>(currentStation.name || '');
   const [ip1, setIp1] = useState(currentStation.ip_camera_1 || '');
   const [ip2, setIp2] = useState(currentStation.ip_camera_2 || '');
   const [safetyCode, setSafetyCode] = useState(currentStation.safety_code || '');
@@ -118,20 +120,20 @@ export default function SetupModal({
   const [error, setError] = useState('');
   const [showSafetyCode, setShowSafetyCode] = useState(false);
   const [testingIp, setTestingIp] = useState(false);
-  const [testIpResult, setTestIpResult] = useState(null);
+  const [testIpResult, setTestIpResult] = useState<{ok: boolean, msg: string} | null>(null);
   const [collapsed, setCollapsed] = useState({ system: false, telegram: false });
   const [dirty, setDirty] = useState(false);
-  const [warnings, setWarnings] = useState([]);
-  const [touched, setTouched] = useState({});
-  const conflictTimerRef = useRef(null);
-  const [confirmDialog, setConfirmDialog] = useState({ show: false, message: '', onConfirm: null });
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const conflictTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ show: boolean; message?: string; onConfirm?: () => void }>({ show: false });
 
   useEffect(() => {
     if (!isOpen) {
       if (conflictTimerRef.current) clearTimeout(conflictTimerRef.current);
       return;
     }
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') handleCancel();
     };
     window.addEventListener('keydown', handler);
@@ -147,8 +149,8 @@ export default function SetupModal({
 
   const markDirty = useCallback(() => setDirty(true), []);
 
-  const touch = useCallback((field) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
+  const touch = useCallback((field: string) => {
+      setTouched((prev) => ({ ...prev, [field]: true }));
   }, []);
 
   const excludeId = currentStation?.id || 0;
@@ -200,7 +202,7 @@ export default function SetupModal({
   const errors = validate();
   const hasErrors = errors.length > 0;
 
-  const fieldBorder = (fieldName, hasError) => {
+  const fieldBorder = (fieldName: string, hasError: boolean) => {
     if (!touched[fieldName]) return 'border-white/10';
     return hasError ? 'border-red-500/60' : 'border-emerald-500/40';
   };
@@ -338,9 +340,9 @@ export default function SetupModal({
     }
   };
 
-  const formatMac = (val) => {
+  const formatMac = (val: string) => {
     const raw = val.replace(/[\s:.-]/g, '').toUpperCase();
-    if (raw.length === 12) return raw.match(/.{2}/g).join(':');
+    if (raw.length === 12) return raw.match(/.{2}/g)!.join(':');
     return val;
   };
 
@@ -838,15 +840,13 @@ export default function SetupModal({
         </div>
 
         <div className="flex gap-3 p-6 pt-3">
-          {onCancel && (
-            <button
-              onClick={handleCancel}
-              disabled={loading}
-              className="flex-1 bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-50"
-            >
-              HỦY BỎ
-            </button>
-          )}
+          <button
+            onClick={handleCancel}
+            disabled={loading}
+            className="flex-1 bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-50"
+          >
+            HỦY BỎ
+          </button>
           <button
             onClick={handleSave}
             disabled={loading}
@@ -891,4 +891,6 @@ export default function SetupModal({
       )}
     </div>
   );
-}
+};
+
+export default SetupModal;

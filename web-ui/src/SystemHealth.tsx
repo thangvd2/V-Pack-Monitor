@@ -9,13 +9,24 @@ import axios from 'axios';
 import { Monitor, HardDrive, Clock, Activity, Wifi, Cpu, Server } from 'lucide-react';
 import API_BASE from './config';
 
+import { SystemHealthProps } from './types/props';
+
 const STATUS_CONFIG = {
   ok: { color: '#34d399', bar: 'bg-emerald-500', dot: '🟢', label: 'Bình thường' },
   warning: { color: '#fbbf24', bar: 'bg-amber-500', dot: '🟡', label: 'Cảnh báo' },
   critical: { color: '#f87171', bar: 'bg-red-500', dot: '🔴', label: 'Nguy hiểm' },
 };
 
-function StatusCard({ title, icon: Icon, value, subtitle, status, percent }) {
+interface StatusCardProps {
+  title: string;
+  icon: React.ElementType;
+  value: string;
+  subtitle?: string;
+  status: 'ok' | 'warning' | 'critical';
+  percent?: number;
+}
+
+const StatusCard: React.FC<StatusCardProps> = ({ title, icon: Icon, value, subtitle, status, percent }) => {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.ok;
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-sm">
@@ -40,14 +51,14 @@ function StatusCard({ title, icon: Icon, value, subtitle, status, percent }) {
       )}
     </div>
   );
-}
+};
 
-export default function SystemHealth({ currentUser: _currentUser }) {
-  const [health, setHealth] = useState(null);
-  const [processes, setProcesses] = useState(null);
-  const [network, setNetwork] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const SystemHealth: React.FC<SystemHealthProps> = ({ currentUser: _currentUser }) => {
+  const [health, setHealth] = useState<any>(null);
+  const [processes, setProcesses] = useState<any>(null);
+  const [network, setNetwork] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -199,7 +210,7 @@ export default function SystemHealth({ currentUser: _currentUser }) {
                 </tr>
               </thead>
               <tbody>
-                {processes.ffmpeg_processes.map((proc, idx) => (
+                {processes.ffmpeg_processes.map((proc: any, idx: number) => (
                   <tr key={proc.pid || idx} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-2.5 px-3 text-slate-300 font-mono text-xs">{proc.pid}</td>
                     <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate" title={proc.cmdline_short}>
@@ -238,7 +249,7 @@ export default function SystemHealth({ currentUser: _currentUser }) {
                 </tr>
               </thead>
               <tbody>
-                {network.cameras.map((cam, idx) => (
+                {network.cameras.map((cam: any, idx: number) => (
                   <tr
                     key={cam.station_id || idx}
                     className="border-b border-white/5 hover:bg-white/5 transition-colors"
@@ -269,4 +280,6 @@ export default function SystemHealth({ currentUser: _currentUser }) {
       </div>
     </div>
   );
-}
+};
+
+export default SystemHealth;

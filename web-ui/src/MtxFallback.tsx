@@ -5,7 +5,7 @@
 
 import React from 'react';
 
-export default function MtxFallback() {
+const MtxFallback: React.FC = () => {
   return (
     <div className="w-full h-full flex items-center justify-center" style={{ background: '#09090b' }}>
       <div className="text-center">
@@ -15,4 +15,6 @@ export default function MtxFallback() {
       </div>
     </div>
   );
-}
+};
+
+export default MtxFallback;

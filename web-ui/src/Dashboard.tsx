@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Clock,
   PieChart as PieChartIcon,
-  Calendar,
   Activity,
 } from 'lucide-react';
 import {
@@ -35,6 +34,7 @@ import {
 import SystemHealth from './SystemHealth';
 import ErrorBoundary from './ErrorBoundary';
 import API_BASE from './config';
+import { DashboardProps } from './types/props';
 
 const CHART_COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#c084fc', '#fb7185', '#38bdf8', '#a3e635'];
 
@@ -48,7 +48,16 @@ const CustomTooltipStyle = {
   boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
 };
 
-function StatCard({ label, value, subValue, subLabel, icon: Icon, gradient }) {
+interface StatCardProps {
+  label: string;
+  value: string;
+  subValue?: string;
+  subLabel?: string;
+  icon: React.ElementType;
+  gradient: string;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ label, value, subValue, subLabel, icon: Icon, gradient }) => {
   return (
     <div className={`relative overflow-hidden rounded-2xl p-5 border border-white/10 ${gradient}`}>
       <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-8 translate-x-8" />
@@ -69,7 +78,14 @@ function StatCard({ label, value, subValue, subLabel, icon: Icon, gradient }) {
   );
 }
 
-function ChartCard({ title, icon: Icon, children, controls }) {
+interface ChartCardProps {
+  title: string;
+  icon: React.ElementType;
+  children: React.ReactNode;
+  controls?: React.ReactNode;
+}
+
+const ChartCard: React.FC<ChartCardProps> = ({ title, icon: Icon, children, controls }) => {
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-sm">
       <div className="flex items-center justify-between mb-4">
@@ -86,10 +102,10 @@ function ChartCard({ title, icon: Icon, children, controls }) {
   );
 }
 
-export default function Dashboard({ stations, activeStationId, storageInfo, currentUser, analytics }) {
-  const [hourlyData, setHourlyData] = useState([]);
-  const [trendData, setTrendData] = useState([]);
-  const [stationsComparison, setStationsComparison] = useState([]);
+const Dashboard: React.FC<DashboardProps> = ({ stations, activeStationId, storageInfo, currentUser, analytics }) => {
+  const [hourlyData, setHourlyData] = useState<any[]>([]);
+  const [trendData, setTrendData] = useState<any[]>([]);
+  const [stationsComparison, setStationsComparison] = useState<any[]>([]);
   const [loading, setLoading] = useState({ hourly: true, trend: true, comparison: true });
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedStation, setSelectedStation] = useState('all');
@@ -116,7 +132,7 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
     try {
       const res = await axios.get(`${API_BASE}/api/analytics/trend?days=7`);
       setTrendData(
-        (res.data?.data || []).map((d) => ({
+        (res.data?.data || []).map((d: any) => ({
           ...d,
           date: d.date ? d.date.slice(5) : d.date,
         })),
@@ -353,7 +369,7 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
                     outerRadius={110}
                     innerRadius={55}
                     paddingAngle={3}
-                    label={({ station_name, count }) => `${station_name}: ${count}`}
+                    label={({ station_name, count }: any) => `${station_name}: ${count}`}
                     labelLine={{ stroke: '#475569', strokeWidth: 1 }}
                   >
                     {stationsComparison.map((_, idx) => (
@@ -370,4 +386,6 @@ export default function Dashboard({ stations, activeStationId, storageInfo, curr
       )}
     </div>
   );
-}
+};
+
+export default Dashboard;

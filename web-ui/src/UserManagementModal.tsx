@@ -21,12 +21,12 @@ import {
   Unlock,
   Edit3,
   AlertCircle,
-  Search,
-  ChevronDown,
 } from 'lucide-react';
 import API_BASE from './config';
 
-const ACTION_LABELS = {
+import { UserManagementModalProps } from './types/props';
+
+const ACTION_LABELS: Record<string, string> = {
   LOGIN: 'Đăng nhập',
   LOGOUT: 'Đăng xuất',
   START_RECORD: 'Bắt đầu ghi',
@@ -44,37 +44,37 @@ const ACTION_LABELS = {
   STATION_DELETE: 'Xoá trạm',
 };
 
-const timeAgo = (dateStr) => {
+const timeAgo = (dateStr: string): string => {
   const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
   if (seconds < 60) return `${seconds} giây trước`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)} phút trước`;
   return `${Math.floor(seconds / 3600)} giờ trước`;
 };
 
-export default function UserManagementModal({ isOpen, onClose, currentUser, showConfirmDialog }) {
-  const [activeTab, setActiveTab] = useState('users');
-  const [users, setUsers] = useState([]);
-  const [sessions, setSessions] = useState([]);
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+const UserManagementModal: React.FC<UserManagementModalProps> = ({ isOpen, onClose, currentUser, showConfirmDialog }) => {
+  const [activeTab, setActiveTab] = useState<string>('users');
+  const [users, setUsers] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
 
   // Users tab state
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [addForm, setAddForm] = useState({ username: '', password: '', full_name: '', role: 'OPERATOR' });
-  const [editingId, setEditingId] = useState(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ full_name: '', role: '' });
-  const [passwordModalId, setPasswordModalId] = useState(null);
-  const [newPassword, setNewPassword] = useState('');
-  const [passwordMsg, setPasswordMsg] = useState('');
+  const [passwordModalId, setPasswordModalId] = useState<number | null>(null);
+  const [newPassword, setNewPassword] = useState<string>('');
+  const [passwordMsg, setPasswordMsg] = useState<string>('');
 
   // Audit log filters
-  const [logFilterUser, setLogFilterUser] = useState('');
-  const [logFilterAction, setLogFilterAction] = useState('');
-  const [logOffset, setLogOffset] = useState(0);
-  const [logHasMore, setLogHasMore] = useState(true);
+  const [logFilterUser, setLogFilterUser] = useState<string>('');
+  const [logFilterAction, setLogFilterAction] = useState<string>('');
+  const [logOffset, setLogOffset] = useState<number>(0);
+  const [logHasMore, setLogHasMore] = useState<boolean>(true);
 
-  const logIntervalRef = useRef(null);
+  const logIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -170,12 +170,12 @@ export default function UserManagementModal({ isOpen, onClose, currentUser, show
       setShowAddForm(false);
       setAddForm({ username: '', password: '', full_name: '', role: 'OPERATOR' });
       fetchUsers();
-    } catch (err) {
+    } catch (err: any) {
       setError(err.response?.data?.detail || 'Lỗi khi tạo user.');
     }
   };
 
-  const handleDeleteUser = async (user) => {
+  const handleDeleteUser = async (user: any) => {
     if (user.id === currentUser?.id) {
       alert('Không thể xoá tài khoản của chính bạn.');
       return;
@@ -190,7 +190,7 @@ export default function UserManagementModal({ isOpen, onClose, currentUser, show
     });
   };
 
-  const handleToggleActive = async (user) => {
+  const handleToggleActive = async (user: any) => {
     try {
       await axios.put(`${API_BASE}/api/users/${user.id}`, { is_active: user.is_active ? 0 : 1 });
       fetchUsers();
@@ -199,12 +199,12 @@ export default function UserManagementModal({ isOpen, onClose, currentUser, show
     }
   };
 
-  const handleStartEdit = (user) => {
+  const handleStartEdit = (user: any) => {
     setEditingId(user.id);
     setEditForm({ full_name: user.full_name, role: user.role });
   };
 
-  const handleSaveEdit = async (userId) => {
+  const handleSaveEdit = async (userId: number) => {
     try {
       await axios.put(`${API_BASE}/api/users/${userId}`, editForm);
       setEditingId(null);
@@ -233,7 +233,7 @@ export default function UserManagementModal({ isOpen, onClose, currentUser, show
   };
 
   // --- Sessions handlers ---
-  const handleKillSession = async (sessionId, username) => {
+  const handleKillSession = async (sessionId: string, username: string) => {
     showConfirmDialog(`Kết thúc phiên của "${username}"?`, async () => {
       try {
         await axios.delete(`${API_BASE}/api/sessions/${sessionId}`);
@@ -729,4 +729,6 @@ export default function UserManagementModal({ isOpen, onClose, currentUser, show
       </div>
     </div>
   );
-}
+};
+
+export default UserManagementModal;

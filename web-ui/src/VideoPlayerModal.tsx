@@ -8,25 +8,27 @@ import React, { useRef, useState, useEffect } from 'react';
 import { X, Play, Pause, Camera, Download, Volume2, VolumeX } from 'lucide-react';
 import API_BASE from './config';
 
-function formatTime(seconds) {
+import { VideoPlayerModalProps } from './types/props';
+
+function formatTime(seconds: number): string {
   if (!seconds || isNaN(seconds)) return '0:00';
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClose }) {
-  const videoRef = useRef(null);
-  const progressRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [buffered, setBuffered] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const hideTimer = useRef(null);
+const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ isOpen, videoUrl, waybillCode, onClose }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
+  const [buffered, setBuffered] = useState<number>(0);
+  const [volume, setVolume] = useState<number>(1);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [showControls, setShowControls] = useState<boolean>(true);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -43,7 +45,7 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleKey = (e) => {
+    const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
       if (e.key === ' ' && videoRef.current) {
         e.preventDefault();
@@ -58,7 +60,7 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
 
   const scheduleHide = () => {
     setShowControls(true);
-    clearTimeout(hideTimer.current);
+    if (hideTimer.current) clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(() => {
       if (videoRef.current && !videoRef.current.paused) {
         setShowControls(false);
@@ -92,7 +94,7 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
     setDuration(videoRef.current.duration);
   };
 
-  const handleProgressClick = (e) => {
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!progressRef.current || !videoRef.current) return;
     const rect = progressRef.current.getBoundingClientRect();
     const pos = (e.clientX - rect.left) / rect.width;
@@ -105,7 +107,7 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
     setIsMuted(videoRef.current.muted);
   };
 
-  const handleVolumeChange = (e) => {
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!videoRef.current) return;
     const vol = parseFloat(e.target.value);
     videoRef.current.volume = vol;
@@ -121,7 +123,7 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      if (ctx) ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
       const a = document.createElement('a');
       a.href = dataUrl;
@@ -142,7 +144,7 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
     >
       <div
         className="bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden relative"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         {/* Header */}
         <div
@@ -312,4 +314,6 @@ export default function VideoPlayerModal({ isOpen, videoUrl, waybillCode, onClos
       </div>
     </div>
   );
-}
+};
+
+export default VideoPlayerModal;

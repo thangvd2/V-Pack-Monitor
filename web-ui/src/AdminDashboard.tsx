@@ -9,7 +9,9 @@ import { MonitorPlay, LayoutGrid } from 'lucide-react';
 import MtxFallback from './MtxFallback';
 import ErrorBoundary from './ErrorBoundary';
 
-export default function AdminDashboard({
+import { AdminDashboardProps } from './types/props';
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({
   stations,
   stationStatuses,
   reconnectInfo,
@@ -17,7 +19,7 @@ export default function AdminDashboard({
   isDualCamStation,
   MTX_HOST,
   onStationClick,
-}) {
+}) => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Live Cameras Grid (Luôn hiện cho admin) */}
@@ -144,4 +146,6 @@ export default function AdminDashboard({
       </section>
     </div>
   );
-}
+};
+
+export default AdminDashboard;
