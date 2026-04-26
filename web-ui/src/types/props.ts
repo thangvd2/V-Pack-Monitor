@@ -59,5 +59,6 @@ export interface AdminDashboardProps {
 
 export interface SystemHealthProps {
   currentUser: User;
+  stations: Station[];
 }
 

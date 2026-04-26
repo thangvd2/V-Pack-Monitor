@@ -109,6 +109,8 @@ const SetupModal: React.FC<SetupModalProps> = ({
   const [cloudProvider, setCloudProvider] = useState(initialSettings?.CLOUD_PROVIDER || 'NONE');
   const [cloudSyncScheduled, setCloudSyncScheduled] = useState(initialSettings?.CLOUD_SYNC_SCHEDULED === 'true');
   const [cloudSyncTime, setCloudSyncTime] = useState(initialSettings?.CLOUD_SYNC_TIME || '02:00');
+  const [cameraHealthCheckInterval, setCameraHealthCheckInterval] = useState<number>(initialSettings?.CAMERA_HEALTH_CHECK_INTERVAL || 60);
+  const [cameraDownAlertMinutes, setCameraDownAlertMinutes] = useState<number>(initialSettings?.CAMERA_DOWN_ALERT_MINUTES || 5);
   const [gDriveFolderId, setGDriveFolderId] = useState(initialSettings?.GDRIVE_FOLDER_ID || '');
   const [gDriveCreds, setGDriveCreds] = useState('');
   const [s3Endpoint, setS3Endpoint] = useState(initialSettings?.S3_ENDPOINT || '');
@@ -234,6 +236,8 @@ const SetupModal: React.FC<SetupModalProps> = ({
         CLOUD_PROVIDER: cloudProvider,
         CLOUD_SYNC_SCHEDULED: cloudSyncScheduled ? 'true' : 'false',
         CLOUD_SYNC_TIME: cloudSyncTime,
+        CAMERA_HEALTH_CHECK_INTERVAL: cameraHealthCheckInterval,
+        CAMERA_DOWN_ALERT_MINUTES: cameraDownAlertMinutes,
         GDRIVE_FOLDER_ID: gDriveFolderId,
         S3_ENDPOINT: s3Endpoint,
         S3_ACCESS_KEY: s3Access,
@@ -671,6 +675,34 @@ const SetupModal: React.FC<SetupModalProps> = ({
                     <option value="365">365 Ngày</option>
                     <option value="0">Không bao giờ xoá</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Kiểm tra kết nối Camera (giây)</label>
+                  <input
+                    type="number"
+                    min="10"
+                    value={cameraHealthCheckInterval}
+                    onChange={(e) => {
+                      setCameraHealthCheckInterval(Number(e.target.value));
+                      markDirty();
+                    }}
+                    className="w-full bg-[#1e293b] border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Cảnh báo mất kết nối Camera (phút)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={cameraDownAlertMinutes}
+                    onChange={(e) => {
+                      setCameraDownAlertMinutes(Number(e.target.value));
+                      markDirty();
+                    }}
+                    className="w-full bg-[#1e293b] border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-blue-500/50"
+                  />
                 </div>
 
                 <div>
