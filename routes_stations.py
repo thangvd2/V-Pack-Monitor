@@ -5,23 +5,36 @@
 # =============================================================================
 
 
+import re
+
 from fastapi import HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 import api
 import database
 import network
 from auth import AdminUser, CurrentUser
 
+IP_PATTERN = re.compile(r"^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$")
+
 
 class StationPayload(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
+    name: str = Field(..., min_length=1, max_length=50)
     ip_camera_1: str = Field(..., min_length=7, max_length=45)
     ip_camera_2: str = ""
     safety_code: str = Field(..., min_length=1, max_length=50)
     camera_mode: str = Field(default="single")
     camera_brand: str = "imou"
     mac_address: str = ""
+
+    @field_validator("ip_camera_1", "ip_camera_2")
+    @classmethod
+    def validate_ip(cls, v):
+        if not v:
+            return v
+        if not IP_PATTERN.match(v):
+            raise ValueError(f"Invalid IP address format: {v}")
+        return v
 
 
 def _resolve_cam2_url(payload, url_fn):

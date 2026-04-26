@@ -411,6 +411,13 @@ class SettingsUpdate(BaseModel):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
 
+    @field_validator("RECORD_STREAM_TYPE")
+    @classmethod
+    def validate_stream_type(cls, v):
+        if v not in ("main", "sub"):
+            raise ValueError("RECORD_STREAM_TYPE must be 'main' or 'sub'")
+        return v
+
     @field_validator("RECORD_KEEP_DAYS")
     @classmethod
     def validate_keep_days(cls, v):
