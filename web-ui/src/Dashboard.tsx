@@ -4,7 +4,7 @@
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import axios from 'axios';
 import {
   BarChart3,
@@ -31,7 +31,7 @@ import {
   Legend,
 } from 'recharts';
 
-import SystemHealth from './SystemHealth';
+const SystemHealth = React.lazy(() => import('./SystemHealth'));
 import ErrorBoundary from './ErrorBoundary';
 import API_BASE from './config';
 import { DashboardProps } from './types/props';
@@ -236,9 +236,11 @@ const Dashboard: React.FC<DashboardProps> = ({ stations, activeStationId, storag
       </div>
 
       {dashTab === 'health' ? (
-        <ErrorBoundary sectionName="SystemHealth" fallback="Không thể tải thông tin hệ thống.">
-          <SystemHealth currentUser={currentUser} />
-        </ErrorBoundary>
+        <Suspense fallback={<div className="p-10 flex items-center justify-center text-slate-400 animate-pulse">Đang tải thông tin hệ thống...</div>}>
+          <ErrorBoundary sectionName="SystemHealth" fallback="Không thể tải thông tin hệ thống.">
+            <SystemHealth currentUser={currentUser} />
+          </ErrorBoundary>
+        </Suspense>
       ) : (
         <>
           <div className="flex flex-col lg:flex-row gap-4 items-stretch">

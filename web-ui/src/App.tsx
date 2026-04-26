@@ -4,7 +4,7 @@
  * All rights reserved. Unauthorized copying or distribution is prohibited.
  */
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 import axios from 'axios';
 import {
   Search,
@@ -26,11 +26,11 @@ import {
   LayoutGrid,
   RefreshCw,
 } from 'lucide-react';
-import SetupModal from './SetupModal';
-import VideoPlayerModal from './VideoPlayerModal';
-import UserManagementModal from './UserManagementModal';
-import Dashboard from './Dashboard';
-import AdminDashboard from './AdminDashboard';
+const SetupModal = React.lazy(() => import('./SetupModal'));
+const VideoPlayerModal = React.lazy(() => import('./VideoPlayerModal'));
+const UserManagementModal = React.lazy(() => import('./UserManagementModal'));
+const Dashboard = React.lazy(() => import('./Dashboard'));
+const AdminDashboard = React.lazy(() => import('./AdminDashboard'));
 import ErrorBoundary from './ErrorBoundary';
 import MtxFallback from './MtxFallback';
 import API_BASE from './config';
@@ -783,24 +783,26 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen p-3 md:p-6 lg:p-10 font-sans">
       {showSetupModal && (
-        <SetupModal
-          isOpen={showSetupModal}
-          initialSettings={initialSettings}
-          currentStation={activeStation}
-          isNewStation={!activeStation?.id}
-          onSaved={() => {
-            setShowSetupModal(false);
-            window.location.reload();
-          }}
-          onCancel={() => {
-            setShowSetupModal(false);
-            if (activeStationId === 0 && previousStationId) {
-              setActiveStationId(previousStationId);
-            } else if (activeStationId === 0 && stations.length > 0) {
-              setActiveStationId(stations[0].id);
-            }
-          }}
-        />
+        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"><div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div></div>}>
+          <SetupModal
+            isOpen={showSetupModal}
+            initialSettings={initialSettings}
+            currentStation={activeStation}
+            isNewStation={!activeStation?.id}
+            onSaved={() => {
+              setShowSetupModal(false);
+              window.location.reload();
+            }}
+            onCancel={() => {
+              setShowSetupModal(false);
+              if (activeStationId === 0 && previousStationId) {
+                setActiveStationId(previousStationId);
+              } else if (activeStationId === 0 && stations.length > 0) {
+                setActiveStationId(stations[0].id);
+              }
+            }}
+          />
+        </Suspense>
       )}
 
       <ErrorBoundary
@@ -808,20 +810,24 @@ const App: React.FC = () => {
         fallback="Không thể phát video. Tải lại trang."
         onReset={() => setVideoModalOpen(false)}
       >
-        <VideoPlayerModal
-          isOpen={videoModalOpen}
-          videoUrl={selectedVideo.url}
-          waybillCode={selectedVideo.waybillCode}
-          onClose={() => setVideoModalOpen(false)}
-        />
+        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"><div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div></div>}>
+          <VideoPlayerModal
+            isOpen={videoModalOpen}
+            videoUrl={selectedVideo.url}
+            waybillCode={selectedVideo.waybillCode}
+            onClose={() => setVideoModalOpen(false)}
+          />
+        </Suspense>
       </ErrorBoundary>
 
-      <UserManagementModal
-        isOpen={showUserModal}
-        onClose={() => setShowUserModal(false)}
-        currentUser={currentUser}
-        showConfirmDialog={showConfirmDialog}
-      />
+      <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"><div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div></div>}>
+        <UserManagementModal
+          isOpen={showUserModal}
+          onClose={() => setShowUserModal(false)}
+          currentUser={currentUser}
+          showConfirmDialog={showConfirmDialog}
+        />
+      </Suspense>
 
       {showChangePassword && (
         <div
@@ -1299,13 +1305,15 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       {showDashboard && currentUser?.role !== 'ADMIN' ? (
-        <Dashboard
-          stations={stations}
-          activeStationId={activeStationId}
-          storageInfo={storageInfo}
-          currentUser={currentUser}
-          analytics={analytics}
-        />
+        <Suspense fallback={<div className="p-10 flex items-center justify-center text-slate-400 animate-pulse">Đang tải bảng điều khiển...</div>}>
+          <Dashboard
+            stations={stations}
+            activeStationId={activeStationId}
+            storageInfo={storageInfo}
+            currentUser={currentUser}
+            analytics={analytics}
+          />
+        </Suspense>
       ) : (
         <div
           className={`grid gap-4 md:gap-8 ${viewMode === 'grid' || currentUser?.role === 'ADMIN' ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-3'}`}
@@ -1316,27 +1324,31 @@ const App: React.FC = () => {
           >
             {currentUser?.role === 'ADMIN' && viewMode === 'grid' ? (
               adminTab === 'operations' ? (
-                <AdminDashboard
-                  stations={stations}
-                  stationStatuses={stationStatuses}
-                  reconnectInfo={reconnectInfo}
-                  mtxAvailable={mtxAvailable || false}
-                  isDualCamStation={isDualCamStation}
-                  MTX_HOST={MTX_HOST}
-                  onStationClick={(id) => {
-                    setActiveStationId(id);
-                    setViewMode('single');
-                  }}
-                />
+                <Suspense fallback={<div className="p-10 flex items-center justify-center text-slate-400 animate-pulse">Đang tải bảng điều khiển quản trị...</div>}>
+                  <AdminDashboard
+                    stations={stations}
+                    stationStatuses={stationStatuses}
+                    reconnectInfo={reconnectInfo}
+                    mtxAvailable={mtxAvailable || false}
+                    isDualCamStation={isDualCamStation}
+                    MTX_HOST={MTX_HOST}
+                    onStationClick={(id) => {
+                      setActiveStationId(id);
+                      setViewMode('single');
+                    }}
+                  />
+                </Suspense>
               ) : (
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  <Dashboard
-                    stations={stations}
-                    activeStationId={null}
-                    storageInfo={storageInfo}
-                    currentUser={currentUser}
-                    analytics={analytics}
-                  />
+                  <Suspense fallback={<div className="p-10 flex items-center justify-center text-slate-400 animate-pulse">Đang tải bảng điều khiển...</div>}>
+                    <Dashboard
+                      stations={stations}
+                      activeStationId={null}
+                      storageInfo={storageInfo}
+                      currentUser={currentUser}
+                      analytics={analytics}
+                    />
+                  </Suspense>
                 </div>
               )
             ) : viewMode === 'grid' ? (
