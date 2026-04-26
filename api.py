@@ -27,14 +27,17 @@ import time
 import urllib.error
 import urllib.request
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+import cloud_sync
 import database
 import network
 import recorder
+import telegram_bot
 import video_worker
 
 _SERVER_START_TIME = time.time()
@@ -349,9 +352,6 @@ def get_rtsp_sub_url(ip, safety_code, channel=1, brand="imou"):
         return f"rtsp://admin:{safety_code}@{ip}:554/cam/realmonitor?channel={channel}&subtype=1"
 
 
-import telegram_bot
-
-
 def _cancel_recording_timer(station_id):
     with _recording_timers_lock:
         timer = _recording_timers.pop(station_id, None)
@@ -640,8 +640,33 @@ async def lifespan(app: FastAPI):
 
     cleanup_task = asyncio.create_task(_periodic_audit_cleanup())
 
+    async def _periodic_cloud_sync():
+        _last_sync_day = None
+        while True:
+            await asyncio.sleep(3600)  # 1 hour
+            try:
+                provider = database.get_setting("CLOUD_PROVIDER")
+                enabled = database.get_setting("CLOUD_SYNC_SCHEDULED")
+                schedule_time = database.get_setting("CLOUD_SYNC_TIME") or "02:00"
+
+                if provider and provider != "NONE" and enabled == "true":
+                    now = datetime.now()
+                    try:
+                        scheduled_hour = int(schedule_time.split(":")[0])
+                    except Exception:
+                        scheduled_hour = 2
+
+                    if now.hour == scheduled_hour and _last_sync_day != now.date():
+                        _last_sync_day = now.date()
+                        await asyncio.to_thread(cloud_sync.process_cloud_sync)
+            except Exception as e:
+                logger.error(f"[CLOUD] Scheduled sync failed: {e}")
+
+    cloud_sync_task = asyncio.create_task(_periodic_cloud_sync())
+
     yield
     cleanup_task.cancel()
+    cloud_sync_task.cancel()
     with _recording_timers_lock:
         for timer in _recording_timers.values():
             timer.cancel()

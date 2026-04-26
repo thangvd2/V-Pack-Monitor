@@ -403,6 +403,8 @@ class SettingsUpdate(BaseModel):
     RECORD_KEEP_DAYS: int
     RECORD_STREAM_TYPE: str = "main"
     CLOUD_PROVIDER: str = "NONE"
+    CLOUD_SYNC_SCHEDULED: str = "false"
+    CLOUD_SYNC_TIME: str = "02:00"
     GDRIVE_FOLDER_ID: str = ""
     S3_ENDPOINT: str = ""
     S3_ACCESS_KEY: str = ""

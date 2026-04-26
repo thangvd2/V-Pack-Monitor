@@ -107,6 +107,8 @@ const SetupModal: React.FC<SetupModalProps> = ({
   const [discoverResult, setDiscoverResult] = useState('');
   const [keepDays, setKeepDays] = useState<number>(initialSettings?.RECORD_KEEP_DAYS || 365);
   const [cloudProvider, setCloudProvider] = useState(initialSettings?.CLOUD_PROVIDER || 'NONE');
+  const [cloudSyncScheduled, setCloudSyncScheduled] = useState(initialSettings?.CLOUD_SYNC_SCHEDULED === 'true');
+  const [cloudSyncTime, setCloudSyncTime] = useState(initialSettings?.CLOUD_SYNC_TIME || '02:00');
   const [gDriveFolderId, setGDriveFolderId] = useState(initialSettings?.GDRIVE_FOLDER_ID || '');
   const [gDriveCreds, setGDriveCreds] = useState('');
   const [s3Endpoint, setS3Endpoint] = useState(initialSettings?.S3_ENDPOINT || '');
@@ -230,6 +232,8 @@ const SetupModal: React.FC<SetupModalProps> = ({
       await axios.post(`${API_BASE}/api/settings`, {
         RECORD_KEEP_DAYS: Number(keepDays),
         CLOUD_PROVIDER: cloudProvider,
+        CLOUD_SYNC_SCHEDULED: cloudSyncScheduled ? 'true' : 'false',
+        CLOUD_SYNC_TIME: cloudSyncTime,
         GDRIVE_FOLDER_ID: gDriveFolderId,
         S3_ENDPOINT: s3Endpoint,
         S3_ACCESS_KEY: s3Access,
@@ -684,6 +688,48 @@ const SetupModal: React.FC<SetupModalProps> = ({
                     <option value="S3">S3 / R2 (Amazon / Cloudflare)</option>
                   </select>
                 </div>
+
+                {cloudProvider !== 'NONE' && (
+                  <div className="space-y-4 pt-2 border-t border-white/5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300">Tự động đồng bộ hàng ngày</label>
+                        <p className="text-xs text-slate-500">Tự động nén và tải video mới lên Cloud</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={cloudSyncScheduled}
+                          onChange={(e) => {
+                            setCloudSyncScheduled(e.target.checked);
+                            markDirty();
+                          }}
+                        />
+                        <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                      </label>
+                    </div>
+                    
+                    {cloudSyncScheduled && (
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Giờ đồng bộ</label>
+                        <select
+                          value={cloudSyncTime}
+                          onChange={(e) => {
+                            setCloudSyncTime(e.target.value);
+                            markDirty();
+                          }}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50 appearance-none"
+                        >
+                          {Array.from({ length: 24 }).map((_, i) => {
+                            const hr = i.toString().padStart(2, '0');
+                            return <option key={hr} value={`${hr}:00`}>{hr}:00</option>;
+                          })}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {cloudProvider === 'GDRIVE' && (
                   <div className="space-y-4 pt-2 border-t border-white/5">
