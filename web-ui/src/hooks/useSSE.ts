@@ -13,6 +13,7 @@ export function useSSE({
   stationsIdStr,
   currentUser,
   stationsRef,
+  setStations,
   setStationStatuses,
   setPackingStatus,
   setCurrentWaybill,
@@ -30,6 +31,7 @@ export function useSSE({
   stationsIdStr: string;
   currentUser: User | null;
   stationsRef: React.MutableRefObject<Station[]>;
+  setStations: React.Dispatch<React.SetStateAction<Station[]>>;
   setStationStatuses: React.Dispatch<React.SetStateAction<Record<string, StationStatus>>>;
   setPackingStatus: (status: 'idle' | 'packing') => void;
   setCurrentWaybill: (waybill: string) => void;
@@ -203,6 +205,21 @@ export function useSSE({
           }
         } catch {
           // SSE parse failure - ignore
+        }
+      });
+
+      es.addEventListener('camera_status', (evt) => {
+        try {
+          const data = JSON.parse(evt.data);
+          setStations((prev) =>
+            prev.map((s) =>
+              s.id === Number(data.station_id)
+                ? { ...s, camera_health: { ...s.camera_health, online: data.online } }
+                : s
+            )
+          );
+        } catch {
+          // ignore
         }
       });
 

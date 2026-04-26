@@ -98,7 +98,7 @@ const StatusCard: React.FC<StatusCardProps> = ({ title, icon: Icon, value, subti
   );
 };
 
-const SystemHealth: React.FC<SystemHealthProps> = ({ currentUser: _currentUser }) => {
+const SystemHealth: React.FC<SystemHealthProps> = ({ currentUser: _currentUser, stations }) => {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [processes, setProcesses] = useState<ProcessData | null>(null);
   const [network, setNetwork] = useState<NetworkData | null>(null);
@@ -283,7 +283,7 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ currentUser: _currentUser }
           <Wifi className="w-5 h-5 text-emerald-400" />
           <h3 className="font-semibold text-slate-200">Trạng Thái Camera</h3>
         </div>
-        {(network?.cameras?.length ?? 0) > 0 ? (
+        {(stations?.length ?? 0) > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -294,25 +294,31 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ currentUser: _currentUser }
                 </tr>
               </thead>
               <tbody>
-                {network?.cameras?.map((cam, idx: number) => (
+                {stations?.map((cam, idx: number) => {
+                  const online = cam.camera_health?.online;
+                  const latency = cam.camera_health?.latency_ms;
+                  const statusText = online === true ? `Kết nối (${latency}ms)` : online === false ? 'Mất kết nối' : 'Đang kiểm tra...';
+                  const dotColor = online === true ? 'bg-emerald-400' : online === false ? 'bg-red-400' : 'bg-slate-400';
+                  const textColor = online === true ? 'text-emerald-400' : online === false ? 'text-red-400' : 'text-slate-400';
+                  return (
                   <tr
-                    key={cam.station_id || idx}
+                    key={cam.id || idx}
                     className="border-b border-white/5 hover:bg-white/5 transition-colors"
                   >
-                    <td className="py-2.5 px-3 text-slate-300">{cam.station_name || `Trạm ${cam.station_id}`}</td>
-                    <td className="py-2.5 px-3 text-slate-300 font-mono text-xs">{cam.ip || '—'}</td>
+                    <td className="py-2.5 px-3 text-slate-300">{cam.name || `Trạm ${cam.id}`}</td>
+                    <td className="py-2.5 px-3 text-slate-300 font-mono text-xs">{cam.ip_camera_1 || '—'}</td>
                     <td className="py-2.5 px-3">
                       <span className="flex items-center gap-1.5">
                         <span
-                          className={`inline-block w-2 h-2 rounded-full ${cam.reachable ? 'bg-emerald-400' : 'bg-red-400'}`}
+                          className={`inline-block w-2 h-2 rounded-full ${dotColor}`}
                         />
-                        <span className={cam.reachable ? 'text-emerald-400' : 'text-red-400'}>
-                          {cam.reachable ? 'Kết nối' : 'Mất kết nối'}
+                        <span className={textColor}>
+                          {statusText}
                         </span>
                       </span>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>

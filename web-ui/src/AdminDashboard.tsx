@@ -67,7 +67,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     )}
 
                     <div className="absolute top-3 left-3 right-3 flex items-start gap-2 pointer-events-none z-10">
-                      <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-mono text-white/90">
+                      <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-mono text-white/90 flex items-center gap-1.5">
+                        {station.camera_health?.online === false && (
+                          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Camera mất kết nối" />
+                        )}
                         {station.name}
                       </div>
                       {st.status === 'packing' && (

@@ -238,7 +238,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stations, activeStationId, storag
       {dashTab === 'health' ? (
         <Suspense fallback={<div className="p-10 flex items-center justify-center text-slate-400 animate-pulse">Đang tải thông tin hệ thống...</div>}>
           <ErrorBoundary sectionName="SystemHealth" fallback="Không thể tải thông tin hệ thống.">
-            <SystemHealth currentUser={currentUser} />
+            <SystemHealth currentUser={currentUser} stations={stations} />
           </ErrorBoundary>
         </Suspense>
       ) : (

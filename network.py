@@ -11,6 +11,7 @@ import platform
 import re
 import socket
 import subprocess
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -177,3 +178,32 @@ def scan_lan_all() -> list[dict]:
         List of dicts like [{"ip": "192.168.1.55", "mac": "AA:BB:CC:DD:EE:FF"}, ...]
     """
     return _parse_arp_table()
+
+
+def check_ping(ip: str, timeout_ms: int = 2000) -> tuple[bool, int]:
+    """Ping a host and return (is_online, latency_ms)."""
+    system = platform.system()
+    start_time = time.time()
+    try:
+        if system == "Windows":
+            proc = subprocess.run(
+                ["ping", "-n", "1", "-w", str(timeout_ms), ip],
+                capture_output=True,
+                text=True,
+                timeout=(timeout_ms / 1000) + 1,
+            )
+            is_online = proc.returncode == 0 and "TTL=" in proc.stdout
+        else:
+            timeout_s = max(1, timeout_ms // 1000)
+            proc = subprocess.run(
+                ["ping", "-c", "1", "-W", str(timeout_s), ip],
+                capture_output=True,
+                text=True,
+                timeout=timeout_s + 1,
+            )
+            is_online = proc.returncode == 0 and "ttl=" in proc.stdout.lower()
+
+        latency = int((time.time() - start_time) * 1000) if is_online else 0
+        return is_online, latency
+    except Exception:
+        return False, 0

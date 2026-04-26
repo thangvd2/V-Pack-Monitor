@@ -57,6 +57,7 @@ class StationModel(BaseModel):
     camera_brand: str
     mac_address: str
     processing_count: int | None = None
+    camera_health: dict | None = None
 
 
 class StationsResponse(BaseModel):
@@ -73,6 +74,12 @@ def register_routes(app):
         with api._processing_lock:
             for s in stations:
                 s["processing_count"] = api._processing_count.get(s["id"], 0)
+
+        with api._camera_health_lock:
+            for s in stations:
+                sid = str(s["id"])
+                if sid in api._camera_health:
+                    s["camera_health"] = api._camera_health[sid]
 
         if current_user.get("role") != "ADMIN":
             for s in stations:

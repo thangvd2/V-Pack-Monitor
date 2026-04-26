@@ -90,6 +90,9 @@ _station_locks_lock = threading.Lock()  # guards _station_locks dict itself
 _cache_lock = threading.Lock()  # guards _update_check_cache
 _login_attempts_lock = threading.Lock()  # guards _login_attempts
 
+_camera_health = {}  # {station_id: {"online": bool, "last_seen": int, "latency_ms": int, "down_alert_sent": bool}}
+_camera_health_lock = threading.Lock()  # guards _camera_health
+
 _logger = logging.getLogger("vpack")
 
 MAX_SSE_CLIENTS = 50
@@ -664,9 +667,89 @@ async def lifespan(app: FastAPI):
 
     cloud_sync_task = asyncio.create_task(_periodic_cloud_sync())
 
+    async def _periodic_camera_health_check():
+        while True:
+            try:
+                interval = int(database.get_setting("CAMERA_HEALTH_CHECK_INTERVAL", 60))
+            except Exception:
+                interval = 60
+            await asyncio.sleep(interval)
+            try:
+                try:
+                    alert_minutes = int(database.get_setting("CAMERA_DOWN_ALERT_MINUTES", 5))
+                except Exception:
+                    alert_minutes = 5
+
+                stations = database.get_stations()
+                for st in stations:
+                    station_id = str(st["id"])
+                    ip = st.get("ip_camera_1")
+                    if not ip:
+                        continue
+
+                    is_online, latency = await asyncio.to_thread(network.check_ping, ip, 2000)
+                    now_ts = int(time.time())
+
+                    with _camera_health_lock:
+                        if station_id not in _camera_health:
+                            _camera_health[station_id] = {
+                                "online": is_online,
+                                "last_seen": now_ts if is_online else 0,
+                                "latency_ms": latency,
+                                "down_alert_sent": False,
+                                "down_time": now_ts if not is_online else 0,
+                            }
+                            state_changed = True
+                            prev_online = None
+                        else:
+                            prev_online = _camera_health[station_id]["online"]
+                            state_changed = prev_online != is_online
+
+                            _camera_health[station_id]["online"] = is_online
+                            _camera_health[station_id]["latency_ms"] = latency
+                            if is_online:
+                                _camera_health[station_id]["last_seen"] = now_ts
+
+                        current_state = dict(_camera_health[station_id])
+
+                    if state_changed:
+                        notify_sse("camera_status", {"station_id": station_id, "online": is_online})
+
+                        if is_online and prev_online is False and current_state.get("down_alert_sent"):
+                            duration = now_ts - current_state.get("down_time", now_ts)
+                            dur_mins = duration // 60
+                            telegram_bot.send_telegram_message(
+                                f"✅ <b>Camera UP</b>\nTrạm: {st.get('name')}\nThời gian gián đoạn: {dur_mins} phút"
+                            )
+                            with _camera_health_lock:
+                                _camera_health[station_id]["down_alert_sent"] = False
+
+                        if not is_online and prev_online is not False:
+                            with _camera_health_lock:
+                                _camera_health[station_id]["down_time"] = now_ts
+
+                    if not is_online:
+                        with _camera_health_lock:
+                            down_time = _camera_health[station_id].get("down_time", now_ts)
+                            alert_sent = _camera_health[station_id].get("down_alert_sent", False)
+
+                        if not alert_sent and (now_ts - down_time) >= alert_minutes * 60:
+                            dt_str = datetime.fromtimestamp(down_time).strftime("%Y-%m-%d %H:%M:%S")
+                            telegram_bot.send_telegram_message(
+                                f"⚠️ <b>Camera DOWN</b>\nTrạm: {st.get('name')}\nIP: {ip}\nThời gian mất kết nối: {dt_str}"
+                            )
+                            with _camera_health_lock:
+                                _camera_health[station_id]["down_alert_sent"] = True
+
+            except Exception as e:
+                logger.error(f"[HEALTH] Camera health check failed: {e}")
+
+    camera_health_task = asyncio.create_task(_periodic_camera_health_check())
+
     yield
     cleanup_task.cancel()
     cloud_sync_task.cancel()
+    camera_health_task.cancel()
     with _recording_timers_lock:
         for timer in _recording_timers.values():
             timer.cancel()
