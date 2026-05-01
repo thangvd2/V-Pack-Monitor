@@ -6,7 +6,7 @@
 
 ---
 
-**Status**: Plan created, not yet implemented
+**Status**: Done — PR #83 merged to dev
 
 ## Problem
 
