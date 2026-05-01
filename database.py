@@ -142,6 +142,166 @@ def get_connection():
     return conn
 
 
+def _init_schema_raw_sql(cursor):
+    """Fallback schema initialization if Alembic is unavailable."""
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS packing_video (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            station_id INTEGER DEFAULT 1,
+            waybill_code TEXT NOT NULL,
+            video_paths TEXT NOT NULL,
+            record_mode TEXT NOT NULL,
+            recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'READY' CHECK(status IN ('READY', 'RECORDING', 'PROCESSING', 'FAILED', 'SYNCED')),
+            is_synced INTEGER DEFAULT 0,
+            duration REAL DEFAULT 0
+        )
+    """)
+
+    cursor.execute("PRAGMA table_info(packing_video);")
+    columns = [col[1] for col in cursor.fetchall()]
+    if "station_id" not in columns:
+        cursor.execute("ALTER TABLE packing_video ADD COLUMN station_id INTEGER DEFAULT 1;")
+    if "is_synced" not in columns:
+        cursor.execute("ALTER TABLE packing_video ADD COLUMN is_synced INTEGER DEFAULT 0;")
+    if "status" not in columns:
+        cursor.execute("ALTER TABLE packing_video ADD COLUMN status TEXT DEFAULT 'READY';")
+    if "duration" not in columns:
+        cursor.execute("ALTER TABLE packing_video ADD COLUMN duration REAL DEFAULT 0;")
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS system_settings (
+            config_key TEXT PRIMARY KEY,
+            config_value TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS stations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            ip_camera_1 TEXT,
+            ip_camera_2 TEXT,
+            safety_code TEXT,
+            camera_mode TEXT DEFAULT 'SINGLE',
+            camera_brand TEXT DEFAULT 'imou'
+        )
+    """)
+
+    cursor.execute("PRAGMA table_info(stations);")
+    st_cols = [col[1] for col in cursor.fetchall()]
+    if "camera_brand" not in st_cols:
+        cursor.execute("ALTER TABLE stations ADD COLUMN camera_brand TEXT DEFAULT 'imou';")
+    if "mac_address" not in st_cols:
+        cursor.execute("ALTER TABLE stations ADD COLUMN mac_address TEXT DEFAULT '';")
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'OPERATOR' CHECK(role IN ('ADMIN', 'OPERATOR')),
+            full_name TEXT NOT NULL DEFAULT '',
+            is_active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            must_change_password INTEGER DEFAULT 0
+        )
+    """)
+    cursor.execute("PRAGMA table_info(users);")
+    user_cols = [col[1] for col in cursor.fetchall()]
+    if "must_change_password" not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0;")
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            station_id INTEGER NOT NULL,
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_heartbeat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'EXPIRED')),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (station_id) REFERENCES stations(id) ON DELETE CASCADE
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            action TEXT NOT NULL,
+            details TEXT,
+            station_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS revoked_tokens (
+            jti TEXT PRIMARY KEY,
+            expires_at REAL NOT NULL
+        )
+    """)
+
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_recorded_at ON packing_video(recorded_at DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_station_id ON packing_video(station_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_status ON packing_video(status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_station_date ON packing_video(station_id, recorded_at DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_station_status ON sessions(station_id, status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_packing_video_waybill_code ON packing_video(waybill_code)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)")
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
+    if cursor.fetchone():
+        try:
+            cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
+            fts_sql = cursor.fetchone()[0] or ""
+            if "unicode61" in fts_sql:
+                cursor.execute("DROP TABLE IF EXISTS packing_video_fts")
+                cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_insert")
+                cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_update")
+                cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_delete")
+        except Exception:
+            pass
+
+    cursor.execute("""
+        CREATE VIRTUAL TABLE IF NOT EXISTS packing_video_fts USING fts5(
+            waybill_code,
+            content='packing_video',
+            content_rowid='id',
+            tokenize='trigram'
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TRIGGER IF NOT EXISTS packing_video_fts_insert AFTER INSERT ON packing_video BEGIN
+            INSERT INTO packing_video_fts(rowid, waybill_code) VALUES (new.id, new.waybill_code);
+        END
+    """)
+    cursor.execute("""
+        CREATE TRIGGER IF NOT EXISTS packing_video_fts_update AFTER UPDATE ON packing_video BEGIN
+            INSERT INTO packing_video_fts(packing_video_fts, rowid, waybill_code)
+                VALUES ('delete', old.id, old.waybill_code);
+            INSERT INTO packing_video_fts(rowid, waybill_code) VALUES (new.id, new.waybill_code);
+        END
+    """)
+    cursor.execute("""
+        CREATE TRIGGER IF NOT EXISTS packing_video_fts_delete AFTER DELETE ON packing_video BEGIN
+            INSERT INTO packing_video_fts(packing_video_fts, rowid, waybill_code)
+                VALUES ('delete', old.id, old.waybill_code);
+        END
+    """)
+
+    # Migrate encrypted values from v1 to v2 (handled natively in _init_schema_raw_sql fallback)
+    # Note: This is safe to run multiple times (idempotent) because it specifically
+    # looks for 'enc:v1:' prefix. If Alembic runs later and triggers Revision 3,
+    # it will safely no-op on already migrated data.
+    _migrate_v1_to_v2()
+
+
 def init_db():
     global _init_done, _init_db_path
     with _init_lock:
@@ -158,61 +318,34 @@ def init_db():
             conn.execute("PRAGMA foreign_keys = ON")
 
             cursor = conn.cursor()
-            # Note: SQLite ignores DATETIME vs TIMESTAMP distinction — both stored as TEXT
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS packing_video (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    station_id INTEGER DEFAULT 1,
-                    waybill_code TEXT NOT NULL,
-                    video_paths TEXT NOT NULL,
-                    record_mode TEXT NOT NULL,
-                    recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    status TEXT DEFAULT 'READY' CHECK(status IN ('READY', 'RECORDING', 'PROCESSING', 'FAILED', 'SYNCED')),
-                    is_synced INTEGER DEFAULT 0,
-                    duration REAL DEFAULT 0
-                )
-            """)
 
-            # Check and add columns if not exists (for migration)
-            cursor.execute("PRAGMA table_info(packing_video);")
-            columns = [col[1] for col in cursor.fetchall()]
-            if "station_id" not in columns:
-                cursor.execute("ALTER TABLE packing_video ADD COLUMN station_id INTEGER DEFAULT 1;")
-            if "is_synced" not in columns:
-                # L7: is_synced column reserved for future cloud-sync tracking
-                cursor.execute("ALTER TABLE packing_video ADD COLUMN is_synced INTEGER DEFAULT 0;")
-            if "status" not in columns:
-                cursor.execute("ALTER TABLE packing_video ADD COLUMN status TEXT DEFAULT 'READY';")
-            if "duration" not in columns:
-                cursor.execute("ALTER TABLE packing_video ADD COLUMN duration REAL DEFAULT 0;")
+            # --- Alembic Bootstrap ---
+            try:
+                from alembic import command
+                from alembic.config import Config
 
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS system_settings (
-                    config_key TEXT PRIMARY KEY,
-                    config_value TEXT
-                )
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS stations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    ip_camera_1 TEXT,
-                    ip_camera_2 TEXT,
-                    safety_code TEXT,
-                    camera_mode TEXT DEFAULT 'SINGLE',
-                    camera_brand TEXT DEFAULT 'imou'
-                )
-            """)
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='packing_video'")
+                has_tables = cursor.fetchone() is not None
 
-            cursor.execute("PRAGMA table_info(stations);")
-            st_cols = [col[1] for col in cursor.fetchall()]
-            if "camera_brand" not in st_cols:
-                cursor.execute("ALTER TABLE stations ADD COLUMN camera_brand TEXT DEFAULT 'imou';")
-            if "mac_address" not in st_cols:
-                cursor.execute("ALTER TABLE stations ADD COLUMN mac_address TEXT DEFAULT '';")
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='alembic_version'")
+                has_alembic = cursor.fetchone() is not None
 
+                alembic_cfg = Config(os.path.join(os.path.dirname(os.path.abspath(__file__)), "alembic.ini"))
+                db_uri = f"sqlite:///{os.path.abspath(DB_FILE).replace(os.sep, '/')}"
+                alembic_cfg.set_main_option("sqlalchemy.url", db_uri)
+
+                if has_tables and not has_alembic:
+                    logger.info("[DB] Existing database detected, stamping Alembic initial_schema.")
+                    command.stamp(alembic_cfg, "initial_schema")
+
+                command.upgrade(alembic_cfg, "head")
+                logger.info("[DB] Alembic schema is up to date.")
+            except Exception as e:
+                logger.warning(f"[DB] Alembic init failed: {e}. Falling back to raw SQL schema.")
+                _init_schema_raw_sql(cursor)
+
+            # --- Data Seeding and Housekeeping (Always runs) ---
             # One-time migration: import old single-station settings into stations table
-            # Guard: only run once, even if stations table is empty later (e.g. user deleted all)
             cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'stations_migrated'")
             if not cursor.fetchone():
                 cursor.execute("SELECT COUNT(*) FROM stations")
@@ -241,36 +374,6 @@ def init_db():
                     "INSERT OR REPLACE INTO system_settings (config_key, config_value) VALUES ('stations_migrated', '1')"
                 )
 
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT 'OPERATOR' CHECK(role IN ('ADMIN', 'OPERATOR')),
-                    full_name TEXT NOT NULL DEFAULT '',
-                    is_active INTEGER DEFAULT 1,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    must_change_password INTEGER DEFAULT 0
-                )
-            """)
-            cursor.execute("PRAGMA table_info(users);")
-            user_cols = [col[1] for col in cursor.fetchall()]
-            if "must_change_password" not in user_cols:
-                cursor.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0;")
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS sessions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    station_id INTEGER NOT NULL,
-                    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    last_heartbeat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    status TEXT DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'EXPIRED')),
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                    FOREIGN KEY (station_id) REFERENCES stations(id) ON DELETE CASCADE
-                )
-            """)
-
             cursor.execute("SELECT COUNT(*) FROM users")
             if cursor.fetchone()[0] == 0:
                 # Lazy import to avoid startup overhead when bcrypt not yet needed
@@ -286,27 +389,9 @@ def init_db():
                     "[DB] WARNING: Default admin password is '08012011'. Change it immediately after first login."
                 )
 
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS audit_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    action TEXT NOT NULL,
-                    details TEXT,
-                    station_id INTEGER,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-                )
-            """)
-
             # Clean up audit logs older than 90 days
             cursor.execute("DELETE FROM audit_log WHERE created_at < datetime('now', '-90 days')")
 
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS revoked_tokens (
-                    jti TEXT PRIMARY KEY,
-                    expires_at REAL NOT NULL
-                )
-            """)
             cursor.execute("DELETE FROM revoked_tokens WHERE expires_at < ?", (_time.time(),))
 
             # Expire all stale sessions on startup
@@ -325,75 +410,8 @@ def init_db():
             except Exception as e:
                 logger.warning(f"[DB] Orphan cleanup warning: {e}")
 
-            conn.commit()
-
-            # --- Indexes for packing_video ---
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_recorded_at ON packing_video(recorded_at DESC)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_station_id ON packing_video(station_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_pv_status ON packing_video(status)")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_pv_station_date ON packing_video(station_id, recorded_at DESC)"
-            )
-
-            # H1: Additional indexes for common queries
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_station_status ON sessions(station_id, status)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_packing_video_waybill_code ON packing_video(waybill_code)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)")
-
-            # --- FTS5 virtual table (external content, trigram for substring search) ---
-            # Migration: drop old unicode61 FTS5 table if it exists (tokenizer cannot be altered)
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
-            if cursor.fetchone():
-                # Check if it's the old unicode61 version — if so, drop and recreate
-                try:
-                    cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='packing_video_fts'")
-                    fts_sql = cursor.fetchone()[0] or ""
-                    if "unicode61" in fts_sql:
-                        cursor.execute("DROP TABLE IF EXISTS packing_video_fts")
-                        # Drop triggers too — they'll be recreated below
-                        cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_insert")
-                        cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_update")
-                        cursor.execute("DROP TRIGGER IF EXISTS packing_video_fts_delete")
-                except Exception:
-                    pass
-
-            cursor.execute("""
-                CREATE VIRTUAL TABLE IF NOT EXISTS packing_video_fts USING fts5(
-                    waybill_code,
-                    content='packing_video',
-                    content_rowid='id',
-                    tokenize='trigram'
-                )
-            """)
-
-            # --- Triggers for auto-sync FTS5 ---
-            cursor.execute("""
-                CREATE TRIGGER IF NOT EXISTS packing_video_fts_insert AFTER INSERT ON packing_video BEGIN
-                    INSERT INTO packing_video_fts(rowid, waybill_code) VALUES (new.id, new.waybill_code);
-                END
-            """)
-            cursor.execute("""
-                CREATE TRIGGER IF NOT EXISTS packing_video_fts_update AFTER UPDATE ON packing_video BEGIN
-                    INSERT INTO packing_video_fts(packing_video_fts, rowid, waybill_code)
-                        VALUES ('delete', old.id, old.waybill_code);
-                    INSERT INTO packing_video_fts(rowid, waybill_code) VALUES (new.id, new.waybill_code);
-                END
-            """)
-            cursor.execute("""
-                CREATE TRIGGER IF NOT EXISTS packing_video_fts_delete AFTER DELETE ON packing_video BEGIN
-                    INSERT INTO packing_video_fts(packing_video_fts, rowid, waybill_code)
-                        VALUES ('delete', old.id, old.waybill_code);
-                END
-            """)
-
-            # Rebuild FTS5 index from existing data using existing connection (H4: avoid nested connections)
+            # Rebuild FTS5 index from existing data
             _rebuild_fts_index(conn)
-
-            # D1: Migrate encrypted values from v1 (XOR) to v2 (Fernet)
-            _migrate_v1_to_v2()
 
             conn.commit()
 
