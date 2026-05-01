@@ -123,22 +123,17 @@ pip install --upgrade pip
 pip install -r requirements.txt
 log "Python deps installed OK"
 
-# 5. Build frontend (skip if dist/ already exists)
+# 5. Build frontend
 echo "[5/6] Build giao dien Frontend..."
 log "[5/6] Frontend..."
-if [ -d "web-ui/dist" ]; then
-    echo "       Frontend da build san... Bo qua."
-    log "Frontend dist already exists, skipped"
-else
-    cd web-ui
-    if [ ! -d "node_modules" ]; then
-        npm install
-    fi
-    npm run build
-    cd ..
-    echo "       Build Frontend... Hoan tat!"
-    log "Frontend built OK"
+cd web-ui
+if [ ! -d "node_modules" ]; then
+    npm install
 fi
+npm run build
+cd ..
+echo "       Build Frontend... Hoan tat!"
+log "Frontend built OK"
 
 # 6. Download MediaMTX for Live View
 echo "[6/6] Cai dat MediaMTX (WebRTC Live View)..."

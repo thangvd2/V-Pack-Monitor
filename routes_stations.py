@@ -5,23 +5,36 @@
 # =============================================================================
 
 
+import re
+
 from fastapi import HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 import api
 import database
 import network
 from auth import AdminUser, CurrentUser
 
+IP_PATTERN = re.compile(r"^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$")
+
 
 class StationPayload(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
+    name: str = Field(..., min_length=1, max_length=50)
     ip_camera_1: str = Field(..., min_length=7, max_length=45)
     ip_camera_2: str = ""
     safety_code: str = Field(..., min_length=1, max_length=50)
     camera_mode: str = Field(default="single")
     camera_brand: str = "imou"
     mac_address: str = ""
+
+    @field_validator("ip_camera_1", "ip_camera_2")
+    @classmethod
+    def validate_ip(cls, v):
+        if not v:
+            return v
+        if not IP_PATTERN.match(v):
+            raise ValueError(f"Invalid IP address format: {v}")
+        return v
 
 
 def _resolve_cam2_url(payload, url_fn):
@@ -34,16 +47,39 @@ def _resolve_cam2_url(payload, url_fn):
     return None
 
 
+class StationModel(BaseModel):
+    id: int
+    name: str
+    ip_camera_1: str
+    ip_camera_2: str
+    safety_code: str | None = None
+    camera_mode: str
+    camera_brand: str
+    mac_address: str
+    processing_count: int | None = None
+    camera_health: dict | None = None
+
+
+class StationsResponse(BaseModel):
+    data: list[StationModel]
+
+
 def register_routes(app):
     # --- STATIONS CRUD API ---
 
-    @app.get("/api/stations")
+    @app.get("/api/stations", response_model=StationsResponse, response_model_exclude_none=True)
     def get_stations_api(current_user: CurrentUser):
         stations = database.get_stations()
 
         with api._processing_lock:
             for s in stations:
                 s["processing_count"] = api._processing_count.get(s["id"], 0)
+
+        with api._camera_health_lock:
+            for s in stations:
+                sid = str(s["id"])
+                if sid in api._camera_health:
+                    s["camera_health"] = api._camera_health[sid]
 
         if current_user.get("role") != "ADMIN":
             for s in stations:
@@ -126,6 +162,11 @@ def register_routes(app):
             api.reconnect_status.pop(station_id, None)
         if sm:
             sm.stop()
+
+        # Safety net — always cleanup MediaMTX path even if sm is missing
+        api._mtx_remove_path(station_id)
+        api._mtx_remove_path(station_id, suffix="_cam2")
+
         with api._recorders_lock:
             rec = api.active_recorders.pop(station_id, None)
             api.active_waybills.pop(station_id, None)

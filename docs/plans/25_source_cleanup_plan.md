@@ -2,10 +2,15 @@
 
 **Created**: 2026-04-18
 **Verified**: 2026-04-19 by 5 parallel explore agents
-**Status**: DRAFT — Awaiting user confirmation
+**Status**: DONE — Closed 2026-04-24. Phase 1 + Phase 2 implemented via PRs #51-53 (v3.4.0).
 **Scope**: Fix verified issues found during full source code audit (Phase J)
-**Branch**: `feature/source-cleanup-v3.3.0` from `dev`
-**Version target**: v3.3.0
+**Version target**: v3.3.0 → completed in v3.4.0
+
+## DEFERRED (low value, high risk, or cosmetic only)
+
+- Phase 2C: Refactor `_handle_scan_locked` (213 lines) — core scan flow, high risk
+- Phase 3A: Test quality (broad exceptions, stale docstrings) — cosmetic
+- Phase 3B: Docs cleanup (ROADMAP.md counts, QUALITY_CONTROL.md versions) — cosmetic
 
 ## VERIFICATION RESULTS
 

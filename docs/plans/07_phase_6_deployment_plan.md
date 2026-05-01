@@ -1,5 +1,7 @@
 # Bản Thiết Kế Triển Khai Thương Mại: V-Pack Monitor (Giai đoạn 6)
 
+**Status**: DONE — Implemented in v3.x series.
+
 Triết lý của giai đoạn này là thay đổi hoàn toàn cách chúng ta coi V-Pack Monitor là một "Mã Nguồn Của Lập Trình Viên" sang một "Sản Phẩm Đóng Gói Hoàn Chỉnh". Chúng ta sẽ thực hiện 2 tiêu chuẩn triển khai tốt nhất cho khách hàng.
 
 ## 1. Phương án Ưu Tiên: Trọn Gói Windows Kịch Bản (The Bootstrap Script)

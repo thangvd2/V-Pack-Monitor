@@ -93,8 +93,6 @@ echo [%date% %time%] PYTHON_CMD=!PYTHON_CMD! >> "%LOG%"
 REM ============================================
 REM 2/7. KIEM TRA NODE.JS VA BUILD FRONTEND
 REM ============================================
-if exist "web-ui\dist" goto :frontend_done
-
 echo [2/7] Kiem tra Node.js...
 echo [%date% %time%] Checking Node.js... >> "%LOG%"
 node --version >nul 2>&1
@@ -159,10 +157,6 @@ popd
 echo [2/7] Build Frontend... Hoan tat!
 echo [%date% %time%] Frontend built OK >> "%LOG%"
 goto :frontend_next
-
-:frontend_done
-echo [2/7] Frontend da build san... Bo qua.
-echo [%date% %time%] Frontend dist already exists >> "%LOG%"
 
 :frontend_next
 

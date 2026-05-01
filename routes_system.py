@@ -403,6 +403,10 @@ class SettingsUpdate(BaseModel):
     RECORD_KEEP_DAYS: int
     RECORD_STREAM_TYPE: str = "main"
     CLOUD_PROVIDER: str = "NONE"
+    CLOUD_SYNC_SCHEDULED: str = "false"
+    CLOUD_SYNC_TIME: str = "02:00"
+    CAMERA_HEALTH_CHECK_INTERVAL: int = 60
+    CAMERA_DOWN_ALERT_MINUTES: int = 5
     GDRIVE_FOLDER_ID: str = ""
     S3_ENDPOINT: str = ""
     S3_ACCESS_KEY: str = ""
@@ -411,12 +415,60 @@ class SettingsUpdate(BaseModel):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
 
+    @field_validator("RECORD_STREAM_TYPE")
+    @classmethod
+    def validate_stream_type(cls, v):
+        if v not in ("main", "sub"):
+            raise ValueError("RECORD_STREAM_TYPE must be 'main' or 'sub'")
+        return v
+
     @field_validator("RECORD_KEEP_DAYS")
     @classmethod
     def validate_keep_days(cls, v):
         if v not in (0, 3, 7, 15, 30, 60, 90, 150, 365):
             raise ValueError("RECORD_KEEP_DAYS must be one of: 0, 3, 7, 15, 30, 60, 90, 150, 365")
         return v
+
+
+class SettingsResponse(BaseModel):
+    data: dict[str, str | int | float | None]
+
+
+class AnalyticsTodayData(BaseModel):
+    total_today: int
+    station_today: int
+
+
+class AnalyticsTodayResponse(BaseModel):
+    data: AnalyticsTodayData
+
+
+class CpuComponent(BaseModel):
+    percent: float
+    status: str
+    count: int
+
+
+class MemoryComponent(BaseModel):
+    total_gb: float
+    used_gb: float
+    percent: float
+    status: str
+
+
+class DiskComponent(BaseModel):
+    total_gb: float
+    used_gb: float
+    percent: float
+    status: str
+
+
+class HealthResponse(BaseModel):
+    cpu: CpuComponent
+    memory: MemoryComponent
+    disk: DiskComponent
+    uptime: str
+    uptime_seconds: int
 
 
 def register_routes(app):
@@ -435,7 +487,7 @@ def register_routes(app):
 
     # --- SYSTEM SETTINGS API ---
 
-    @app.get("/api/settings")
+    @app.get("/api/settings", response_model=SettingsResponse)
     def get_settings(admin: AdminUser):
         settings = database.get_all_settings()
         for k in _SENSITIVE_KEYS:
@@ -531,7 +583,7 @@ def register_routes(app):
 
     # --- ANALYTICS DASHBOARD API ---
 
-    @app.get("/api/analytics/today")
+    @app.get("/api/analytics/today", response_model=AnalyticsTodayResponse)
     def get_analytics_today(current_user: CurrentUser, station_id: int | None = None):
         conn = database.get_connection()
         with conn:
@@ -614,7 +666,7 @@ def register_routes(app):
 
     # --- SYSTEM HEALTH PRO API ---
 
-    @app.get("/api/system/health")
+    @app.get("/api/system/health", response_model=HealthResponse)
     def get_system_health(admin: AdminUser):
         cpu_percent = psutil.cpu_percent(interval=0.5)
         memory = psutil.virtual_memory()

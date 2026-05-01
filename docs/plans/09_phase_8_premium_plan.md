@@ -1,5 +1,7 @@
 # Kế Hoạch Triển Khai Giai Đoạn 8: Premium Features & Stability
 
+**Status**: DONE — Implemented in v3.x series.
+
 Giai đoạn 8 tập trung vào việc gia tăng tính ổn định cấp doanh nghiệp (Enterprise), các tiện ích cho chủ kho và công cụ Playback nâng cao cho việc truy xuất bằng chứng. 
 
 ## Tính năng 1: Cảnh báo "Bình Xăng" Ổ Cứng (Disk Health Dashboard)

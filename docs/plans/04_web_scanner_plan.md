@@ -1,5 +1,7 @@
 # Giai đoạn 4.1: Đưa Máy Quét Lên Web & Định hình Kiến trúc Đa Trạm (Multi-Station)
 
+**Status**: DONE — Implemented in v3.x series.
+
 Kế hoạch này giải quyết hai mục tiêu lớn: Loại bỏ hoàn toàn cửa sổ dòng lệnh Terminal đen ngòm để mang lại trải nghiệm chuẩn Web 100%, và định hướng kiến trúc mở rộng khi nhà kho tăng từ 1 lên nhiều trạm đóng hàng.
 
 ## 1. Trả lời câu hỏi: "Khi muốn thêm mới 1 vị trí đóng hàng thì sao?"

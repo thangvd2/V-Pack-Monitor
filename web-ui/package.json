@@ -1,7 +1,7 @@
 {
   "name": "v-pack-monitor",
   "private": true,
-  "version": "3.4.0",
+  "version": "3.5.0",
   "description": "V-Pack Monitor - Camera Recording & Packing Management System by VDT",
   "author": "VDT - Vu Duc Thang <thangvd2>",
   "license": "UNLICENSED",
@@ -11,7 +11,8 @@
     "build": "vite build",
     "lint": "eslint . && prettier --check \"src/**/*.{js,jsx,json,css}\"",
     "format": "prettier --write \"src/**/*.{js,jsx,json,css}\"",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.59.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
@@ -33,6 +35,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
     "prettier": "^3.8.3",
+    "typescript": "^6.0.3",
     "vite": "^8.0.1"
   }
 }

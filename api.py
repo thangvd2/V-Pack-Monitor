@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v3.4.0
+# V-Pack Monitor - CamDongHang v3.5.0
 import logging
 import sys
 
@@ -27,14 +27,17 @@ import time
 import urllib.error
 import urllib.request
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+import cloud_sync
 import database
 import network
 import recorder
+import telegram_bot
 import video_worker
 
 _SERVER_START_TIME = time.time()
@@ -86,6 +89,9 @@ _streams_lock = threading.Lock()  # guards stream_managers, reconnect_status
 _station_locks_lock = threading.Lock()  # guards _station_locks dict itself
 _cache_lock = threading.Lock()  # guards _update_check_cache
 _login_attempts_lock = threading.Lock()  # guards _login_attempts
+
+_camera_health = {}  # {station_id: {"online": bool, "last_seen": int, "latency_ms": int, "down_alert_sent": bool}}
+_camera_health_lock = threading.Lock()  # guards _camera_health
 
 _logger = logging.getLogger("vpack")
 
@@ -168,8 +174,29 @@ def _mtx_remove_path(station_id, suffix="", station_name=""):
     except urllib.error.HTTPError as e:
         if e.code != 404:
             logger.error(f"[MTX] delete {name} failed: {e}")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[MTX] Failed to remove path {name}: {e}")
+
+
+def _mtx_cleanup_orphaned_paths(station_ids):
+    """Remove MediaMTX paths for stations that no longer exist in DB."""
+    import re
+
+    try:
+        req = urllib.request.Request(f"{MTX_API}/v3/paths/list", method="GET")
+        resp = urllib.request.urlopen(req, timeout=5)
+        paths = json.loads(resp.read())
+        items = paths.get("items", [])
+        pattern = re.compile(r"^station_(\d+)(?:_cam2)?$")
+        for p in items:
+            name = p.get("name", "")
+            m = pattern.match(name)
+            if m and int(m.group(1)) not in station_ids:
+                suffix = name.removeprefix(f"station_{m.group(1)}")
+                _mtx_remove_path(int(m.group(1)), suffix=suffix)
+                logger.info(f"[MTX] Cleaned orphaned path: {name}")
+    except Exception as e:
+        logger.debug(f"[MTX] Cleanup scan skipped (MediaMTX not available): {e}")
 
 
 class CameraStreamManager:
@@ -326,9 +353,6 @@ def get_rtsp_sub_url(ip, safety_code, channel=1, brand="imou"):
         return f"rtsp://admin:{safety_code}@{ip}:554/stream2"
     else:
         return f"rtsp://admin:{safety_code}@{ip}:554/cam/realmonitor?channel={channel}&subtype=1"
-
-
-import telegram_bot
 
 
 def _cancel_recording_timer(station_id):
@@ -556,6 +580,11 @@ async def lifespan(app: FastAPI):
     recovery_thread = threading.Thread(target=_recover_pending_records, daemon=True)
     recovery_thread.start()
     stations = database.get_stations()
+
+    # Cleanup orphaned MediaMTX paths from previous sessions
+    station_ids = {st["id"] for st in stations}
+    _mtx_cleanup_orphaned_paths(station_ids)
+
     live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
     for st in stations:
         brand = st.get("camera_brand", "imou")
@@ -614,8 +643,113 @@ async def lifespan(app: FastAPI):
 
     cleanup_task = asyncio.create_task(_periodic_audit_cleanup())
 
+    async def _periodic_cloud_sync():
+        _last_sync_day = None
+        while True:
+            await asyncio.sleep(3600)  # 1 hour
+            try:
+                provider = database.get_setting("CLOUD_PROVIDER")
+                enabled = database.get_setting("CLOUD_SYNC_SCHEDULED")
+                schedule_time = database.get_setting("CLOUD_SYNC_TIME") or "02:00"
+
+                if provider and provider != "NONE" and enabled == "true":
+                    now = datetime.now()
+                    try:
+                        scheduled_hour = int(schedule_time.split(":")[0])
+                    except Exception:
+                        scheduled_hour = 2
+
+                    if now.hour == scheduled_hour and _last_sync_day != now.date():
+                        _last_sync_day = now.date()
+                        await asyncio.to_thread(cloud_sync.process_cloud_sync)
+            except Exception as e:
+                logger.error(f"[CLOUD] Scheduled sync failed: {e}")
+
+    cloud_sync_task = asyncio.create_task(_periodic_cloud_sync())
+
+    async def _periodic_camera_health_check():
+        while True:
+            try:
+                interval = int(database.get_setting("CAMERA_HEALTH_CHECK_INTERVAL", 60))
+            except Exception:
+                interval = 60
+            await asyncio.sleep(interval)
+            try:
+                try:
+                    alert_minutes = int(database.get_setting("CAMERA_DOWN_ALERT_MINUTES", 5))
+                except Exception:
+                    alert_minutes = 5
+
+                stations = database.get_stations()
+                for st in stations:
+                    station_id = str(st["id"])
+                    ip = st.get("ip_camera_1")
+                    if not ip:
+                        continue
+
+                    is_online, latency = await asyncio.to_thread(network.check_ping, ip, 2000)
+                    now_ts = int(time.time())
+
+                    with _camera_health_lock:
+                        if station_id not in _camera_health:
+                            _camera_health[station_id] = {
+                                "online": is_online,
+                                "last_seen": now_ts if is_online else 0,
+                                "latency_ms": latency,
+                                "down_alert_sent": False,
+                                "down_time": now_ts if not is_online else 0,
+                            }
+                            state_changed = True
+                            prev_online = None
+                        else:
+                            prev_online = _camera_health[station_id]["online"]
+                            state_changed = prev_online != is_online
+
+                            _camera_health[station_id]["online"] = is_online
+                            _camera_health[station_id]["latency_ms"] = latency
+                            if is_online:
+                                _camera_health[station_id]["last_seen"] = now_ts
+
+                        current_state = dict(_camera_health[station_id])
+
+                    if state_changed:
+                        notify_sse("camera_status", {"station_id": station_id, "online": is_online})
+
+                        if is_online and prev_online is False and current_state.get("down_alert_sent"):
+                            duration = now_ts - current_state.get("down_time", now_ts)
+                            dur_mins = duration // 60
+                            telegram_bot.send_telegram_message(
+                                f"✅ <b>Camera UP</b>\nTrạm: {st.get('name')}\nThời gian gián đoạn: {dur_mins} phút"
+                            )
+                            with _camera_health_lock:
+                                _camera_health[station_id]["down_alert_sent"] = False
+
+                        if not is_online and prev_online is not False:
+                            with _camera_health_lock:
+                                _camera_health[station_id]["down_time"] = now_ts
+
+                    if not is_online:
+                        with _camera_health_lock:
+                            down_time = _camera_health[station_id].get("down_time", now_ts)
+                            alert_sent = _camera_health[station_id].get("down_alert_sent", False)
+
+                        if not alert_sent and (now_ts - down_time) >= alert_minutes * 60:
+                            dt_str = datetime.fromtimestamp(down_time).strftime("%Y-%m-%d %H:%M:%S")
+                            telegram_bot.send_telegram_message(
+                                f"⚠️ <b>Camera DOWN</b>\nTrạm: {st.get('name')}\nIP: {ip}\nThời gian mất kết nối: {dt_str}"
+                            )
+                            with _camera_health_lock:
+                                _camera_health[station_id]["down_alert_sent"] = True
+
+            except Exception as e:
+                logger.error(f"[HEALTH] Camera health check failed: {e}")
+
+    camera_health_task = asyncio.create_task(_periodic_camera_health_check())
+
     yield
     cleanup_task.cancel()
+    cloud_sync_task.cancel()
+    camera_health_task.cancel()
     with _recording_timers_lock:
         for timer in _recording_timers.values():
             timer.cancel()
@@ -643,6 +777,10 @@ def _get_cors_origins():
     origins = [
         "http://localhost:8001",
         "http://127.0.0.1:8001",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
     ]
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

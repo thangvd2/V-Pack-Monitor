@@ -38,8 +38,7 @@ class TestStationValidation:
         assert r.status_code == 422
 
     def test_create_station_very_long_name(self, client, admin_headers):
-        """Names exceeding 50 characters are currently accepted."""
-        # TODO(Plan #19): Backend should reject name > 50 characters
+        """Names exceeding 50 characters should be rejected."""
         r = client.post(
             "/api/stations",
             headers=admin_headers,
@@ -50,8 +49,7 @@ class TestStationValidation:
                 "camera_mode": "SINGLE",
             },
         )
-        assert r.status_code == 200
-        assert r.json()["status"] == "success"
+        assert r.status_code == 422
 
     def test_create_station_empty_ip_camera(self, client, admin_headers):
         """Empty ip_camera_1 is currently accepted."""
@@ -84,8 +82,7 @@ class TestStationValidation:
         assert r.status_code == 422
 
     def test_create_station_invalid_ip_format(self, client, admin_headers):
-        """Invalid IP format is currently accepted — no server-side regex check."""
-        # TODO(Plan #19): Backend should validate IP address format
+        """Invalid IP format should be rejected."""
         r = client.post(
             "/api/stations",
             headers=admin_headers,
@@ -96,8 +93,7 @@ class TestStationValidation:
                 "camera_mode": "SINGLE",
             },
         )
-        assert r.status_code == 200
-        assert r.json()["status"] == "success"
+        assert r.status_code == 422
 
 
 class TestStationConflict:
@@ -210,8 +206,7 @@ class TestSettingsValidation:
         assert database.get_setting("RECORD_STREAM_TYPE") == "sub"
 
     def test_settings_invalid_stream_type_accepted(self, client, admin_headers):
-        """Invalid stream type is persisted without validation."""
-        # TODO(Plan #16): Backend should validate RECORD_STREAM_TYPE ∈ {main, sub}
+        """Invalid stream type should be rejected."""
         r = client.post(
             "/api/settings",
             headers=admin_headers,
@@ -221,8 +216,7 @@ class TestSettingsValidation:
                 "CLOUD_PROVIDER": "NONE",
             },
         )
-        assert r.json()["status"] == "success"
-        assert database.get_setting("RECORD_STREAM_TYPE") == "INVALID_TYPE"
+        assert r.status_code == 422
 
 
 class TestAutoUpdate:

@@ -3,7 +3,7 @@
 > **Version:** v2.2.0 → v2.3.0
 > **Date:** 2026-04-11
 > **Author:** VDT
-> **Status:** PENDING REVIEW
+> **Status:** DONE — Implemented in v3.x series. All responsive CSS (min-h-[44px], sm:/md:/lg: breakpoints, mobile-friendly touch targets) applied across all components.
 
 ## Mục tiêu
 

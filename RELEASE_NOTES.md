@@ -2,6 +2,70 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v3.5.0] - 2026-05-02 (Infrastructure & Quality Overhaul) 🚀 MINOR RELEASE
+
+### 🚀 Tính Năng Mới
+- **SSE Auto-Reconnection (PR #73)**:
+  - Tự động khôi phục kết nối SSE khi mất mạng, kèm re-fetch dữ liệu đầy đủ.
+  - Trải nghiệm người dùng không bị gián đoạn khi network flaky.
+- **Cloud Sync Scheduler (PR #80)**:
+  - Backup tự động lên Google Drive / S3 theo lịch trình (mặc định 02:00 hàng ngày).
+  - Toggle bật/tắt + chọn thời gian sync trong SetupModal.
+- **Camera Health Monitoring (PR #54, PR #81)**:
+  - Kiểm tra sức khỏe camera định kỳ (60s), hiển thị trạng thái online/offline + latency.
+  - Cảnh báo Telegram khi camera mất kết nối > 5 phút.
+  - Red pulse indicator trên Dashboard khi camera offline.
+- **Alembic Database Migration (PR #83)**:
+  - Hệ thống migration chuyên nghiệp thay thế handwritten ALTER TABLE.
+  - 3 revisions: initial schema, FTS5 unicode61→trigram, crypto v1→v2.
+  - Raw SQL fallback nếu Alembic chưa available.
+  - `render_as_batch=True` cho SQLite compatibility.
+- **Section-Level Error Boundaries (PR #65)**:
+  - Cô lập lỗi theo khu vực UI — lỗi SystemHealth không crash toàn bộ Dashboard.
+- **Input Validation Harden (PR #78)**:
+  - IP regex validator, station name max_length 50, stream type validator.
+  - Reject invalid input với HTTP 422 thay vì silently accept.
+
+### ⚡ Performance
+- **Bundle Optimization (PR #79)**:
+  - React.lazy cho 6 heavy components (Dashboard, SetupModal, VideoPlayerModal, UserManagementModal, AdminDashboard, SystemHealth).
+  - Suspense + ErrorBoundary wrapping.
+  - Main bundle ~246KB, Dashboard chunk ~394KB.
+
+### 🔧 Refactoring & Migration
+- **TypeScript Migration (PR #70)**:
+  - Tất cả components .jsx → .tsx với type safety đầy đủ.
+  - Type definitions cho API responses và component props.
+- **Pydantic API Response Models (PR #72)**:
+  - Explicit response shape cho tất cả API endpoints.
+- **Custom Hooks Extraction (PR #63)**:
+  - Tách useAuth, useBarcodeScanner, useRecords, useSSE, useToast, useConfirmDialog.
+- **Pytest Parametrize (PR #64)**:
+  - Migrate test cases sang pytest.mark.parametrize, giảm duplicate code.
+
+### 🧪 Testing
+- **E2E Playwright Framework (PR #66)**:
+  - 6 test suites: auth, admin grid, operator scan, records, settings.
+  - CI integration, auto-run trên mỗi push.
+
+### 🐛 Bug Fixes
+- **PIP QSV Crash on Windows (PR #67)**: Sửa crash khi dùng Intel Quick Sync GPU encoding với PIP mode.
+- **Records Station Filter Lock (PR #68)**: Lock station filter khi xem single station view.
+- **Orphaned Records 422 (PR #69)**: Sửa lỗi 422 khi xem records của station đã bị xóa.
+- **MediaMTX Orphaned Paths (PR #75)**: Cleanup orphaned MediaMTX paths khi xóa station.
+- **PyInstaller Hidden Imports (PR #77)**: Thêm jwt, bcrypt, psutil vào build.
+- **Remove tsc_errors.txt artifact (PR #71)**: Dọn file artifact không cần thiết.
+
+### 📚 Documentation
+- Plans 41-61 với status tracking (PR #55-60, #74, #76, #82, #84)
+- Hardware Requirements document cho 2 camera Dahua (PR #85, #86)
+- Design Patterns audit — 75 patterns documented (PR #58)
+
+### 📊 Stats
+- **PRs merged**: 31 (13 code + 18 docs/infra)
+- **Files changed**: 137 (+6,216 / -1,381 lines)
+- **Dependencies added**: alembic>=1.13.1, sqlalchemy>=1.4.23
+
 ## [v3.4.0] - 2026-04-23 (Admin Tab Navigation & UI Revamp) 🚀 MINOR RELEASE
 
 ### 🚀 Tính Năng Mới

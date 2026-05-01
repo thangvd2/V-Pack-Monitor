@@ -1,5 +1,7 @@
 # Giai đoạn 4.2: Mở Rộng Hệ Sinh Thái (Giả lập, Đa Trạm, Quản lý Lưu trữ)
 
+**Status**: DONE — Implemented in v3.x series.
+
 Bản thiết kế này nhằm đưa V-Pack Monitor từ phần mềm 1-Trạm cục bộ thành phần mềm quy mô Quản lý Doanh nghiệp (Enterprise-ready).
 
 ## Cấu trúc hạng mục

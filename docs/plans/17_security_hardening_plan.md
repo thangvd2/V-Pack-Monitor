@@ -1,5 +1,7 @@
 # Kế Hoạch #17: Security Hardening — 26 Lỗ Hổng Bảo Mật
 
+**Status**: DONE — Implemented in v3.x series.
+
 **Phiên bản:** v2.2.4
 **Ngày lập:** 2026-04-12
 **Ngày hoàn thành:** 2026-04-12
