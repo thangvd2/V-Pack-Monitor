@@ -53,9 +53,12 @@ chmod +x install_macos.sh
 docker-compose up -d
 ```
 
+## 💻 Yêu cầu Cấu hình Phần cứng
+Để đảm bảo hệ thống ghi hình ổn định (đặc biệt là tính năng PIP và encode H.265), vui lòng tham khảo chi tiết tại: **[Tài liệu Yêu cầu Phần cứng (HARDWARE_REQUIREMENTS.md)](docs/HARDWARE_REQUIREMENTS.md)**.
+
 ## 🛠 Cài Đặt Thủ Công (Developer)
 
-**Yêu cầu:** Python 3.10+ & Node.js 18+
+**Yêu cầu Phần mềm:** Python 3.10+ & Node.js 18+
 
 ```bash
 # Backend
