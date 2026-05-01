@@ -1,5 +1,5 @@
 # =============================================================================
-# V-Pack Monitor - CamDongHang v3.4.0
+# V-Pack Monitor - CamDongHang v3.5.0
 import logging
 import sys
 
