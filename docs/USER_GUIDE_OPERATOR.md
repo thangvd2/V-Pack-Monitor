@@ -1,6 +1,6 @@
 Copyright (c) 2024-2026 VDT - Vu Duc Thang (thangvd2)
 
-# V-Pack Monitor v2.1.0 — Hướng Dẫn Sử Dụng cho OPERATOR
+# V-Pack Monitor v3.5.0 — Hướng Dẫn Sử Dụng cho OPERATOR
 
 ## Mục Lục
 
@@ -115,6 +115,8 @@ Sau khi quét thành công:
 
 - Badge chuyển sang 🔴 **"Đang đóng hàng: [MÃ VẠCH]"**
 - Camera bắt đầu ghi hình
+
+> **Lưu ý an toàn (Auto-stop):** Mỗi video có thời lượng tối đa là 10 phút. Nếu bạn quên quét mã kiện tiếp theo, hệ thống sẽ tự động dừng ghi và lưu video. Ở phút thứ 9, hệ thống sẽ phát tiếng "beep" liên tục và hiển thị đồng hồ đếm ngược trên màn hình để nhắc nhở.
 
 > Video được ghi dưới dạng MPEG-TS. Dữ liệu được ghi liên tục nên không sợ mất video khi mất điện đột ngột.
 
@@ -270,3 +272,4 @@ Trạm bạn đang giữ sẽ được **tự động giải phóng**, người 
 | Không thấy nút Grid | Cần 2 trạm trở lên nút **LayoutGrid** mới hiện. |
 | Không thấy chế độ Dual/PIP | Trạm chỉ có 1 camera. Yêu cầu Administrator cấu hình thêm camera phụ. |
 | Thanh cảnh báo ổ cứng đỏ | Báo Administrator ngay để tránh mất dữ liệu. |
+| Đang đóng hàng thấy tiếng beep liên tục | Tính năng Tự động dừng (Auto-stop) sắp kích hoạt. Quét mã tiếp theo để bắt đầu video mới. |
