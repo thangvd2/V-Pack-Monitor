@@ -71,7 +71,7 @@ Layer 1 — Pre-commit hooks (LOCAL, block commit)
   ✅ STATUS: ĐANG CHẠY — pre-commit install, ruff.toml config
 
 Layer 1.5 — Pre-push hook (LOCAL, block push)
-  └── pytest → 322 tests, fail = không push được
+  └── pytest → 326 tests, fail = không push được
   ✅ STATUS: ĐANG CHẠY — pre-push install
 
 Layer 2 — CI Pipeline (REMOTE, block merge)
@@ -332,7 +332,7 @@ Ghi vào `docs/incidents/YYYY-MM-DD-title.md`:
 
 ## Tooling Status & Roadmap
 
-### Hiện có (v3.0.0)
+### Hiện có (v3.5.0)
 
 | Tool | Enforce cái gì | Layer |
 |---|---|---|
@@ -341,12 +341,13 @@ Ghi vào `docs/incidents/YYYY-MM-DD-title.md`:
 | vite build (CI) | Frontend build | CI |
 | Branch protection | PR + review cho master | GitHub |
 | AGENTS.md | AI session rules | Auto-load |
+| Pre-commit hooks | Lint + test trước khi commit | Local |
+| E2E tests | Frontend flow verification | CI |
 
 ### Thiếu — theo thứ tự ưu tiên
 
 | # | Tool | Enforce cái gì | Giải quyết vấn đề |
 |---|---|---|---|
-| 1 | **Pre-commit hooks** | Lint + test trước khi commit | Block lỗi tại local, không đợi CI |
 | 2 | **Structured logging** | Thay print() → logging module | Debug được khi có incident |
 | 3 | **pip-audit / npm audit** | Scan dependency vulnerabilities | P0 security issues |
 | 4 | **DB backup cron** | Daily backup recordings DB | Data loss prevention |
@@ -354,7 +355,6 @@ Ghi vào `docs/incidents/YYYY-MM-DD-title.md`:
 | 6 | **pytest-cov** | Test coverage report | Biết module nào thiếu test |
 | 7 | **Integration tests** | End-to-end scan→record→video flow | Catch cross-module bugs |
 | 8 | **Process manager** | Auto-restart khi crash | Availability |
-| 9 | **E2E tests (Playwright)** | Frontend flow verification | Catch UI regression |
 | 10 | **Rollback mechanism** | 1-click revert | Recoverability |
 
 ### Metrics — chỉ đo những gì có tooling

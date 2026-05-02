@@ -1,3 +1,6 @@
+> [!WARNING]
+> **⚠️ OUTDATED — Post-v2.1.0 brainstorm. Most items implemented in v2.2-v3.5. Kept for historical reference.**
+
 # Brainstorm — Hướng Phát Triển Tiếp Theo (Post v2.1.0)
 
 > **Ngày:** 2026-04-10
