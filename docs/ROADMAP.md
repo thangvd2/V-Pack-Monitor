@@ -1,6 +1,13 @@
-# V-Pack Monitor — Roadmap & Backlog (Updated 2026-04-15)
+# V-Pack Monitor — Roadmap & Backlog (Updated 2026-05-02)
 
 ## COMPLETED
+- [x] v3.5.0 — Infrastructure & Quality Overhaul (SSE auto-reconnect, Cloud Sync Scheduler, Camera Health Monitoring, Alembic migration, TypeScript, Pydantic, E2E Playwright)
+- [x] v3.4.0 — Admin Tab Navigation & UI Revamp
+- [x] v3.3.2 — Performance & Cleanup
+- [x] v3.3.1 — Bugfixes & Cleanup
+- [x] v3.3.0 — Phase 3 Infrastructure & Pydantic v2 Migration
+- [x] v3.2.0 — .ai-sync Protocol, Release Workflow, Enforcement Layers
+- [x] v3.1.0 — Auto-Stop Recording, Notification Sounds, Quality Enforcement
 - [x] v3.0.0 — Major Security Hardening (111 issues: Fernet encryption, FK enforcement, thread locks, path traversal prevention, HTTP status codes, input validation, recorder path sanitization, AbortController, confirm modal)
 - [x] v2.4.2 — Security & Stability Audit (22 issues fixed: FTS5 crash guard, Zip Slip prevention, SSE stale closure, CORS hardening, error boundary, search debounce)
 - [x] v2.4.1 — Bugfix (semver version comparison for auto-update)
@@ -49,11 +56,11 @@
 - Version badge trên UI header
 - Changelog popup sau khi update
 
-### 5. Camera Health Monitoring
-- Auto-reconnect khi camera offline > X phút (configurable)
-- Telegram alert khi camera down lâu
-- Camera latency/quality metrics trong SystemHealth
-- Camera uptime percentage per day/week
+### 5. ~~Camera Health Monitoring~~ ✅ DONE (v3.5.0)
+- ~~Auto-reconnect khi camera offline > X phút (configurable)~~
+- ~~Telegram alert khi camera down lâu~~
+- ~~Camera latency/quality metrics trong SystemHealth~~
+- ~~Camera uptime percentage per day/week~~
 
 ### 6. ~~Video Search & Filter nâng cao~~ ✅ DONE (v2.4.0)
 - FTS5 full-text search (replacing LIKE)
