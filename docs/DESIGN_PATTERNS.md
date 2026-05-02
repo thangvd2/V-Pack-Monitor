@@ -1,6 +1,6 @@
-# Design Patterns — V-Pack Monitor v3.4.0
+# Design Patterns — V-Pack Monitor v3.5.0
 
-> Audit date: 2026-04-24 | 36 patterns identified.
+> Audit date: 2026-05-02 | 36 patterns identified.
 > Related: [BEST_PRACTICES.md](./BEST_PRACTICES.md) for coding conventions and standard techniques.
 
 ---
@@ -422,6 +422,6 @@ Cross-checks VERSION vs api.py header vs package.json vs README.md. Fails CI on 
 - **Security**: Fernet encryption, JWT with revocation, path traversal defense, RBAC
 
 ### Opportunities
-- **Custom hooks**: App.jsx at 2200+ lines — extraction candidates: `useSSE()`, `useAuth()`, `useToast()`, `useDebouncedFetch()`
-- **Parameterized tests**: Use `@pytest.mark.parametrize` instead of test method enumeration
-- **Error boundaries**: Only wraps App root — individual risky sections (SSE handler, video player) lack local boundaries
+- ~~**Custom hooks**: App.jsx at 2200+ lines — extraction candidates: `useSSE()`, `useAuth()`, `useToast()`, `useDebouncedFetch()`~~ ✅ DONE (v3.5.0)
+- ~~**Parameterized tests**: Use `@pytest.mark.parametrize` instead of test method enumeration~~ ✅ DONE (v3.5.0)
+- ~~**Error boundaries**: Only wraps App root — individual risky sections (SSE handler, video player) lack local boundaries~~ ✅ DONE (v3.5.0)

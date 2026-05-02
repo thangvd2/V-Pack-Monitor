@@ -1,4 +1,4 @@
-# Best Practices — V-Pack Monitor v3.4.0
+# Best Practices — V-Pack Monitor v3.5.0
 
 > Coding conventions, standard techniques, and tooling choices applied throughout the codebase.
 > Related: [DESIGN_PATTERNS.md](./DESIGN_PATTERNS.md) for architectural design patterns.
@@ -31,7 +31,7 @@
 ### JWT + Token Revocation
 **File:** `auth.py`
 
-Access tokens (15min) + Refresh tokens (7days). Revocation list stored in DB. `get_current_user()` checks revocation on every request.
+Access tokens (8 hours). Revocation list stored in DB. `get_current_user()` checks revocation on every request.
 
 ### Secret Management (Encryption at Rest)
 **File:** `database.py:27-56`

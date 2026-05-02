@@ -1,3 +1,6 @@
+> [!WARNING]
+> **⚠️ OUTDATED — All issues fixed in v2.2.2 and v3.0.0. Kept for historical reference.**
+
 # Windows Fixes Needed — V-Pack Monitor v2.1.0
 
 > Các vấn đề cần fix khi chuyển sang làm việc trên máy Windows.
