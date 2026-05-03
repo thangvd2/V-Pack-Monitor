@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import api
 import database
 import video_worker
+import vpack.state
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -164,7 +165,7 @@ class TestAutoStopTimer:
         _cancel_real_timers(sid)
 
         with patch.object(video_worker, "submit_stop_and_save", return_value=True):
-            with patch.object(api, "notify_sse") as mock_sse:
+            with patch.object(vpack.state, "notify_sse") as mock_sse:
                 api._auto_stop_recording(sid, actual_rid)
 
         # Recorders cleaned up
@@ -207,7 +208,7 @@ class TestAutoStopTimer:
         _cancel_real_timers(sid)
 
         with patch.object(video_worker, "submit_stop_and_save", return_value=True):
-            with patch.object(api, "notify_sse") as mock_sse:
+            with patch.object(vpack.state, "notify_sse") as mock_sse:
                 client.post(
                     "/api/scan",
                     headers=operator_headers,
@@ -226,7 +227,7 @@ class TestAutoStopTimer:
     # 8. Warning not emitted when no recorder exists
     # ------------------------------------------------------------------
     def test_warning_not_emitted_when_not_recording(self, client):
-        with patch.object(api, "notify_sse") as mock_sse:
+        with patch.object(vpack.state, "notify_sse") as mock_sse:
             api._emit_recording_warning(99999)
             mock_sse.assert_not_called()
 
@@ -238,7 +239,7 @@ class TestAutoStopTimer:
         sid = sample_station_id
         _cancel_real_timers(sid)
 
-        with patch.object(api, "notify_sse") as mock_sse:
+        with patch.object(vpack.state, "notify_sse") as mock_sse:
             api._emit_recording_warning(sid)
             mock_sse.assert_called_once()
 
@@ -337,7 +338,7 @@ class TestAutoStopTimer:
         _cancel_real_timers(sid)
 
         with patch.object(video_worker, "submit_stop_and_save", return_value=False):
-            with patch.object(api, "notify_sse") as mock_sse:
+            with patch.object(vpack.state, "notify_sse") as mock_sse:
                 api._auto_stop_recording(sid, actual_rid)
 
         rec = database.get_record_by_id(actual_rid)
