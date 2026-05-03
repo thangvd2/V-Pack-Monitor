@@ -21,7 +21,7 @@ Scanner USB ──→ Browser ──→ FastAPI ──→ SQLite DB ──→ Cl
 - 🎬 **Video Player Pro:** Tua 0.5x-2x, Snapshot chụp khung hình JPG.
 - 🔍 **Auto-Discovery Camera:** Tự động tìm lại camera khi đổi IP (quét theo MAC Address), không cần can thiệp tay.
 - 🔐 **JWT Authentication & RBAC:** Đăng nhập bằng Username/Password. Phân quyền ADMIN (toàn quyền) / OPERATOR (ghi đơn & xem lịch sử). Session locking ngăn xung đột multi-user.
-- 🖥️ **Station Assignment:** OPERATOR phải chọn trạm sau khi đăng nhập. Trạm đangoccupied không thể chọn. Heartbeat giữ session sống. ADMIN tự do xem tất cả trạm.
+- 🖥️ **Station Assignment:** OPERATOR phải chọn trạm sau khi đăng nhập. Trạm đang occupied không thể chọn. Heartbeat giữ session sống. ADMIN tự do xem tất cả trạm.
 - 🖥️ **Multi-Camera Overview Grid:** Xem tất cả camera cùng lúc trong lưới responsive. Click-to-zoom, per-station status realtime.
 - 📹 **Dual Camera + PIP:** Trạm 2 camera → hiển thị song song (Dual) hoặc Picture-in-Picture. Click PIP để swap camera chính/phụ.
 - 📊 **Dashboard & Analytics Pro:** Biểu đồ sản xuất theo giờ, xu hướng 7 ngày, so sánh năng suất trạm. Xuất CSV.
