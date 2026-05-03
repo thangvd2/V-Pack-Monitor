@@ -1,6 +1,7 @@
 import os
 import sqlite3
 
+import pytest
 from database import (
     _ENCRYPT_PREFIX,
     _SENSITIVE_KEYS,
@@ -101,19 +102,19 @@ class TestInitDb:
         ]:
             assert expected in tables
 
-    def test_default_admin_created(self):
+    def test_default_admin_created(self, isolate_db):
         admin = get_user_by_username("admin")
         assert admin is not None
         assert admin["role"] == "ADMIN"
         assert admin["must_change_password"] == 1
 
-    def test_default_admin_password_is_08012011(self):
+    def test_default_admin_password_is_08012011(self, isolate_db):
         admin = get_user_by_username("admin")
         import bcrypt
 
         assert bcrypt.checkpw(b"08012011", admin["password_hash"].encode())
 
-    def test_idempotent(self):
+    def test_idempotent(self, isolate_db):
         init_db()
         init_db()
         admin = get_user_by_username("admin")
@@ -124,6 +125,7 @@ class TestInitDb:
     def test_no_ghost_station_after_delete_all(self, tmp_path, monkeypatch):
         """Deleting all stations then re-initing DB should NOT auto-create a station."""
         import database
+
         monkeypatch.setattr(database, "DB_FILE", str(tmp_path / "test.db"))
         database._init_done = False
 
@@ -142,6 +144,7 @@ class TestInitDb:
         assert len(database.get_stations()) == 0, "Ghost station appeared after re-init!"
 
 
+@pytest.mark.usefixtures("isolate_db")
 class TestSettings:
     def test_set_get_roundtrip(self):
         set_setting("TEST_KEY", "hello")
@@ -176,6 +179,7 @@ class TestSettings:
         assert get_setting("K3") == "v3"
 
 
+@pytest.mark.usefixtures("isolate_db")
 class TestRecords:
     def test_create_record_recording_status(self, sample_station_id):
         rid = create_record(sample_station_id, "WB001", "SINGLE")
@@ -307,6 +311,7 @@ class TestRecords:
         assert get_record_by_id(rid) is None
 
 
+@pytest.mark.usefixtures("isolate_db")
 class TestStations:
     def test_add_get_station(self):
         sid = add_station(
@@ -460,6 +465,7 @@ class TestStations:
         assert get_station(99999) is None
 
 
+@pytest.mark.usefixtures("isolate_db")
 class TestUsers:
     def test_create_user(self):
         uid = create_user("testuser", "Password123!", "OPERATOR", "Test User")
@@ -534,6 +540,7 @@ class TestUsers:
         assert "user2" in usernames
 
 
+@pytest.mark.usefixtures("isolate_db")
 class TestSessions:
     def test_create_get_active_session(self, admin_user_id, sample_station_id):
         create_session(admin_user_id, sample_station_id)
@@ -593,6 +600,7 @@ class TestSessions:
         assert session["status"] == "EXPIRED"
 
 
+@pytest.mark.usefixtures("isolate_db")
 class TestAudit:
     def test_log_and_get_audit(self, admin_user_id):
         log_audit(admin_user_id, "LOGIN", "test details")
@@ -623,6 +631,7 @@ class TestAudit:
         assert len(logs) == 0
 
 
+@pytest.mark.usefixtures("isolate_db")
 class TestAnalytics:
     def test_hourly_stats_zero_fill(self, sample_station_id):
         stats = get_hourly_stats()
@@ -665,6 +674,7 @@ class TestAnalytics:
         assert any(c["station_name"] == "Comp1" for c in comparison)
 
 
+@pytest.mark.usefixtures("isolate_db")
 class TestTokenRevocation:
     def test_revoke_check_jti(self):
         revoke_jti("test_jti_123", 9999999999.0)

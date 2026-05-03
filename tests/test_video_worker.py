@@ -102,9 +102,10 @@ class TestVideoWorker:
         done = threading.Event()
 
         def do_shutdown():
-            # Use shorter timeout in test to avoid long waits
+            # 0.5s ceiling: mocked task completes in ~0ms; 500ms is generous
+            # even for slow CI. If thread isn't done in 0.5s → deadlock detected.
             original_timeout = video_worker._SHUTDOWN_TIMEOUT
-            video_worker._SHUTDOWN_TIMEOUT = 3
+            video_worker._SHUTDOWN_TIMEOUT = 0.5
             try:
                 video_worker.shutdown()
             finally:
@@ -113,8 +114,8 @@ class TestVideoWorker:
 
         t = threading.Thread(target=do_shutdown)
         t.start()
-        assert done.wait(timeout=10), "shutdown() hung — possible deadlock"
-        t.join(timeout=3)
+        assert done.wait(timeout=3), "shutdown() hung — possible deadlock"
+        t.join(timeout=1)
 
     # --- task success callback ---
 
