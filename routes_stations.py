@@ -7,12 +7,12 @@
 
 import re
 
-import api
 import database
 import network
 from auth import AdminUser, CurrentUser
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
+from vpack import state
 
 IP_PATTERN = re.compile(r"^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$")
 
@@ -70,15 +70,15 @@ def register_routes(app):
     def get_stations_api(current_user: CurrentUser):
         stations = database.get_stations()
 
-        with api._processing_lock:
+        with state._processing_lock:
             for s in stations:
-                s["processing_count"] = api._processing_count.get(s["id"], 0)
+                s["processing_count"] = state._processing_count.get(s["id"], 0)
 
-        with api._camera_health_lock:
+        with state._camera_health_lock:
             for s in stations:
                 sid = str(s["id"])
-                if sid in api._camera_health:
-                    s["camera_health"] = api._camera_health[sid]
+                if sid in state._camera_health:
+                    s["camera_health"] = state._camera_health[sid]
 
         if current_user.get("role") != "ADMIN":
             for s in stations:
@@ -117,7 +117,7 @@ def register_routes(app):
         new_id = database.add_station(payload.model_dump())
         database.log_audit(admin["id"], "STATION_CREATE", f"station_id={new_id}")
         live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
-        url_fn = api.get_rtsp_url if live_quality == "main" else api.get_rtsp_sub_url
+        url_fn = state.get_rtsp_url if live_quality == "main" else state.get_rtsp_sub_url
         url = url_fn(
             payload.ip_camera_1,
             payload.safety_code,
@@ -125,9 +125,9 @@ def register_routes(app):
             brand=payload.camera_brand,
         )
         cam2_url = _resolve_cam2_url(payload, url_fn)
-        sm = api.CameraStreamManager(url, station_id=new_id, cam2_url=cam2_url, station_name=payload.name)
-        with api._streams_lock:
-            api.stream_managers[new_id] = sm
+        sm = state.CameraStreamManager(url, station_id=new_id, cam2_url=cam2_url, station_name=payload.name)
+        with state._streams_lock:
+            state.stream_managers[new_id] = sm
         sm.start()
         return {"status": "success", "id": new_id}
 
@@ -135,11 +135,11 @@ def register_routes(app):
     def update_station(station_id: int, payload: StationPayload, admin: AdminUser):
         database.update_station(station_id, payload.model_dump())
         database.log_audit(admin["id"], "STATION_UPDATE", f"station_id={station_id}")
-        with api._streams_lock:
-            sm = api.stream_managers.get(station_id)
+        with state._streams_lock:
+            sm = state.stream_managers.get(station_id)
         if sm:
             live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
-            url_fn = api.get_rtsp_url if live_quality == "main" else api.get_rtsp_sub_url
+            url_fn = state.get_rtsp_url if live_quality == "main" else state.get_rtsp_sub_url
             url = url_fn(
                 payload.ip_camera_1,
                 payload.safety_code,
@@ -156,26 +156,26 @@ def register_routes(app):
     def delete_station(station_id: int, admin: AdminUser):
         database.delete_station(station_id)
         database.log_audit(admin["id"], "STATION_DELETE", f"station_id={station_id}")
-        with api._streams_lock:
-            sm = api.stream_managers.pop(station_id, None)
-            api.reconnect_status.pop(station_id, None)
+        with state._streams_lock:
+            sm = state.stream_managers.pop(station_id, None)
+            state.reconnect_status.pop(station_id, None)
         if sm:
             sm.stop()
 
         # Safety net — always cleanup MediaMTX path even if sm is missing
-        api._mtx_remove_path(station_id)
-        api._mtx_remove_path(station_id, suffix="_cam2")
+        state._mtx_remove_path(station_id)
+        state._mtx_remove_path(station_id, suffix="_cam2")
 
-        with api._recorders_lock:
-            rec = api.active_recorders.pop(station_id, None)
-            api.active_waybills.pop(station_id, None)
-            api.active_record_ids.pop(station_id, None)
+        with state._recorders_lock:
+            rec = state.active_recorders.pop(station_id, None)
+            state.active_waybills.pop(station_id, None)
+            state.active_record_ids.pop(station_id, None)
         if rec:
             rec.stop_recording()
-        with api._processing_lock:
-            api._processing_count.pop(station_id, None)
-        with api._station_locks_lock:
-            api._station_locks.pop(station_id, None)
+        with state._processing_lock:
+            state._processing_count.pop(station_id, None)
+        with state._station_locks_lock:
+            state._station_locks.pop(station_id, None)
         return {"status": "success"}
 
     # --- CAMERA DISCOVERY API ---
@@ -232,10 +232,10 @@ def register_routes(app):
         brand = station.get("camera_brand", "imou")
         code = station.get("safety_code", "")
         live_quality = database.get_setting("LIVE_VIEW_STREAM", "sub")
-        url_fn = api.get_rtsp_url if live_quality == "main" else api.get_rtsp_sub_url
+        url_fn = state.get_rtsp_url if live_quality == "main" else state.get_rtsp_sub_url
         new_url = url_fn(new_ip, code, channel=1, brand=brand)
-        with api._streams_lock:
-            sm = api.stream_managers.get(station_id)
+        with state._streams_lock:
+            sm = state.stream_managers.get(station_id)
         if sm:
             sm.update_url(new_url)
 
@@ -248,10 +248,10 @@ def register_routes(app):
 
     @app.get("/api/reconnect-status")
     def get_reconnect_status(current_user: CurrentUser, station_id: int | None = None):
-        with api._streams_lock:
+        with state._streams_lock:
             if station_id:
-                return {"data": api.reconnect_status.get(station_id, None)}
-            return {"data": dict(api.reconnect_status)}
+                return {"data": state.reconnect_status.get(station_id, None)}
+            return {"data": dict(state.reconnect_status)}
 
     # --- SESSION LOCKING API ---
 
