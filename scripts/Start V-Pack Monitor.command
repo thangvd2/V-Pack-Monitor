@@ -1,5 +1,5 @@
 #!/bin/bash
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 echo "====================================="
 echo " KHOY DONG V-PACK MONITOR SERIES"
@@ -24,7 +24,7 @@ if [ -d "bin/ffmpeg/bin" ]; then
 fi
 
 source venv/bin/activate
-python3 -m uvicorn api:app --host 0.0.0.0 --port 8001 &
+python3 -m uvicorn vpack.app:app --host 0.0.0.0 --port 8001 &
 SERVER_PID=$!
 
 cleanup() {

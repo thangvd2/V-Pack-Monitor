@@ -7,15 +7,18 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 print("=== V-Pack Monitor Builder ===")
 
 # 1. Ensure npm is built
 print("\n[1/3] Building Web UI...")
-os.chdir("web-ui")
+os.chdir(PROJECT_ROOT / "web-ui")
 # Dùng npm hoặc npx vite build tuỳ dự án, giả sử chuẩn dùng npm run build
 subprocess.run("npm run build", shell=True, check=True)
-os.chdir("..")
+os.chdir(PROJECT_ROOT)
 
 # 2. Check if PyInstaller is installed
 print("\n[2/3] Checking PyInstaller...")
@@ -56,7 +59,7 @@ command = [
     "psutil",
     "--noconsole",
     "--onefile",
-    "api.py",
+    str(PROJECT_ROOT / "vpack" / "app.py"),
 ]
 
 subprocess.run(command, check=True)

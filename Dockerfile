@@ -30,4 +30,4 @@ RUN mkdir -p recordings
 
 EXPOSE 8001 8889 9997
 
-CMD ["sh", "-c", "bin/mediamtx/mediamtx bin/mediamtx/mediamtx.yml & python -m uvicorn api:app --host 0.0.0.0 --port 8001"]
+CMD ["sh", "-c", "bin/mediamtx/mediamtx bin/mediamtx/mediamtx.yml & python -m uvicorn vpack.app:app --host 0.0.0.0 --port 8001"]

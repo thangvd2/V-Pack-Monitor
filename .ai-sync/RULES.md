@@ -29,7 +29,7 @@ PLAN → git checkout -b feature/xxx dev → IMPLEMENT → TEST → COMMIT → g
 ## RELEASE RULES (MANDATORY)
 
 - Release PR is ALWAYS `dev` → `master`, merged with `gh pr merge <N> --merge` (NOT --squash)
-- ALWAYS update `VERSION`, `api.py` header, and `RELEASE_NOTES.md` ON `dev` BEFORE creating release PR
+- ALWAYS update `VERSION`, `vpack/app.py` header, and `RELEASE_NOTES.md` ON `dev` BEFORE creating release PR
 - NEVER squash or rebase dev → master — this destroys shared history and causes permanent conflicts
 - Full process: see `CONTRIBUTING.md` → "Release Process (dev → master)"
 
@@ -84,9 +84,9 @@ Before pushing ANY new feature or significant change:
 ## CODE REVIEW ANTI-FALSE-POSITIVE RULES (MANDATORY)
 
 When flagging a potential issue during code review, you MUST:
-1. **Read ALL files in the dependency chain** — not just the immediate file. If issue is in `api.py`, also read callers (`routes_*.py`), callees (`video_worker.py`, `database.py`), and config (`auth.py`).
+1. **Read ALL files in the dependency chain** — not just the immediate file. If issue is in `vpack/app.py`, also read callers (`routes_*.py`), callees (`vpack/video_worker.py`, `vpack/database.py`), and config (`vpack/auth.py`).
 2. **Trace the FULL call path** — callers, callees, related modules. A lock in one function is only a deadlock risk if another code path acquires locks in reverse order.
-3. **Check mitigations FIRST** — before flagging, ask: "Is this already handled elsewhere?" (e.g., a random key fallback in `database.py` is mitigated by `auth.py` persisting SECRET_KEY in DB).
+3. **Check mitigations FIRST** — before flagging, ask: "Is this already handled elsewhere?" (e.g., a random key fallback in `vpack/database.py` is mitigated by `vpack/auth.py` persisting SECRET_KEY in DB).
 4. **Provide FOR and AGAINST evidence** — every flagged issue MUST include:
    - EVIDENCE FOR: why this seems like a real issue (with file:line)
    - EVIDENCE AGAINST: why this might NOT be a real issue — check guards, related code, production config
@@ -137,7 +137,7 @@ For release PRs, security audits, and critical code changes — use this two-pas
 - SPECULATIVE issues are reported with clear caveat
 - FALSE POSITIVE issues are documented with explanation of why they're safe
 
-**Why 2 passes?** A single pass creates confirmation bias — agents find "evidence" to support their initial concern without checking if it's already mitigated. Two passes separate "detection" (Pass 1) from "verification" (Pass 2), dramatically reducing false positives.
+
 
 ## MANDATORY SELF-VERIFICATION CHECKLIST (BEFORE SAYING "DONE")
 You MUST NOT report a task as complete until EVERY item below passes.
@@ -171,19 +171,29 @@ No exceptions. If you skip any item, the user WILL find the bug on double-check.
 - [ ] If adding `if:` conditions — verified that skipped jobs still satisfy branch protection
 
 ### For docs/config changes (AGENTS.md, CONTRIBUTING.md, VERSION):
-- [ ] VERSION file matches api.py header
+- [ ] VERSION file matches vpack/app.py header
 - [ ] Cross-references between docs are accurate (section names, file paths)
 - [ ] No contradictory rules between AGENTS.md and CONTRIBUTING.md
 
 ### For release PRs:
 - [ ] `gh pr merge <N> --merge` (NOT --squash)
-- [ ] VERSION, api.py header, RELEASE_NOTES.md all updated on dev BEFORE creating PR
+- [ ] VERSION, vpack/app.py header, RELEASE_NOTES.md all updated on dev BEFORE creating PR
 
 ## PROJECT STRUCTURE
-- `api.py` — FastAPI app, shared state, lifespan, helpers (DO NOT add routes here)
-- `routes_*.py` — Route modules, each exports `register_routes(app)`
-- `database.py` — DB layer, Fernet encryption, FTS5 search
-- `auth.py` — JWT, password hashing, token revocation
-- `video_worker.py` — Video processing queue (bounded, max 10 pending)
-- `recorder.py` — FFmpeg recording
+```
+vpack/                    ← Python package
+  __init__.py
+  app.py                  ← FastAPI app (DO NOT add routes here)
+  state.py                ← Shared state (extracted from api.py)
+  auth.py, database.py, network.py, recorder.py
+  video_worker.py, cloud_sync.py, telegram_bot.py
+  routes/
+    __init__.py
+    auth.py, records.py, stations.py, system.py
+scripts/                  ← ALL scripts
+  build.py, start.sh, start_windows.bat
+  install_macos.sh, install_windows.bat
+  inno_setup.iss
+  bump_version.py, check_version_consistency.py, test_rtsp.py
+```
 - `tests/` — Pytest suite with tmp_path isolation

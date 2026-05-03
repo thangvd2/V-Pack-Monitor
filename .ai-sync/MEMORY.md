@@ -41,7 +41,7 @@
 - **Rule**: Formatting issues should NEVER reach code review. Automated tooling catches them.
 
 ### 7. Release Conflict Root Cause: dev Not Synced from master After Release
-- **What happened**: v3.2.0 release PR conflicted on VERSION/api.py/RELEASE_NOTES when merging master into release branch (Step 4).
+- **What happened**: v3.2.0 release PR conflicted on VERSION/vpack/app.py/RELEASE_NOTES when merging master into release branch (Step 4).
 - **Root cause**: After v3.1.1 release (merge to master), dev was never synced back from master. Dev stayed at VERSION v3.1.0 while master had v3.1.1. Next release branch (from dev) conflicted when merged with master's newer VERSION.
 - **Fix**: Added Step 7 to release workflow — after tag+release creation, merge master back into dev (`git merge origin/master --no-edit`). This ensures dev ≤ master at all times.
 - **Prevention**: ALWAYS sync dev from master after every release. Never skip this step.
@@ -51,11 +51,11 @@
 ## Project-Specific Gotchas
 
 ### V-Pack Monitor Architecture
-- `api.py` is the FastAPI app entry point — DO NOT add routes here. Use `routes_*.py` which export `register_routes(app)`.
-- `video_worker.py` uses bounded queue (max 10). Don't add unbounded queues — OOM risk with large video files.
-- `database.py` uses Fernet encryption for sensitive fields (Telegram bot token, cloud credentials). Key is persisted in DB by `auth.py`.
+- `vpack/app.py` is the FastAPI app entry point — DO NOT add routes here. Use `routes_*.py` which export `register_routes(app)`.
+- `vpack/video_worker.py` uses bounded queue (max 10). Don't add unbounded queues — OOM risk with large video files.
+- `vpack/database.py` uses Fernet encryption for sensitive fields (Telegram bot token, cloud credentials). Key is persisted in DB by `vpack/auth.py`.
 - SSE events in backend MUST have corresponding frontend handler in the SAME commit.
-- FFmpeg processes must be cleaned up on shutdown — check `recorder.py` cleanup paths.
+- FFmpeg processes must be cleaned up on shutdown — check `vpack/recorder.py` cleanup paths.
 
 ### Testing Patterns
 - Tests use `tmp_path` fixture for isolation — no shared state between tests, no temp file leaks.
@@ -79,7 +79,7 @@
 5. Report only REAL issues to user
 
 ### Effective Release Flow
-1. Update VERSION + api.py header + RELEASE_NOTES.md on dev
+1. Update VERSION + vpack/app.py header + RELEASE_NOTES.md on dev
 2. Create release branch from dev
 3. Push + create PR to master
 4. Wait CI pass (if "not up to date", merge master into release branch)

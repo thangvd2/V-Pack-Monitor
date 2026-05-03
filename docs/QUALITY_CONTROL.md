@@ -149,13 +149,13 @@ Khi sửa logic của function/module:
 ### Dependency Graph
 
 ```
-api.py ← routes_auth.py    (auth state, login_attempts)
-api.py ← routes_stations.py (stream_managers, recorders, locks)
-api.py ← routes_records.py  (ALL shared state)
-api.py ← routes_system.py   (update state, settings, streams)
-database.py ← tất cả modules
-auth.py ← routes_auth.py, routes_records.py
-video_worker.py ← routes_records.py, recorder.py
+vpack/app.py ← vpack/routes/vpack/auth.py    (auth state, login_attempts)
+vpack/app.py ← vpack/routes/stations.py (stream_managers, recorders, locks)
+vpack/app.py ← vpack/routes/records.py  (ALL shared state)
+vpack/app.py ← vpack/routes/system.py   (update state, settings, streams)
+vpack/database.py ← tất cả modules
+vpack/auth.py ← vpack/routes/vpack/auth.py, vpack/routes/records.py
+vpack/video_worker.py ← vpack/routes/records.py, vpack/recorder.py
 ```
 
 Sửa bất kỳ ô nào → kiểm tra tất cả mũi tên đi ra từ ô đó.

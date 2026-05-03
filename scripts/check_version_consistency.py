@@ -17,8 +17,8 @@ def main():
 
     errors = []
 
-    # Check api.py
-    api_file = root_dir / "api.py"
+    # Check vpack/app.py
+    api_file = root_dir / "vpack" / "app.py"
     header_pattern = re.compile(r"^(?:#| \*) V-Pack Monitor(?: - CamDongHang)?\s+v(\d+\.\d+\.\d+)", flags=re.MULTILINE)
     if api_file.exists():
         content = api_file.read_text(encoding="utf-8")

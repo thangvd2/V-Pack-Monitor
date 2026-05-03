@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 set "LOG=%~dp0install_log.txt"
 echo [%date% %time%] Bat dau cai dat V-Pack Monitor > "%LOG%"
@@ -254,6 +254,7 @@ if !errorLevel! neq 0 (
 
 echo [%date% %time%] Installing requirements... >> "%LOG%"
 python -m pip install -r requirements.txt
+call pip install -e .
 if !errorLevel! neq 0 (
     echo LOI: Khong cai dat duoc thu vien Python!
     echo Kiem tra ket noi Internet va thu lai.

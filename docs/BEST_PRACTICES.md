@@ -21,7 +21,7 @@
 ## Security (4 items)
 
 ### Path Traversal Defense
-**Files:** `routes_records.py:272-275`, `recorder.py:173-178`, `routes_system.py:270-276`, `database.py:869-870`
+**Files:** `vpack/routes/records.py:272-275`, `vpack/recorder.py:173-178`, `vpack/routes/system.py:270-276`, `vpack/database.py:869-870`
 
 - Waybill code sanitization (strip special chars)
 - Download path validation (prevent `../` traversal)
@@ -29,17 +29,17 @@
 - SQL column whitelist
 
 ### JWT + Token Revocation
-**File:** `auth.py`
+**File:** `vpack/auth.py`
 
 Access tokens (8 hours). Revocation list stored in DB. `get_current_user()` checks revocation on every request.
 
 ### Secret Management (Encryption at Rest)
-**File:** `database.py:27-56`
+**File:** `vpack/database.py:27-56`
 
 Fernet encryption for sensitive settings (bot token, cloud credentials). Key derived from JWT secret. `_SENSITIVE_KEYS` whitelist determines which settings to encrypt.
 
 ### Auto-stop Timer Safety
-**File:** `api.py:78-81, 334-409`
+**File:** `vpack/app.py:78-81, 334-409`
 
 Warning timer (540s) → SSE `recording_warning` event. Stop timer (600s) → auto-stop recording. Critical safety check at L353: `if current_record_id == record_id` prevents stopping wrong recording.
 
@@ -126,7 +126,7 @@ Every useEffect with side effects has a cleanup function: SSE close, clearInterv
 ## Standard Techniques (6 items)
 
 ### Middleware (CORS + Exception Handler)
-**File:** `api.py:542-553, 658-664`
+**File:** `vpack/app.py:542-553, 658-664`
 
 CORS middleware with restricted methods. Custom async exception handler suppresses connection reset errors in SSE streams.
 
@@ -164,18 +164,18 @@ Fetches health + processes + network in parallel. Each result checked independen
 
 | File | Concern |
 |------|---------|
-| `test_database.py` | DB layer (encryption, settings, records, stations, users) |
+| `test_vpack/database.py` | DB layer (encryption, settings, records, stations, users) |
 | `test_database_edge_cases.py` | Boundary / security |
-| `test_auth.py` | JWT, token revocation, RBAC |
+| `test_vpack/auth.py` | JWT, token revocation, RBAC |
 | `test_api_routes.py` | API integration |
 | `test_api_hardening.py` | Input validation |
 | `test_security_regression.py` | 18 security regression tests |
-| `test_video_worker.py` | Worker lifecycle, crash recovery |
-| `test_recorder.py` | FFmpeg recording modes |
+| `test_vpack/video_worker.py` | Worker lifecycle, crash recovery |
+| `test_vpack/recorder.py` | FFmpeg recording modes |
 | `test_video_search.py` | FTS5, pagination, filters |
 | `test_auto_stop_timer.py` | Timer lifecycle |
-| `test_network.py` | Network utilities |
-| `test_cloud_sync.py` | Cloud backup |
+| `test_vpack/network.py` | Network utilities |
+| `test_vpack/cloud_sync.py` | Cloud backup |
 | `test_telegram.py` | Telegram API |
 | `test_api_helpers.py` | RTSP URL builder |
 
@@ -184,12 +184,12 @@ Fetches health + processes + network in parallel. Each result checked independen
 ## Concurrency (2 items)
 
 ### Exponential Backoff
-**File:** `telegram_bot.py:96-105`
+**File:** `vpack/telegram_bot.py:96-105`
 
 Telegram bot polling retries with exponential backoff (3s → 6s → 12s → 24s → 48s → 60s cap). Resets to 3s on success.
 
 ### Parallel Execution (ThreadPoolExecutor)
-**File:** `network.py:157-163`
+**File:** `vpack/network.py:157-163`
 
 LAN ping sweep uses `ThreadPoolExecutor(max_workers=50)` to ping all 254 hosts in a /24 subnet in parallel with `as_completed(futures, timeout=17)`.
 
@@ -213,10 +213,10 @@ Runtime arch detection for MediaMTX download. Dual-process CMD: `mediamtx & pyth
 Backend (Python/FastAPI) + frontend (React/Vite) + Docker + CI + scripts in one repo. Build script orchestrates both.
 
 ### Feature Flags / Configuration-Driven Behavior
-**Files:** `database.py`, `api.py`, `routes_system.py`
+**Files:** `vpack/database.py`, `vpack/app.py`, `vpack/routes/system.py`
 
-- `_VALID_RECORD_STATUSES` whitelist (`database.py:476`)
-- `_VALID_ROLES` whitelist (`database.py:993`)
-- `LIVE_VIEW_STREAM` setting: main vs sub stream (`api.py:559`)
-- `RECORD_KEEP_DAYS` validated enum: 0/3/7/15/30/60/90/150/365 (`routes_system.py:414`)
-- `_MAX_RECORDING_SECONDS = 600` hard cap (`api.py:42`)
+- `_VALID_RECORD_STATUSES` whitelist (`vpack/database.py:476`)
+- `_VALID_ROLES` whitelist (`vpack/database.py:993`)
+- `LIVE_VIEW_STREAM` setting: main vs sub stream (`vpack/app.py:559`)
+- `RECORD_KEEP_DAYS` validated enum: 0/3/7/15/30/60/90/150/365 (`vpack/routes/system.py:414`)
+- `_MAX_RECORDING_SECONDS = 600` hard cap (`vpack/app.py:42`)
