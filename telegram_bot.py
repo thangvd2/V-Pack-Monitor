@@ -12,9 +12,8 @@ import shutil
 import threading
 import time
 
-import telebot
-
 import database
+import telebot
 
 _bot = None
 _bot_thread = None
