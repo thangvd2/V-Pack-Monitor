@@ -15,6 +15,17 @@
 - Release PR → master: use `--merge` (keep shared history, prevent future conflicts)
 - NEVER merge any PR without explicit user confirmation. Always ask first.
 
+## IMPLEMENTATION WORKFLOW (MANDATORY — ALL AGENTS)
+
+```
+PLAN → git checkout -b feature/xxx dev → IMPLEMENT → TEST → COMMIT → gh pr create → WAIT FOR REVIEW → USER MERGES
+```
+
+1. **CREATE BRANCH BEFORE any code**: `git checkout -b {type}/{desc} dev`. NEVER write code on `dev` or `master`. If already on `dev`, stash → create branch → pop stash.
+2. **IMPLEMENT on feature branch**: All changes, tests, fixes on this branch. Run `pytest tests/ -v` and `npm run build && npm run lint` before committing.
+3. **CREATE PR AFTER implementation**: `gh pr create --base dev`. PR must include: plan reference, files changed, test results, any deviations. PR enables OpenCode review.
+4. **WAIT for review**: OpenCode reviews PR. Fix issues on same branch. ONLY merge after explicit user approval.
+
 ## RELEASE RULES (MANDATORY)
 
 - Release PR is ALWAYS `dev` → `master`, merged with `gh pr merge <N> --merge` (NOT --squash)
