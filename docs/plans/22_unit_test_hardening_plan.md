@@ -1,9 +1,8 @@
 # Plan #22: Unit Test Hardening — Coverage Gaps & Regression Guards
 
-**Status**: DONE — Implemented in v3.x series.
+> **Status:** DONE
 
 **Created:** 2026-04-14
-**Status:** PLANNING
 **Priority:** P1 (CI/CD Readiness)
 **Depends on:** Plan #20 (Unit Test Suite — Phase 1-4 DONE)
 
