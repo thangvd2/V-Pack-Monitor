@@ -87,9 +87,16 @@ PLAN → git checkout -b feature/xxx dev → IMPLEMENT → TEST → COMMIT → g
 ## PLAN FILE RULES (MANDATORY)
 
 - Plan files live in `docs/plans/` with header `> **Status:** READY | DONE | SKIPPED`
-- Antigravity MUST commit plan file **verbatim** (nguyên vẹn) from OpenCode's version — do NOT modify the plan content
+- **OpenCode MUST commit plan file to `dev` BEFORE handing it to Antigravity** — create a quick PR or direct commit on a feature branch, merge to dev. Plan file MUST exist on `dev` before implementation starts.
+- **Antigravity MUST NOT include plan file in implementation PR** — it should already be on `dev`. Antigravity only implements what the plan says.
 - If approach changes during implementation, document deviations in PR description, not in the plan file
 - After PR is merged to `dev`, update plan status from `READY` → `DONE` in a separate commit on `dev`
+
+### Why plan must be on dev before implement?
+- Clear paper trail: plan → review → implement → review → merge
+- Prevents Antigravity from modifying plan mid-implementation
+- Separates planning (OpenCode) from execution (Antigravity)
+- Plan acts as "contract" both agents reference from repo
 
 ## MANDATORY PRE-PUSH REVIEW (EVERY FEATURE)
 
