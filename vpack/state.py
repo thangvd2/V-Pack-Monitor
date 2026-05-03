@@ -7,10 +7,7 @@ import time
 import urllib.error
 import urllib.request
 
-import database
-import network
-import recorder
-import video_worker
+from vpack import database, network, recorder, video_worker
 
 # Logger
 _logger = logging.getLogger("vpack")

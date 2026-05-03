@@ -1,14 +1,8 @@
-import os
-import sys
 from unittest.mock import patch
 
-import pytest
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import auth
 import bcrypt
-import database
+import pytest
+from vpack import auth, database
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -84,9 +78,9 @@ def sample_station_id(isolate_db):
 
 @pytest.fixture
 def client(isolate_db, monkeypatch):
-    import api
-    import routes_auth
+    import vpack.app as api
     import vpack.state
+    from vpack.routes import auth as routes_auth
 
     for attr in [
         "stream_managers",

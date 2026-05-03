@@ -2,7 +2,7 @@ import os
 import sqlite3
 
 import pytest
-from database import (
+from vpack.database import (
     _ENCRYPT_PREFIX,
     _SENSITIVE_KEYS,
     _decrypt_value,
@@ -84,8 +84,8 @@ class TestEncryption:
 class TestInitDb:
     def test_creates_tables(self, tmp_path, monkeypatch):
         db_path = str(tmp_path / "test.db")
-        monkeypatch.setattr("database.DB_FILE", db_path)
-        monkeypatch.setattr("database._DB_DIR", str(tmp_path / "recordings"))
+        monkeypatch.setattr("vpack.database.DB_FILE", db_path)
+        monkeypatch.setattr("vpack.database._DB_DIR", str(tmp_path / "recordings"))
         init_db()
         with sqlite3.connect(db_path) as conn:
             tables = [
@@ -124,7 +124,7 @@ class TestInitDb:
 
     def test_no_ghost_station_after_delete_all(self, tmp_path, monkeypatch):
         """Deleting all stations then re-initing DB should NOT auto-create a station."""
-        import database
+        from vpack import database
 
         monkeypatch.setattr(database, "DB_FILE", str(tmp_path / "test.db"))
         database._init_done = False
@@ -689,4 +689,4 @@ class TestTokenRevocation:
         assert is_jti_revoked("dup_jti") is True
 
 
-import database
+from vpack import database

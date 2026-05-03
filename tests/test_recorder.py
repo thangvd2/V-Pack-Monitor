@@ -1,8 +1,8 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-import recorder
-from recorder import CameraRecorder, _detect_hw_encoder
+from vpack import recorder
+from vpack.recorder import CameraRecorder, _detect_hw_encoder
 
 
 @pytest.fixture(autouse=True)
@@ -56,7 +56,7 @@ def test_start_recording_dual(mock_popen, tmp_path):
 
 
 @patch("subprocess.Popen")
-@patch("recorder._detect_hw_encoder", return_value=("libx264", ""))
+@patch("vpack.recorder._detect_hw_encoder", return_value=("libx264", ""))
 def test_start_recording_pip(mock_detect, mock_popen, tmp_path):
     mock_popen.return_value = MagicMock()
     rec = CameraRecorder("rtsp://fake1", "rtsp://fake2", output_dir=str(tmp_path), record_mode="PIP")
