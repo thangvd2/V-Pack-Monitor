@@ -24,7 +24,7 @@ test.describe('Admin Grid View', () => {
     await expect(adminPage.locator('text=Chế Độ Quan Sát Live')).toBeVisible();
 
     // 7. Click back to grid
-    await adminPage.click('button[title="Quay lại giao diện tổng quan"]');
+    await adminPage.click('button[title="Quay lại giao diện vận hành"]');
     await expect(adminPage.locator('text=Live Cameras Toàn Hệ Thống')).toBeVisible();
   });
 });
