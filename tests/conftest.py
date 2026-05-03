@@ -102,7 +102,6 @@ def client(isolate_db, monkeypatch):
     ]:
         d = {}
         monkeypatch.setattr(vpack.state, attr, d)
-        monkeypatch.setattr(api, attr, d)
 
     monkeypatch.setattr(routes_auth, "_login_attempts", {})
     with (

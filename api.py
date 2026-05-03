@@ -39,51 +39,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from vpack import state
 
-# Backward-compat re-exports
-active_recorders = state.active_recorders
-active_waybills = state.active_waybills
-active_record_ids = state.active_record_ids
-_processing_count = state._processing_count
-stream_managers = state.stream_managers
-reconnect_status = state.reconnect_status
-_camera_health = state._camera_health
-_sse_clients = state._sse_clients
-
-_recording_timers = state._recording_timers
-_recording_start_times = state._recording_start_times
-_recording_warning_timers = state._recording_warning_timers
-
-_streams_lock = state._streams_lock
-_recorders_lock = state._recorders_lock
-_processing_lock = state._processing_lock
-_station_locks_lock = state._station_locks_lock
-_recording_timers_lock = state._recording_timers_lock
-_login_attempts_lock = state._login_attempts_lock
-_camera_health_lock = state._camera_health_lock
-_sse_lock = state._sse_lock
-_cache_lock = state._cache_lock
-_station_locks = state._station_locks
-
-MTX_API = state.MTX_API
-MAX_UPLOAD_SIZE = state.MAX_UPLOAD_SIZE
-MAX_SSE_CLIENTS = state.MAX_SSE_CLIENTS
-_SERVER_START_TIME = state._SERVER_START_TIME
-_MAX_RECORDING_SECONDS = state._MAX_RECORDING_SECONDS
-_RECORDING_WARNING_SECONDS = state._RECORDING_WARNING_SECONDS
-
-get_rtsp_url = state.get_rtsp_url
-get_rtsp_sub_url = state.get_rtsp_sub_url
-notify_sse = state.notify_sse
-
-_read_version = state._read_version
-_parse_semver = state._parse_semver
-_cancel_recording_timer = state._cancel_recording_timer
-_preflight_checks = state._preflight_checks
-_auto_stop_recording = state._auto_stop_recording
-_emit_recording_warning = state._emit_recording_warning
-_mtx_remove_path = state._mtx_remove_path
-CameraStreamManager = state.CameraStreamManager
-
 
 def _mtx_cleanup_orphaned_paths(station_ids):
     """Remove MediaMTX paths for stations that no longer exist in DB."""
