@@ -1,6 +1,6 @@
 # Plan 63: IP → MAC Auto-Discovery (Reverse ARP Lookup)
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** MEDIUM — UX improvement
 > **Scope:** 3 files + tests
 > **Estimated Effort:** 30-45 min

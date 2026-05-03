@@ -84,6 +84,13 @@ PLAN → git checkout -b feature/xxx dev → IMPLEMENT → TEST → COMMIT → g
 - **Frontend-Backend sync**: When adding SSE event or API response field in backend, MUST add frontend handler in the SAME commit
 - **React stale closures**: Variables used inside useEffect/useState callbacks must be in deps array or accessed via ref (enforced by `eslint-plugin-react-hooks`)
 
+## PLAN FILE RULES (MANDATORY)
+
+- Plan files live in `docs/plans/` with header `> **Status:** READY | DONE | SKIPPED`
+- Antigravity MUST commit plan file **verbatim** (nguyên vẹn) from OpenCode's version — do NOT modify the plan content
+- If approach changes during implementation, document deviations in PR description, not in the plan file
+- After PR is merged to `dev`, update plan status from `READY` → `DONE` in a separate commit on `dev`
+
 ## MANDATORY PRE-PUSH REVIEW (EVERY FEATURE)
 
 Before pushing ANY new feature or significant change:
