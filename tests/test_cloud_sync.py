@@ -1,9 +1,8 @@
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 import cloud_sync
+import pytest
 
 
 class TestS3Upload:

@@ -29,16 +29,15 @@ import urllib.request
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-
 import cloud_sync
 import database
 import network
 import recorder
 import telegram_bot
 import video_worker
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 _SERVER_START_TIME = time.time()
 
@@ -566,7 +565,7 @@ async def lifespan(app: FastAPI):
 
     def _suppress_conn_reset(loop, ctx):
         exc = ctx.get("exception")
-        if isinstance(exc, (ConnectionResetError, ConnectionAbortedError)):
+        if isinstance(exc, ConnectionResetError | ConnectionAbortedError):
             _logger.debug("Suppressed connection reset error")
             return
         if orig_handler:

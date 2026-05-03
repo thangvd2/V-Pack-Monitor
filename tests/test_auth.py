@@ -1,9 +1,8 @@
 import time
 
-import pytest
-
 import auth
 import database
+import pytest
 
 
 class TestJWT:

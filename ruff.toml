@@ -1,6 +1,7 @@
 # Ruff configuration — shared between pre-commit hooks and CI
 
 line-length = 120
+src = ["vpack"]
 
 [lint]
 select = ["E", "F", "W", "S", "B", "SIM", "UP", "I"]

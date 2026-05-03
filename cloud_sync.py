@@ -15,15 +15,14 @@ import zipfile
 
 # AWS / S3 API
 import boto3
+import database
+import telegram_bot
 from botocore.exceptions import NoCredentialsError
+from database import get_setting
 
 # Google API
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-
-import database
-import telegram_bot
-from database import get_setting
 
 # Scope cho Google Drive
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]

@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 import recorder
 from recorder import CameraRecorder, _detect_hw_encoder
 

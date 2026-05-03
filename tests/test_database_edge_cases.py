@@ -1,9 +1,8 @@
 import os
 import sqlite3
 
-import pytest
-
 import database
+import pytest
 from database import (
     add_station,
     cleanup_old_records,

@@ -16,17 +16,16 @@ import threading
 import time
 import urllib.request
 
-import jwt as _jwt
-from fastapi import HTTPException, Request
-from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field
-
 import api
 import auth
 import database
+import jwt as _jwt
 import network
 import video_worker
 from auth import AdminUser, CurrentUser
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, Field
 from recorder import CameraRecorder
 
 
