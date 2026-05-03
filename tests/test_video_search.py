@@ -5,8 +5,8 @@ Covers FTS5 search, pagination, date range, status filter, sorting, and API resp
 
 from datetime import date
 
-import database
 import pytest
+from vpack import database
 
 
 def _create_test_records(station_id, count, prefix="WB"):

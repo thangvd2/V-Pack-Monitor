@@ -1,12 +1,11 @@
 import os
-import sys
 from logging.config import fileConfig
 
-# Add project root to sys.path to import database module
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-import database
 from alembic import context
 from sqlalchemy import engine_from_config, pool, text
+
+# Add project root to sys.path to import database module
+from vpack import database
 
 config = context.config
 

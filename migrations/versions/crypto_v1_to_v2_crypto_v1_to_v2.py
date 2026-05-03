@@ -15,12 +15,8 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-import os
-import sys
-
 # Add project root to sys.path to import database module
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-import database
+from vpack import database
 
 
 def upgrade() -> None:

@@ -8,8 +8,7 @@ import pytest
 for _mod in ("recorder", "telegram_bot", "telebot", "psutil", "cloud_sync", "network"):
     sys.modules.setdefault(_mod, MagicMock())
 
-import database
-import video_worker
+from vpack import database, video_worker
 
 
 @pytest.fixture(autouse=True)
@@ -34,7 +33,7 @@ class TestVideoWorker:
         assert video_worker._executor is None
         mock_rec = MagicMock()
         mock_rec.stop_recording.return_value = []
-        with patch("video_worker._process_stop_and_save"):
+        with patch("vpack.video_worker._process_stop_and_save"):
             video_worker.submit_stop_and_save(1, mock_rec, "WB001", 1, save=False)
             assert video_worker._executor is not None
 
@@ -72,7 +71,7 @@ class TestVideoWorker:
         """After shutdown, module-level _executor is reset to None."""
         mock_rec = MagicMock()
         mock_rec.stop_recording.return_value = []
-        with patch("video_worker._process_stop_and_save"):
+        with patch("vpack.video_worker._process_stop_and_save"):
             video_worker.submit_stop_and_save(1, mock_rec, "WB001", 1, save=False)
             assert video_worker._executor is not None
         video_worker.shutdown()
@@ -82,7 +81,7 @@ class TestVideoWorker:
         """Calling shutdown() twice does not raise — second call is a no-op."""
         mock_rec = MagicMock()
         mock_rec.stop_recording.return_value = []
-        with patch("video_worker._process_stop_and_save"):
+        with patch("vpack.video_worker._process_stop_and_save"):
             video_worker.submit_stop_and_save(1, mock_rec, "WB001", 1, save=False)
             video_worker.shutdown()
         # Second call — must not raise
@@ -96,7 +95,7 @@ class TestVideoWorker:
         mock_rec = MagicMock()
         mock_rec.stop_recording.return_value = []
         # Pre-create executor with a real task (mock processing to avoid DB side effects)
-        with patch("video_worker._process_stop_and_save"):
+        with patch("vpack.video_worker._process_stop_and_save"):
             video_worker.submit_stop_and_save(1, mock_rec, "WB001", 1, save=False)
 
         done = threading.Event()
@@ -126,9 +125,9 @@ class TestVideoWorker:
         mock_rec.stop_recording.return_value = ["/fake/video.mp4"]
 
         with (
-            patch("video_worker._get_video_info", return_value=(True, 30.5)),
-            patch("video_worker._decrement_processing"),
-            patch("video_worker._notify_sse_safe"),
+            patch("vpack.video_worker._get_video_info", return_value=(True, 30.5)),
+            patch("vpack.video_worker._decrement_processing"),
+            patch("vpack.video_worker._notify_sse_safe"),
         ):
             video_worker._process_stop_and_save(
                 rid,
@@ -149,9 +148,9 @@ class TestVideoWorker:
         mock_rec.stop_recording.return_value = []
 
         with (
-            patch("video_worker._send_failed_alert"),
-            patch("video_worker._decrement_processing"),
-            patch("video_worker._notify_sse_safe"),
+            patch("vpack.video_worker._send_failed_alert"),
+            patch("vpack.video_worker._decrement_processing"),
+            patch("vpack.video_worker._notify_sse_safe"),
         ):
             video_worker._process_stop_and_save(
                 rid,
@@ -172,8 +171,8 @@ class TestVideoWorker:
         mock_rec.stop_recording.return_value = ["/fake/video.mp4"]
 
         with (
-            patch("video_worker._decrement_processing"),
-            patch("video_worker._notify_sse_safe"),
+            patch("vpack.video_worker._decrement_processing"),
+            patch("vpack.video_worker._notify_sse_safe"),
         ):
             video_worker._process_stop_and_save(
                 rid,
@@ -194,9 +193,9 @@ class TestVideoWorker:
         mock_rec.stop_recording.side_effect = RuntimeError("FFmpeg crashed")
 
         with (
-            patch("video_worker._send_failed_alert"),
-            patch("video_worker._decrement_processing"),
-            patch("video_worker._notify_sse_safe"),
+            patch("vpack.video_worker._send_failed_alert"),
+            patch("vpack.video_worker._decrement_processing"),
+            patch("vpack.video_worker._notify_sse_safe"),
         ):
             video_worker._process_stop_and_save(
                 rid,
@@ -215,14 +214,14 @@ class TestVideoWorker:
 class TestCrashRecovery:
     def test_recover_recording_records(self, sample_station_id):
         """RECORDING records with no recoverable files are marked FAILED."""
-        import api
+        import vpack.app as api
 
         rid = database.create_record(sample_station_id, "REC_WB", "SINGLE")
         assert database.get_record_by_id(rid)["status"] == "RECORDING"
 
         with (
             patch("os.path.exists", return_value=False),
-            patch("api._get_video_info_external", return_value=(False, 0)),
+            patch("vpack.app._get_video_info_external", return_value=(False, 0)),
         ):
             api._recover_pending_records()
 
@@ -230,7 +229,7 @@ class TestCrashRecovery:
 
     def test_recover_processing_records_with_valid_video(self, sample_station_id):
         """PROCESSING records with a valid video file are recovered to READY."""
-        import api
+        import vpack.app as api
 
         rid = database.create_record(sample_station_id, "PROC_WB", "SINGLE")
         database.update_record_status(rid, "PROCESSING", video_paths="/fake/video.mp4")
@@ -241,7 +240,7 @@ class TestCrashRecovery:
 
         with (
             patch("os.path.exists", side_effect=mock_exists),
-            patch("api._get_video_info_external", return_value=(True, 15.0)),
+            patch("vpack.app._get_video_info_external", return_value=(True, 15.0)),
         ):
             api._recover_pending_records()
 

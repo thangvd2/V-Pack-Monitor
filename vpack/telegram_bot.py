@@ -12,8 +12,9 @@ import shutil
 import threading
 import time
 
-import database
 import telebot
+
+from vpack import database
 
 _bot = None
 _bot_thread = None

@@ -16,17 +16,14 @@ import threading
 import time
 import urllib.request
 
-import auth
-import database
 import jwt as _jwt
-import network
-import video_worker
-from auth import AdminUser, CurrentUser
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from recorder import CameraRecorder
-from vpack import state
+
+from vpack import auth, database, network, state, video_worker
+from vpack.auth import AdminUser, CurrentUser
+from vpack.recorder import CameraRecorder
 
 
 class ScanPayload(BaseModel):
