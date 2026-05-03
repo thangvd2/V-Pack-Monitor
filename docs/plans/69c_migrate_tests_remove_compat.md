@@ -1,6 +1,6 @@
 # Plan 69C: Migrate Test Files + Remove Backward-Compat Re-exports
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** HIGH — Step 2C of restructuring
 > **Scope:** 5 file updates + 1 cleanup
 > **Estimated Effort:** 20 min
