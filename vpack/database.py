@@ -20,14 +20,14 @@ _ENCRYPT_PREFIX = "enc:v2:"
 _V1_PREFIX = "enc:v1:"
 
 
-_DB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recordings")
+_DB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "recordings")
 os.makedirs(_DB_DIR, exist_ok=True)
 
 
 def _get_enc_key():
     """Get key material for encryption."""
     try:
-        from auth import SECRET_KEY
+        from vpack.auth import SECRET_KEY
 
         key_material = SECRET_KEY.encode("utf-8") if isinstance(SECRET_KEY, str) else SECRET_KEY
         if key_material:
@@ -83,7 +83,7 @@ def _decrypt_value(ciphertext: str) -> str:
     elif ciphertext.startswith(_V1_PREFIX):
         # v1: Legacy XOR decryption (for migration compatibility)
         try:
-            from auth import SECRET_KEY
+            from vpack.auth import SECRET_KEY
 
             key_material = SECRET_KEY.encode("utf-8") if isinstance(SECRET_KEY, str) else SECRET_KEY
             fallback = os.environ.get("VPACK_SECRET", "vpack-default-encryption-key")
@@ -330,7 +330,9 @@ def init_db():
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='alembic_version'")
                 has_alembic = cursor.fetchone() is not None
 
-                alembic_cfg = Config(os.path.join(os.path.dirname(os.path.abspath(__file__)), "alembic.ini"))
+                alembic_cfg = Config(
+                    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "alembic.ini")
+                )
                 db_uri = f"sqlite:///{os.path.abspath(DB_FILE).replace(os.sep, '/')}"
                 alembic_cfg.set_main_option("sqlalchemy.url", db_uri)
 

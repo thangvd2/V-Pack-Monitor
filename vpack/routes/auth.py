@@ -6,13 +6,12 @@
 
 import time
 
-import auth
-import database
-from auth import AdminUser, CurrentUser
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
-from vpack import state
+
+from vpack import auth, database, state
+from vpack.auth import AdminUser, CurrentUser
 
 # --- AUTH API ---
 

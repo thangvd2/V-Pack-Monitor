@@ -24,15 +24,13 @@ import time
 import urllib.error
 import urllib.request
 
-import cloud_sync
-import database
 import psutil
-import video_worker
-from auth import AdminUser, CurrentUser
 from fastapi import File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
-from vpack import state
+
+from vpack import cloud_sync, database, state, video_worker
+from vpack.auth import AdminUser, CurrentUser
 
 _SENSITIVE_KEYS = {"S3_SECRET_KEY", "S3_ACCESS_KEY", "TELEGRAM_BOT_TOKEN"}
 
@@ -507,7 +505,7 @@ def register_routes(app):
         # Restart Telegram Bot polling if tokens change
         if payload.TELEGRAM_BOT_TOKEN and payload.TELEGRAM_CHAT_ID:
             # Import dynamic if not already
-            import telegram_bot
+            from vpack import telegram_bot
 
             telegram_bot.start_polling()
 
@@ -815,7 +813,7 @@ def register_routes(app):
         mac = None
         if alive:
             try:
-                import network
+                from vpack import network
 
                 mac = network.get_mac_for_ip(ip)
             except Exception:

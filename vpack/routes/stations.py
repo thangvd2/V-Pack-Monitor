@@ -7,12 +7,11 @@
 
 import re
 
-import database
-import network
-from auth import AdminUser, CurrentUser
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
-from vpack import state
+
+from vpack import database, network, state
+from vpack.auth import AdminUser, CurrentUser
 
 IP_PATTERN = re.compile(r"^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$")
 

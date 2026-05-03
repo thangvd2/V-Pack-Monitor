@@ -14,9 +14,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-import database
-import recorder
-import telegram_bot
+from vpack import database, recorder, telegram_bot
 
 _executor = None
 _lock = threading.Lock()

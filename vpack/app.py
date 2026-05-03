@@ -28,16 +28,11 @@ import urllib.request
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-import cloud_sync
-import database
-import network
-import recorder
-import telegram_bot
-import video_worker
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from vpack import state
+
+from vpack import cloud_sync, database, network, recorder, state, telegram_bot, video_worker
 
 
 def _mtx_cleanup_orphaned_paths(station_ids):
@@ -416,10 +411,10 @@ except Exception:
 
 
 # --- REGISTER ROUTE MODULES ---
-import routes_auth
-import routes_records
-import routes_stations
-import routes_system
+from vpack.routes import auth as routes_auth
+from vpack.routes import records as routes_records
+from vpack.routes import stations as routes_stations
+from vpack.routes import system as routes_system
 
 routes_auth.register_routes(app)
 routes_stations.register_routes(app)

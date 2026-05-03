@@ -14,10 +14,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import bcrypt
-import database
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+
+from vpack import database
 
 
 def _load_or_create_secret():
