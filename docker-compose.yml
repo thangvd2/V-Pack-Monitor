@@ -8,6 +8,4 @@ services:
       - "9997:9997"
     volumes:
       - ./recordings:/app/recordings
-      # Mapping database file để giữ dữ liệu cấu hình và lịch sử khi Reset Container
-      - ./recordings/vpack.db:/app/vpack.db 
     restart: unless-stopped
