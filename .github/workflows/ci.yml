@@ -97,7 +97,8 @@ jobs:
           restore-keys: ${{ runner.os }}-pip-
 
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt
+        run: |
+          pip install -r requirements-dev.txt
           pip install -e .
 
       - name: Run tests
@@ -172,7 +173,8 @@ jobs:
           restore-keys: ${{ runner.os }}-pip-
 
       - name: Install Python dependencies
-        run: pip install -r requirements-dev.txt
+        run: |
+          pip install -r requirements-dev.txt
           pip install -e .
 
       - name: Install Frontend dependencies
