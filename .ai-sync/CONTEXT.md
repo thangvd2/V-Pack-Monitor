@@ -21,7 +21,7 @@ Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa 
 - **PATCH** (x.x.Z): bugfix only
 - **MINOR** (x.Y.0): new feature, backward-compatible
 - **MAJOR** (X.0.0): breaking change (API format, DB schema, response structure)
-- Update `VERSION` file + `api.py` header + `RELEASE_NOTES.md` on release
+- Update `VERSION` file + `vpack/app.py` header + `RELEASE_NOTES.md` on release
 
 ## Language
 

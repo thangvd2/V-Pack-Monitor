@@ -114,7 +114,7 @@ Release PR → master: gh pr merge <N> --merge    ← giữ shared history, khô
     git merge origin/master --no-edit
     git push origin dev
     ```
-    Sau release, dev PHẢI nhận merge commit + version bump từ master. Nếu bỏ qua bước này, dev sẽ tụt hậu so master trên VERSION/api.py/RELEASE_NOTES → release sau chắc chắn conflict.
+    Sau release, dev PHẢI nhận merge commit + version bump từ master. Nếu bỏ qua bước này, dev sẽ tụt hậu so master trên VERSION/vpack/app.py/RELEASE_NOTES → release sau chắc chắn conflict.
 
 8. **Xong.** Verify:
     ```bash
@@ -176,7 +176,7 @@ EOF
 - ❌ `git cherry-pick` commits từ dev sang master — mất merge history
 - ❌ `git push --force` master — mất release history
 - ❌ Tạo release branch từ master rồi merge dev vào — ngược hướng, gây 12-file conflict
-- ❌ Bỏ bước 7 (sync dev từ master) — release sau WILL conflict trên VERSION/api.py/RELEASE_NOTES
+- ❌ Bỏ bước 7 (sync dev từ master) — release sau WILL conflict trên VERSION/vpack/app.py/RELEASE_NOTES
 
 ## CI Pipeline
 
@@ -205,25 +205,25 @@ CI fail → **không merge**.
 ## Cấu trúc dự án
 
 ```
-├── api.py                  # FastAPI app, shared state, lifespan
-├── routes_auth.py          # Auth + User management routes
-├── routes_stations.py      # Station CRUD + sessions + discovery
-├── routes_records.py       # Scan, records, download, SSE, live
-├── routes_system.py        # Settings, analytics, health, update
-├── database.py             # DB layer, encryption, FTS5
-├── auth.py                 # JWT, password, token revocation
-├── video_worker.py         # Video processing queue
-├── recorder.py             # FFmpeg recording
-├── cloud_sync.py           # Google Drive / S3 backup
-├── telegram_bot.py         # Telegram notifications
-├── network.py              # LAN scanner
+├── vpack/app.py                  # FastAPI app, shared state, lifespan
+├── vpack/routes/vpack/auth.py          # Auth + User management routes
+├── vpack/routes/stations.py      # Station CRUD + sessions + discovery
+├── vpack/routes/records.py       # Scan, records, download, SSE, live
+├── vpack/routes/system.py        # Settings, analytics, health, update
+├── vpack/database.py             # DB layer, encryption, FTS5
+├── vpack/auth.py                 # JWT, password, token revocation
+├── vpack/video_worker.py         # Video processing queue
+├── vpack/recorder.py             # FFmpeg recording
+├── vpack/cloud_sync.py           # Google Drive / S3 backup
+├── vpack/telegram_bot.py         # Telegram notifications
+├── vpack/network.py              # LAN scanner
 ├── tests/                  # Pytest test suite
 ├── web-ui/                 # React frontend
 ├── requirements.txt        # Python dependencies (production)
 ├── requirements-dev.txt    # Python dependencies (development only)
 ├── Dockerfile              # Docker deployment
-├── install_windows.bat     # Windows installer
-├── install_macos.sh        # macOS installer
-├── start.sh                # macOS/Linux launcher
-└── start_windows.bat       # Windows launcher
+├── scripts/install_windows.bat     # Windows installer
+├── scripts/install_macos.sh        # macOS installer
+├── scripts/start.sh                # macOS/Linux launcher
+└── scripts/start_windows.bat       # Windows launcher
 ```

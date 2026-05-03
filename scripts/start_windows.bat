@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0.."
 setlocal EnableDelayedExpansion
 title V-Pack Monitor Server
 echo ===========================================
@@ -57,7 +58,7 @@ ping -n 3 127.0.0.1 >nul
 call venv\Scripts\activate.bat
 
 echo Dang khoi dong may chu Python...
-start "V-Pack API" /B python -m uvicorn api:app --host 0.0.0.0 --port 8001
+start "V-Pack API" /B python -m uvicorn vpack.app:app --host 0.0.0.0 --port 8001
 ping -n 5 127.0.0.1 >nul
 
 echo Dang mo giao dien V-Pack Monitor...

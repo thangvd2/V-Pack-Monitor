@@ -37,8 +37,8 @@
 ### Files modified this session:
 - AGENTS.md, CONTRIBUTING.md, .pre-commit-config.yaml, .git-hooks/
 - web-ui/.prettierrc, web-ui/eslint.config.js, web-ui/package.json
-- routes_records.py, tests/, web-ui/src/SetupModal.jsx
-- VERSION, api.py, RELEASE_NOTES.md
+- vpack/routes/records.py, tests/, web-ui/src/SetupModal.jsx
+- VERSION, vpack/app.py, RELEASE_NOTES.md
 
 ---
 

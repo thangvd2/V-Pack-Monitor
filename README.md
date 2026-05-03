@@ -34,13 +34,13 @@ Scanner USB ──→ Browser ──→ FastAPI ──→ SQLite DB ──→ Cl
 
 ### macOS
 ```bash
-chmod +x install_macos.sh
-./install_macos.sh
-./start.sh
+chmod +x scripts/install_macos.sh
+./scripts/install_macos.sh
+./scripts/start.sh
 ```
 
 ### Windows
-1. Click đúp `install_windows.bat` (chạy bằng Administrator)
+1. Click đúp `scripts/install_windows.bat` (chạy bằng Administrator)
 2. Click đúp biểu tượng **V-Pack Monitor** trên Desktop
 
 ### Docker
@@ -65,25 +65,25 @@ pip install -r requirements.txt
 cd web-ui && npm install && npm run build && cd ..
 
 # Khởi động
-python -m uvicorn api:app --host 0.0.0.0 --port 8001
+python -m uvicorn vpack.app:app --host 0.0.0.0 --port 8001
 ```
 > Trạm điều khiển API sẽ khởi chạy ở cổng `:8001`.
 > MediaMTX WebRTC player ở cổng `:8889`.
 
 > [!TIP]
 > **Dành riêng cho người dùng Windows:** Thư mục mã nguồn đã có sẵn các file tự động hoá. Bạn không cần gõ lệnh thủ công mà chỉ cần:
-> 1. Click đúp vào `install_windows.bat` ở lần đầu tiên để vòng lặp tự tải thư viện (Python, Node.js, FFmpeg, MediaMTX).
-> 2. Click đúp vào `start_windows.bat` cho các lần sử dụng hàng ngày để máy tự động mở Server Backend + MediaMTX + Giao diện Web cùng lúc.
+> 1. Click đúp vào `scripts/install_windows.bat` ở lần đầu tiên để vòng lặp tự tải thư viện (Python, Node.js, FFmpeg, MediaMTX).
+> 2. Click đúp vào `scripts/start_windows.bat` cho các lần sử dụng hàng ngày để máy tự động mở Server Backend + MediaMTX + Giao diện Web cùng lúc.
 
 > [!TIP]
 > **Dành riêng cho người dùng macOS:** Tương tự Windows, dùng:
-> 1. `chmod +x install_macos.sh && ./install_macos.sh` lần đầu.
-> 2. `./start.sh` cho các lần sử dụng hàng ngày.
+> 1. `chmod +x scripts/install_macos.sh && ./scripts/install_macos.sh` lần đầu.
+> 2. `./scripts/start.sh` cho các lần sử dụng hàng ngày.
 
 ## 📦 Biên dịch Ứng dụng Thành Phẩm (Production Executable)
-Nếu bạn muốn tạo file cài đặt cho máy tính Khách hàng (End-user) mà không cần cài Python/Node, vui lòng dùng công cụ `build.py`:
+Nếu bạn muốn tạo file cài đặt cho máy tính Khách hàng (End-user) mà không cần cài Python/Node, vui lòng dùng công cụ `scripts/build.py`:
 ```bash
-python build.py
+python scripts/build.py
 ```
 *(Yêu cầu đã cài PyInstaller)*
 
@@ -112,7 +112,7 @@ A: Đây là tính năng giám sát Health check. Viền đỏ có nghĩa là Ca
 A: Đây là tính năng an toàn (Auto-stop timer). Hệ thống sẽ tự động dừng và lưu video sau 10 phút nếu bạn quên quét mã kiện tiếp theo.
 
 **Q: Lỗi "FFmpeg not found" / "MediaMTX không chạy"?**
-A: Vui lòng chạy lại file `install_windows.bat` (hoặc macOS script) để tải lại các file thực thi (binary) bị thiếu trong thư mục `bin/`. 
+A: Vui lòng chạy lại file `scripts/install_windows.bat` (hoặc macOS script) để tải lại các file thực thi (binary) bị thiếu trong thư mục `bin/`. 
 
 **Q: Lỗi "Database locked"?**
 A: Thường xảy ra khi hệ thống đang xử lý tác vụ nặng (như Cloud Sync hoặc Transcode). Hãy đợi vài giây. Nếu vẫn bị, hãy restart lại server Backend.
