@@ -20,3 +20,13 @@ htmlcov/
 scratch/
 web-dist/
 node_modules/
+
+# Python tool caches
+.ruff_cache/
+.mypy_cache/
+
+# Logs
+*.log
+
+# OS files
+Thumbs.db
