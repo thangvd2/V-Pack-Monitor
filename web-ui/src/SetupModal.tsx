@@ -222,11 +222,14 @@ const SetupModal: React.FC<SetupModalProps> = ({
         if (res.data.mac && !macAddress?.trim()) {
           setMacAddress(res.data.mac);
           markDirty();
+          // Delay conflict check slightly to allow state to update
+          setTimeout(() => checkConflicts(), 0);
         }
       } else {
         setTestIpResult({ ok: false, msg: 'Unreachable — camera không phản hồi' });
       }
-    } catch {
+    } catch (err) {
+      console.warn('[SetupModal] Ping test failed:', err);
       setTestIpResult({ ok: false, msg: 'Lỗi kết nối server' });
     } finally {
       setTestingIp(false);

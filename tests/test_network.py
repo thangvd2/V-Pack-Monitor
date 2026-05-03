@@ -258,9 +258,10 @@ class TestGetMacForIp:
         result = network.get_mac_for_ip("192.168.1.42")
         assert result == "AA:BB:CC:DD:EE:FF"
 
+    @patch("network.time.sleep")
     @patch("network._ping_host")
     @patch("network._parse_arp_table")
-    def test_found_after_ping(self, mock_arp, mock_ping):
+    def test_found_after_ping(self, mock_arp, mock_ping, mock_sleep):
         mock_arp.side_effect = [
             [],
             [{"ip": "192.168.1.42", "mac": "AA:BB:CC:DD:EE:FF"}],
@@ -268,13 +269,16 @@ class TestGetMacForIp:
         result = network.get_mac_for_ip("192.168.1.42")
         assert result == "AA:BB:CC:DD:EE:FF"
         mock_ping.assert_called_once_with("192.168.1.42")
+        mock_sleep.assert_called_once_with(0.3)
 
+    @patch("network.time.sleep")
     @patch("network._ping_host")
     @patch("network._parse_arp_table")
-    def test_not_found(self, mock_arp, mock_ping):
+    def test_not_found(self, mock_arp, mock_ping, mock_sleep):
         mock_arp.return_value = []
         result = network.get_mac_for_ip("192.168.1.42")
         assert result is None
+        mock_sleep.assert_called_once_with(0.3)
 
     def test_different_ip_not_matched(self):
         """Ensure we match exact IP, not partial."""
