@@ -6,13 +6,13 @@
 
 import time
 
-import api
 import auth
 import database
 from auth import AdminUser, CurrentUser
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
+from vpack import state
 
 # --- AUTH API ---
 
@@ -61,7 +61,7 @@ def register_routes(app):
     def login(payload: LoginPayload, request: Request):
         ip = request.client.host if request.client else "unknown"
         now = time.time()
-        with api._login_attempts_lock:
+        with state._login_attempts_lock:
             if len(_login_attempts) > 100:
                 expired_ips = [k for k, v in _login_attempts.items() if not v or now - v[-1] > _LOGIN_WINDOW]
                 for k in expired_ips:
@@ -78,7 +78,7 @@ def register_routes(app):
                 )
         user = database.get_user_by_username(payload.username)
         if not user or not auth.verify_password(payload.password, user["password_hash"]):
-            with api._login_attempts_lock:
+            with state._login_attempts_lock:
                 _login_attempts.setdefault(ip, []).append(now)
             database.log_audit(
                 user["id"] if user else 0,

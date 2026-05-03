@@ -16,7 +16,6 @@ import threading
 import time
 import urllib.request
 
-import api
 import auth
 import database
 import jwt as _jwt
@@ -27,6 +26,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from recorder import CameraRecorder
+from vpack import state
 
 
 class ScanPayload(BaseModel):
@@ -36,15 +36,15 @@ class ScanPayload(BaseModel):
 
 def _handle_scan_exit(sid, current_recorder, current_waybill, current_record_id):
     if current_recorder:
-        api._cancel_recording_timer(sid)
-        with api._recording_timers_lock:
-            api._recording_start_times.pop(sid, None)
+        state._cancel_recording_timer(sid)
+        with state._recording_timers_lock:
+            state._recording_start_times.pop(sid, None)
         database.update_record_status(current_record_id, "PROCESSING")
-        with api._processing_lock:
-            api._processing_count[sid] = api._processing_count.get(sid, 0) + 1
-            p_count = api._processing_count[sid]
+        with state._processing_lock:
+            state._processing_count[sid] = state._processing_count.get(sid, 0) + 1
+            p_count = state._processing_count[sid]
 
-        api.notify_sse(
+        state.notify_sse(
             "video_status",
             {
                 "station_id": sid,
@@ -53,10 +53,10 @@ def _handle_scan_exit(sid, current_recorder, current_waybill, current_record_id)
                 "processing_count": p_count,
             },
         )
-        with api._recorders_lock:
-            api.active_recorders.pop(sid, None)
-            api.active_waybills.pop(sid, None)
-            api.active_record_ids.pop(sid, None)
+        with state._recorders_lock:
+            state.active_recorders.pop(sid, None)
+            state.active_waybills.pop(sid, None)
+            state.active_record_ids.pop(sid, None)
         video_worker.submit_stop_and_save(
             current_record_id,
             current_recorder,
@@ -73,11 +73,11 @@ def _handle_scan_exit(sid, current_recorder, current_waybill, current_record_id)
 
 def _handle_scan_stop(sid, current_recorder, current_waybill, current_record_id, current_user):
     if current_recorder:
-        api._cancel_recording_timer(sid)
-        with api._recording_timers_lock:
-            api._recording_start_times.pop(sid, None)
+        state._cancel_recording_timer(sid)
+        with state._recording_timers_lock:
+            state._recording_start_times.pop(sid, None)
         database.update_record_status(current_record_id, "PROCESSING")
-        api.notify_sse(
+        state.notify_sse(
             "video_status",
             {
                 "station_id": sid,
@@ -85,12 +85,12 @@ def _handle_scan_stop(sid, current_recorder, current_waybill, current_record_id,
                 "record_id": current_record_id,
             },
         )
-        with api._processing_lock:
-            api._processing_count[sid] = api._processing_count.get(sid, 0) + 1
-        with api._recorders_lock:
-            api.active_recorders.pop(sid, None)
-            api.active_waybills.pop(sid, None)
-            api.active_record_ids.pop(sid, None)
+        with state._processing_lock:
+            state._processing_count[sid] = state._processing_count.get(sid, 0) + 1
+        with state._recorders_lock:
+            state.active_recorders.pop(sid, None)
+            state.active_waybills.pop(sid, None)
+            state.active_record_ids.pop(sid, None)
         database.log_audit(
             current_user["id"],
             "STOP_RECORD",
@@ -102,9 +102,9 @@ def _handle_scan_stop(sid, current_recorder, current_waybill, current_record_id,
         )
         if not submitted:
             database.update_record_status(current_record_id, "FAILED")
-            with api._processing_lock:
-                api._processing_count.pop(sid, None)
-            api.notify_sse(
+            with state._processing_lock:
+                state._processing_count.pop(sid, None)
+            state.notify_sse(
                 "video_status",
                 {
                     "station_id": sid,
@@ -124,12 +124,12 @@ def _handle_scan_stop(sid, current_recorder, current_waybill, current_record_id,
 
 
 def _handle_scan_start(sid, barcode, station, current_user):
-    ok, err_msg = api._preflight_checks(sid)
+    ok, err_msg = state._preflight_checks(sid)
     if not ok:
         return {"status": "error", "message": err_msg}
 
-    with api._recorders_lock:
-        api.active_waybills[sid] = barcode
+    with state._recorders_lock:
+        state.active_waybills[sid] = barcode
 
     ip1 = station["ip_camera_1"]
     ip2 = station["ip_camera_2"]
@@ -151,15 +151,15 @@ def _handle_scan_start(sid, barcode, station, current_user):
             database.update_station_ip(sid, "ip_camera_1", ip1)
             brand = station.get("camera_brand", "imou")
             code = station.get("safety_code", "")
-            with api._streams_lock:
-                sm = api.stream_managers.get(sid)
+            with state._streams_lock:
+                sm = state.stream_managers.get(sid)
             if sm:
                 live_quality = database.get_setting("LIVE_VIEW_STREAM") or "sub"
-                url_fn = api.get_rtsp_url if live_quality == "main" else api.get_rtsp_sub_url
+                url_fn = state.get_rtsp_url if live_quality == "main" else state.get_rtsp_sub_url
                 live_url = url_fn(ip1, code, channel=1, brand=brand)
                 sm.update_url(live_url)
 
-    url1 = api.get_rtsp_url(ip1, code, channel=1, brand=brand)
+    url1 = state.get_rtsp_url(ip1, code, channel=1, brand=brand)
     # Log warning for deprecated modes (should be migrated by lifespan init)
     if c_mode in ("pip_sim", "dual_file_sim"):
         logger.warning(
@@ -169,7 +169,7 @@ def _handle_scan_start(sid, barcode, station, current_user):
         )
         c_mode = "pip" if c_mode == "pip_sim" else "dual_file"
     if c_mode == "dual_file" or c_mode == "pip":
-        url2 = api.get_rtsp_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
+        url2 = state.get_rtsp_url(ip2 if ip2 else ip1, code, channel=2, brand=brand)
     else:
         url2 = url1
 
@@ -183,30 +183,30 @@ def _handle_scan_start(sid, barcode, station, current_user):
     record_id = database.create_record(sid, barcode, r_mode)
 
     new_recorder = CameraRecorder(url1, rtsp_url_2=url2, record_mode=r_mode, station_name=station.get("name", ""))
-    with api._recorders_lock:
-        api.active_record_ids[sid] = record_id
-        api.active_recorders[sid] = new_recorder
+    with state._recorders_lock:
+        state.active_record_ids[sid] = record_id
+        state.active_recorders[sid] = new_recorder
     new_recorder.start_recording(barcode)
 
-    api._cancel_recording_timer(sid)
-    with api._recording_timers_lock:
-        api._recording_start_times[sid] = time.time()
+    state._cancel_recording_timer(sid)
+    with state._recording_timers_lock:
+        state._recording_start_times[sid] = time.time()
         warning_timer = threading.Timer(
-            api._RECORDING_WARNING_SECONDS,
-            api._emit_recording_warning,
+            state._RECORDING_WARNING_SECONDS,
+            state._emit_recording_warning,
             args=[sid],
         )
         warning_timer.daemon = True
         warning_timer.start()
-        api._recording_warning_timers[sid] = warning_timer
+        state._recording_warning_timers[sid] = warning_timer
         stop_timer = threading.Timer(
-            api._MAX_RECORDING_SECONDS,
-            api._auto_stop_recording,
+            state._MAX_RECORDING_SECONDS,
+            state._auto_stop_recording,
             args=[sid, record_id],
         )
         stop_timer.daemon = True
         stop_timer.start()
-        api._recording_timers[sid] = stop_timer
+        state._recording_timers[sid] = stop_timer
 
     database.log_audit(
         current_user["id"],
@@ -215,7 +215,7 @@ def _handle_scan_start(sid, barcode, station, current_user):
         station_id=sid,
     )
 
-    api.notify_sse(
+    state.notify_sse(
         "video_status",
         {
             "station_id": sid,
@@ -312,8 +312,8 @@ def register_routes(app):
             }
 
         sid = payload.station_id
-        with api._station_locks_lock:
-            lock = api._station_locks.setdefault(sid, threading.Lock())
+        with state._station_locks_lock:
+            lock = state._station_locks.setdefault(sid, threading.Lock())
         with lock:
             return _handle_scan_locked(payload, sid, current_user)
 
@@ -335,10 +335,10 @@ def register_routes(app):
         if not station:
             return {"status": "error", "message": "Trạm không tồn tại"}
 
-        with api._recorders_lock:
-            current_recorder = api.active_recorders.get(sid)
-            current_waybill = api.active_waybills.get(sid)
-            current_record_id = api.active_record_ids.get(sid)
+        with state._recorders_lock:
+            current_recorder = state.active_recorders.get(sid)
+            current_waybill = state.active_waybills.get(sid)
+            current_record_id = state.active_record_ids.get(sid)
 
         if barcode == "EXIT":
             return _handle_scan_exit(sid, current_recorder, current_waybill, current_record_id)
@@ -356,14 +356,14 @@ def register_routes(app):
 
     @app.get("/api/status")
     def get_status(station_id: int, current_user: CurrentUser):
-        with api._processing_lock:
-            if station_id in api._processing_count:
-                with api._recorders_lock:
-                    waybill = api.active_waybills.get(station_id, "")
+        with state._processing_lock:
+            if station_id in state._processing_count:
+                with state._recorders_lock:
+                    waybill = state.active_waybills.get(station_id, "")
                 return {"status": "processing", "waybill": waybill}
-        with api._recorders_lock:
-            is_recording = station_id in api.active_recorders
-            waybill = api.active_waybills.get(station_id, "")
+        with state._recorders_lock:
+            is_recording = station_id in state.active_recorders
+            waybill = state.active_waybills.get(station_id, "")
         return {
             "status": "recording" if is_recording else "idle",
             "waybill": waybill,
@@ -443,8 +443,8 @@ def register_routes(app):
     @app.get("/api/live-cam2")
     def live_preview_cam2(station_id: int, current_user: CurrentUser):
         mtx_host = os.environ.get("MTX_HOST", "127.0.0.1")
-        with api._streams_lock:
-            has_cam2 = station_id in api.stream_managers and api.stream_managers[station_id].cam2_url is not None
+        with state._streams_lock:
+            has_cam2 = station_id in state.stream_managers and state.stream_managers[station_id].cam2_url is not None
         return {
             "status": "ok",
             "webrtc_url": f"http://{mtx_host}:8889/station_{station_id}_cam2",
@@ -454,7 +454,7 @@ def register_routes(app):
     @app.get("/api/mtx-status")
     def mtx_status(current_user: CurrentUser):
         try:
-            req = urllib.request.Request(f"{api.MTX_API}/v3/paths/list", method="GET")
+            req = urllib.request.Request(f"{state.MTX_API}/v3/paths/list", method="GET")
             resp = urllib.request.urlopen(req, timeout=3)
             return json.loads(resp.read())
         except Exception:
@@ -479,10 +479,10 @@ def register_routes(app):
             raise HTTPException(status_code=401, detail="Invalid token")
 
         q = queue.Queue(maxsize=100)
-        with api._sse_lock:
-            if len(api._sse_clients) >= api.MAX_SSE_CLIENTS:
+        with state._sse_lock:
+            if len(state._sse_clients) >= state.MAX_SSE_CLIENTS:
                 raise HTTPException(status_code=503, detail="Too many SSE connections")
-            api._sse_clients.append(q)
+            state._sse_clients.append(q)
 
         async def event_stream():
             try:
@@ -495,9 +495,9 @@ def register_routes(app):
             except asyncio.CancelledError:
                 pass
             finally:
-                with api._sse_lock:
+                with state._sse_lock:
                     try:
-                        api._sse_clients.remove(q)
+                        state._sse_clients.remove(q)
                     except ValueError:
                         pass
 

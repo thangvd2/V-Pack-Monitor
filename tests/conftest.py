@@ -106,10 +106,10 @@ def client(isolate_db, monkeypatch):
 
     monkeypatch.setattr(routes_auth, "_login_attempts", {})
     with (
-        patch.object(api.CameraStreamManager, "start"),
-        patch.object(api.CameraStreamManager, "stop"),
-        patch.object(api.CameraStreamManager, "update_url"),
-        patch.object(api.CameraStreamManager, "update_cam2_url"),
+        patch.object(vpack.state.CameraStreamManager, "start"),
+        patch.object(vpack.state.CameraStreamManager, "stop"),
+        patch.object(vpack.state.CameraStreamManager, "update_url"),
+        patch.object(vpack.state.CameraStreamManager, "update_cam2_url"),
     ):
         from starlette.testclient import TestClient
 

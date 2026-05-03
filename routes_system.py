@@ -24,7 +24,6 @@ import time
 import urllib.error
 import urllib.request
 
-import api
 import cloud_sync
 import database
 import psutil
@@ -33,6 +32,7 @@ from auth import AdminUser, CurrentUser
 from fastapi import File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
+from vpack import state
 
 _SENSITIVE_KEYS = {"S3_SECRET_KEY", "S3_ACCESS_KEY", "TELEGRAM_BOT_TOKEN"}
 
@@ -71,7 +71,7 @@ def _get_git_branch():
 
 
 def _notify_update_progress(stage, message, progress=0):
-    api.notify_sse(
+    state.notify_sse(
         "update_progress",
         {
             "stage": stage,
@@ -85,8 +85,8 @@ def _do_graceful_restart():
     global _is_updating
     time.sleep(1.5)
     try:
-        with api._recorders_lock:
-            recorders = list(api.active_recorders.values())
+        with state._recorders_lock:
+            recorders = list(state.active_recorders.values())
         for rec in recorders:
             try:
                 rec.stop_recording()
@@ -519,8 +519,8 @@ def register_routes(app):
         if quality not in ("main", "sub"):
             quality = "sub"
         database.set_setting("LIVE_VIEW_STREAM", quality)
-        with api._streams_lock:
-            sm_items = list(api.stream_managers.items())
+        with state._streams_lock:
+            sm_items = list(state.stream_managers.items())
         for sid, sm in sm_items:
             station = database.get_station(sid)
             if not station:
@@ -529,16 +529,16 @@ def register_routes(app):
             code = station["safety_code"]
             brand = station.get("camera_brand", "imou")
             if quality == "main":
-                new_url = api.get_rtsp_url(ip, code, channel=1, brand=brand)
+                new_url = state.get_rtsp_url(ip, code, channel=1, brand=brand)
             else:
-                new_url = api.get_rtsp_sub_url(ip, code, channel=1, brand=brand)
+                new_url = state.get_rtsp_sub_url(ip, code, channel=1, brand=brand)
             sm.update_url(new_url)
             if sm.cam2_url is not None:
                 cam2_ip = station.get("ip_camera_2") or ip
                 if quality == "main":
-                    new_cam2 = api.get_rtsp_url(cam2_ip, code, channel=2, brand=brand)
+                    new_cam2 = state.get_rtsp_url(cam2_ip, code, channel=2, brand=brand)
                 else:
-                    new_cam2 = api.get_rtsp_sub_url(cam2_ip, code, channel=2, brand=brand)
+                    new_cam2 = state.get_rtsp_sub_url(cam2_ip, code, channel=2, brand=brand)
                 sm.update_cam2_url(new_cam2)
         label = "1080p (main)" if quality == "main" else "480p (sub)"
         return {"status": "success", "message": f"Live view: {label}"}
@@ -552,8 +552,8 @@ def register_routes(app):
 
     @app.post("/api/credentials")
     async def upload_credentials(admin: AdminUser, file: UploadFile = File(...)):
-        contents = await file.read(api.MAX_UPLOAD_SIZE + 1)
-        if len(contents) > api.MAX_UPLOAD_SIZE:
+        contents = await file.read(state.MAX_UPLOAD_SIZE + 1)
+        if len(contents) > state.MAX_UPLOAD_SIZE:
             return JSONResponse(
                 status_code=413,
                 content={"status": "error", "message": "File quá lớn (tối đa 1MB)."},
@@ -678,7 +678,7 @@ def register_routes(app):
                 return "warning"
             return "ok"
 
-        uptime_seconds = int(time.time() - api._SERVER_START_TIME)
+        uptime_seconds = int(time.time() - state._SERVER_START_TIME)
         days, remainder = divmod(uptime_seconds, 86400)
         hours, remainder = divmod(remainder, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -828,13 +828,13 @@ def register_routes(app):
     @app.get("/api/system/update-check")
     def check_update(admin: AdminUser):
         now = time.time()
-        with api._cache_lock:
+        with state._cache_lock:
             if _update_check_cache["result"] and (now - _update_check_cache["timestamp"]) < _UPDATE_CHECK_TTL:
                 return _update_check_cache["result"]
 
         import subprocess as _sp
 
-        current = api._read_version()
+        current = state._read_version()
         mode = "dev" if os.path.exists(".git") else "production"
         latest = current
         update_available = False
@@ -896,7 +896,7 @@ def register_routes(app):
                 if tag:
                     latest = tag
                     changelog = release.get("body", "")
-                update_available = api._parse_semver(latest) > api._parse_semver(current) and latest != "unknown"
+                update_available = state._parse_semver(latest) > state._parse_semver(current) and latest != "unknown"
         except Exception as e:
             logger.error(f"[UPDATE] check failed: {e}")
 
@@ -907,7 +907,7 @@ def register_routes(app):
             "mode": mode,
             "changelog": changelog,
         }
-        with api._cache_lock:
+        with state._cache_lock:
             _update_check_cache["result"] = result
             _update_check_cache["timestamp"] = now
         return result
@@ -925,7 +925,7 @@ def register_routes(app):
 
         _is_updating = True
         try:
-            with api._cache_lock:
+            with state._cache_lock:
                 _update_check_cache["result"] = None
                 _update_check_cache["timestamp"] = 0
             mode = "dev" if os.path.exists(".git") else "production"

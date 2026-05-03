@@ -53,29 +53,29 @@ def _get_video_info(filepath):
 
 
 def _decrement_processing(station_id):
-    # Fallback: import api directly (backward compat)
+    # Fallback: from vpack import state directly (backward compat)
     try:
-        import api
+        from vpack import state
 
-        with api._processing_lock:
-            count = api._processing_count.get(station_id, 0)
+        with state._processing_lock:
+            count = state._processing_count.get(station_id, 0)
             if count <= 1:
-                api._processing_count.pop(station_id, None)
+                state._processing_count.pop(station_id, None)
             else:
-                api._processing_count[station_id] = count - 1
+                state._processing_count[station_id] = count - 1
     except Exception:
         pass
 
 
 def _notify_sse_safe(station_id, status, record_id):
     try:
-        import api
+        from vpack import state
 
         p_count = 0
-        with api._processing_lock:
-            p_count = api._processing_count.get(station_id, 0)
+        with state._processing_lock:
+            p_count = state._processing_count.get(station_id, 0)
 
-        api.notify_sse(
+        state.notify_sse(
             "video_status",
             {
                 "station_id": station_id,
