@@ -1,9 +1,9 @@
 import os
 import sqlite3
 
-import database
 import pytest
-from database import (
+from vpack import database
+from vpack.database import (
     add_station,
     cleanup_old_records,
     create_record,

@@ -1,10 +1,7 @@
-import os
 import sys
 
 # Add root directory to sys.path so we can import from database
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import database
+from vpack import database
 
 
 def seed_e2e_data():

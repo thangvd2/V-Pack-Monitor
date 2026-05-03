@@ -1,14 +1,14 @@
 import os
 from unittest.mock import MagicMock, patch
 
-import cloud_sync
 import pytest
+from vpack import cloud_sync
 
 
 class TestS3Upload:
     """Tests for upload_to_s3 function."""
 
-    @patch("cloud_sync.boto3.client")
+    @patch("vpack.cloud_sync.boto3.client")
     def test_s3_upload_success(self, mock_boto_client):
         """Verify S3 upload_file called with correct parameters on success."""
         mock_s3 = MagicMock()
@@ -31,7 +31,7 @@ class TestS3Upload:
         )
         mock_s3.upload_file.assert_called_once_with("/recordings/backup.zip", "vpack-backup", "backup.zip")
 
-    @patch("cloud_sync.boto3.client")
+    @patch("vpack.cloud_sync.boto3.client")
     def test_s3_upload_invalid_credentials(self, mock_boto_client):
         """NoCredentialsError should be caught and re-raised as generic Exception."""
         from botocore.exceptions import NoCredentialsError
@@ -49,7 +49,7 @@ class TestS3Upload:
                 bucket_name="vpack-backup",
             )
 
-    @patch("cloud_sync.boto3.client")
+    @patch("vpack.cloud_sync.boto3.client")
     def test_s3_upload_generic_exception(self, mock_boto_client):
         """Other S3 errors should be caught and re-raised with descriptive message."""
         mock_s3 = MagicMock()
@@ -69,9 +69,9 @@ class TestS3Upload:
 class TestGDriveUpload:
     """Tests for upload_to_gdrive function."""
 
-    @patch("cloud_sync.MediaFileUpload")
-    @patch("cloud_sync.build")
-    @patch("cloud_sync._get_gdrive_creds")
+    @patch("vpack.cloud_sync.MediaFileUpload")
+    @patch("vpack.cloud_sync.build")
+    @patch("vpack.cloud_sync._get_gdrive_creds")
     @patch("os.path.exists", return_value=True)
     def test_gdrive_upload_success(self, mock_exists, mock_get_creds, mock_build, mock_media):
         """Verify Google Drive upload creates file with correct metadata."""
@@ -103,8 +103,8 @@ class TestGDriveUpload:
 class TestProcessCloudSync:
     """Tests for process_cloud_sync orchestration function."""
 
-    @patch("cloud_sync.telegram_bot.send_telegram_message")
-    @patch("cloud_sync.get_setting")
+    @patch("vpack.cloud_sync.telegram_bot.send_telegram_message")
+    @patch("vpack.cloud_sync.get_setting")
     def test_provider_none_raises_exception(self, mock_get_setting, mock_tg):
         """When CLOUD_PROVIDER is NONE, process_cloud_sync should raise exception."""
         mock_get_setting.return_value = "NONE"
@@ -114,11 +114,11 @@ class TestProcessCloudSync:
 
         mock_tg.assert_not_called()
 
-    @patch("cloud_sync.mark_as_synced")
-    @patch("cloud_sync.telegram_bot.send_telegram_message")
-    @patch("cloud_sync.upload_to_s3")
-    @patch("cloud_sync.create_backup_zip")
-    @patch("cloud_sync.get_setting")
+    @patch("vpack.cloud_sync.mark_as_synced")
+    @patch("vpack.cloud_sync.telegram_bot.send_telegram_message")
+    @patch("vpack.cloud_sync.upload_to_s3")
+    @patch("vpack.cloud_sync.create_backup_zip")
+    @patch("vpack.cloud_sync.get_setting")
     def test_s3_sync_success_path(self, mock_get_setting, mock_create_zip, mock_upload_s3, mock_tg, mock_mark_synced):
         """Full S3 sync flow: create zip, upload, mark synced, notify telegram."""
         mock_get_setting.side_effect = lambda key, default=None: {
@@ -142,9 +142,9 @@ class TestProcessCloudSync:
         assert "Cloud Sync Hoàn Tất" in tg_msg
         assert "2 video" in tg_msg
 
-    @patch("cloud_sync.telegram_bot.send_telegram_message")
-    @patch("cloud_sync.create_backup_zip")
-    @patch("cloud_sync.get_setting")
+    @patch("vpack.cloud_sync.telegram_bot.send_telegram_message")
+    @patch("vpack.cloud_sync.create_backup_zip")
+    @patch("vpack.cloud_sync.get_setting")
     def test_sync_no_new_videos(self, mock_get_setting, mock_create_zip, mock_tg):
         """When no unsynced videos exist, return early with info message."""
         mock_get_setting.return_value = "S3"

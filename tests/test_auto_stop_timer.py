@@ -2,9 +2,8 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 
-import database
-import video_worker
 import vpack.state
+from vpack import database, video_worker
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -23,8 +22,8 @@ def _start_recording(client, op_headers, station_id, barcode="TESTWB001"):
     )
     mock_rec = MagicMock()
     with patch.object(vpack.state, "_preflight_checks", return_value=(True, "")):
-        with patch("network.validate_mac", return_value=False):
-            with patch("routes_records.CameraRecorder", return_value=mock_rec):
+        with patch("vpack.network.validate_mac", return_value=False):
+            with patch("vpack.routes.records.CameraRecorder", return_value=mock_rec):
                 r = client.post(
                     "/api/scan",
                     headers=op_headers,

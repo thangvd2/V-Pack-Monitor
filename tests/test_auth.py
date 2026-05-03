@@ -1,8 +1,7 @@
 import time
 
-import auth
-import database
 import pytest
+from vpack import auth, database
 
 
 class TestJWT:
