@@ -23,7 +23,7 @@ def _start_recording(client, op_headers, station_id, barcode="TESTWB001"):
         params={"station_id": station_id},
     )
     mock_rec = MagicMock()
-    with patch.object(api, "_preflight_checks", return_value=(True, "")):
+    with patch.object(vpack.state, "_preflight_checks", return_value=(True, "")):
         with patch("network.validate_mac", return_value=False):
             with patch("routes_records.CameraRecorder", return_value=mock_rec):
                 r = client.post(
