@@ -180,6 +180,35 @@ def scan_lan_all() -> list[dict]:
     return _parse_arp_table()
 
 
+def get_mac_for_ip(target_ip: str) -> str | None:
+    """Look up the MAC address for a given IP from the ARP table.
+
+    If not found in cache, pings the IP to populate the ARP table first,
+    then looks up again.
+
+    Args:
+        target_ip: IPv4 address string.
+
+    Returns:
+        Normalized MAC address string if found, None otherwise.
+    """
+    # Step 1: Check ARP table first
+    for entry in _parse_arp_table():
+        if entry["ip"] == target_ip:
+            return entry["mac"]
+
+    # Step 2: Ping the IP to populate ARP table
+    _ping_host(target_ip)
+    time.sleep(0.3)  # Brief wait for ARP table update
+
+    # Step 3: Re-read ARP table
+    for entry in _parse_arp_table():
+        if entry["ip"] == target_ip:
+            return entry["mac"]
+
+    return None
+
+
 def check_ping(ip: str, timeout_ms: int = 2000) -> tuple[bool, int]:
     """Ping a host and return (is_online, latency_ms)."""
     system = platform.system()

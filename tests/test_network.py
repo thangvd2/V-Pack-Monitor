@@ -240,3 +240,79 @@ class TestDiscoverAPI:
     def test_discover_station_requires_auth(self, client, sample_station_id):
         r = client.get(f"/api/discover/{sample_station_id}")
         assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# get_mac_for_ip
+# ---------------------------------------------------------------------------
+
+
+class TestGetMacForIp:
+    """Tests for network.get_mac_for_ip()."""
+
+    @patch("network._parse_arp_table")
+    def test_found_immediately(self, mock_arp):
+        mock_arp.return_value = [
+            {"ip": "192.168.1.42", "mac": "AA:BB:CC:DD:EE:FF"},
+        ]
+        result = network.get_mac_for_ip("192.168.1.42")
+        assert result == "AA:BB:CC:DD:EE:FF"
+
+    @patch("network._ping_host")
+    @patch("network._parse_arp_table")
+    def test_found_after_ping(self, mock_arp, mock_ping):
+        mock_arp.side_effect = [
+            [],
+            [{"ip": "192.168.1.42", "mac": "AA:BB:CC:DD:EE:FF"}],
+        ]
+        result = network.get_mac_for_ip("192.168.1.42")
+        assert result == "AA:BB:CC:DD:EE:FF"
+        mock_ping.assert_called_once_with("192.168.1.42")
+
+    @patch("network._ping_host")
+    @patch("network._parse_arp_table")
+    def test_not_found(self, mock_arp, mock_ping):
+        mock_arp.return_value = []
+        result = network.get_mac_for_ip("192.168.1.42")
+        assert result is None
+
+    def test_different_ip_not_matched(self):
+        """Ensure we match exact IP, not partial."""
+        with patch("network._parse_arp_table") as mock_arp:
+            mock_arp.return_value = [
+                {"ip": "192.168.1.4", "mac": "AA:BB:CC:DD:EE:FF"},  # .4 not .42
+            ]
+            result = network.get_mac_for_ip("192.168.1.42")
+            assert result is None or result != "AA:BB:CC:DD:EE:FF"
+
+
+# ---------------------------------------------------------------------------
+# /api/ping with MAC
+# ---------------------------------------------------------------------------
+
+
+class TestPingWithMac:
+    """Tests for /api/ping enhanced with MAC lookup."""
+
+    @patch("network.get_mac_for_ip", return_value="AA:BB:CC:DD:EE:FF")
+    @patch("subprocess.run")
+    def test_ping_reachable_with_mac(self, mock_run, mock_get_mac, client, admin_headers):
+        mock_run.return_value = MagicMock(returncode=0)
+        r = client.get("/api/ping", headers=admin_headers, params={"ip": "192.168.1.10"})
+        assert r.json()["reachable"] is True
+        assert r.json()["mac"] == "AA:BB:CC:DD:EE:FF"
+
+    @patch("network.get_mac_for_ip", return_value=None)
+    @patch("subprocess.run")
+    def test_ping_reachable_no_mac(self, mock_run, mock_get_mac, client, admin_headers):
+        mock_run.return_value = MagicMock(returncode=0)
+        r = client.get("/api/ping", headers=admin_headers, params={"ip": "192.168.1.10"})
+        assert r.json()["reachable"] is True
+        assert r.json()["mac"] is None
+
+    @patch("subprocess.run")
+    def test_ping_unreachable_no_mac_lookup(self, mock_run, client, admin_headers):
+        mock_run.return_value = MagicMock(returncode=1)
+        r = client.get("/api/ping", headers=admin_headers, params={"ip": "192.168.1.10"})
+        assert r.json()["reachable"] is False
+        assert "mac" not in r.json() or r.json()["mac"] is None

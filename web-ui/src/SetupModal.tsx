@@ -219,6 +219,10 @@ const SetupModal: React.FC<SetupModalProps> = ({
       const res = await axios.get(`${API_BASE}/api/ping?ip=${encodeURIComponent(ip1)}`);
       if (res.data.reachable) {
         setTestIpResult({ ok: true, msg: `Reachable (${ip1})` });
+        if (res.data.mac && !macAddress?.trim()) {
+          setMacAddress(res.data.mac);
+          markDirty();
+        }
       } else {
         setTestIpResult({ ok: false, msg: 'Unreachable — camera không phản hồi' });
       }
