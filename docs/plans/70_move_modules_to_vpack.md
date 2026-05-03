@@ -98,6 +98,11 @@ from vpack.routes import auth as routes_auth
 - `migrations/env.py` — import database → from vpack import database
 - `migrations/versions/crypto_v1_to_v2_crypto_v1_to_v2.py` — same
 
+**Build/script files (file-path references, NOT Python imports — will break silently):**
+- `build.py` — Line 59: `"api.py"` PyInstaller entry point → must update to `"vpack/app.py"` or use package entry. **CRITICAL: build will hard-fail if not updated.**
+- `scripts/bump_version.py` — Line 26: `root_dir / "api.py"` → `root_dir / "vpack" / "app.py"`. Will silently fail to update version header.
+- `scripts/check_version_consistency.py` — Line 21: `root_dir / "api.py"` → `root_dir / "vpack" / "app.py"`. Will silently stop checking version consistency — CI always green even when broken.
+
 ---
 
 ## Special Cases
@@ -141,6 +146,22 @@ These files have manual `sys.path` manipulation. Remove them (editable install h
 Currently: `from auth import verify_token` (inside function)
 After: `from vpack.auth import verify_token`
 
+### `vpack/state.py` cross-references
+
+After Plan 69, `state.py` already imports from other modules (e.g., `database`, `network`). After Plan 70 moves those modules into `vpack/`, `state.py` needs relative imports updated:
+- `import database` → `from vpack import database`
+- Any other module-level imports in `state.py` need `vpack.` prefix
+
+### `build.py` PyInstaller hidden imports
+
+Check ALL `--hidden-import` flags in `build.py` that reference root module names:
+- `--hidden-import=auth` → `--hidden-import=vpack.auth`
+- `--hidden-import=database` → `--hidden-import=vpack.database`
+- `--hidden-import=routes_auth` → `--hidden-import=vpack.routes.auth`
+- etc. (verify exact list in build.py)
+
+Also update the `Analysis` entry point from `"api.py"` to `"vpack/app.py"`.
+
 ---
 
 ## Verification
@@ -149,9 +170,11 @@ After: `from vpack.auth import verify_token`
 2. `ruff check .` — no errors
 3. `python -c "from vpack.app import app; print(app.title)"` — works
 4. `python -c "from vpack import database; print(database.DB_FILE)"` — works
-5. No `.py` source files remain in root (except `build.py`)
+5. No `.py` source files remain in root
 6. No `sys.path.insert` hacks remain anywhere
+7. `python build.py` — PyInstaller build succeeds (entry point updated)
+8. `python scripts/bump_version.py --check` — version consistency check works
 
 ## After This Plan
 
-All Python source code in `vpack/`. Root has only configs, scripts, docs. Server still starts with `python -m uvicorn api:app` (old way) — Plan 71 updates this to `vpack.app:app`.
+All Python source code in `vpack/`. Root has only configs, scripts, docs. **`build.py` and version scripts MUST be updated in this plan** or they will break. Server still starts with `python -m uvicorn api:app` (old way) — Plan 71 updates start scripts/Dockerfile to `vpack.app:app`.

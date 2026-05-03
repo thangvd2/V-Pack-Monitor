@@ -15,9 +15,9 @@ Root folder has 40 files. Python modules, configs, scripts, docs all mixed.
 | Plan | Title | Scope | Risk | Effort |
 |------|-------|-------|------|--------|
 | **68** | Create `vpack/` package skeleton | pyproject.toml, ruff.toml, __init__.py | LOW | 10 min |
-| **69** | Extract shared state from `api.py` | state.py + update 4 route modules | HIGH | 45 min |
-| **70** | Move all modules into `vpack/` | 12 files move + ~63 import updates | HIGH | 60 min |
-| **71** | Update configs, move scripts, docs, cleanup | 8 scripts → scripts/ + 10+ external files | MEDIUM | 45 min |
+| **69** | Extract shared state from `api.py` | state.py + update 10 files (4 routes + video_worker + 4 tests + api.py + state.py) | HIGH | 60 min |
+| **70** | Move all modules into `vpack/` | 12 files move + ~63 import updates + build.py/scripts fixes | HIGH | 60 min |
+| **71** | Update configs, move scripts, docs, cleanup | 8 scripts moved, 24+ doc/config files, 2 deleted | MEDIUM | 60 min |
 
 ## Target Structure
 
