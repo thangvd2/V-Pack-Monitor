@@ -84,7 +84,9 @@ from vpack.routes import auth as routes_auth
 - `import database` → `from vpack import database`
 
 #### `vpack/database.py`
-- `from auth import verify_token` (inside function) → `from vpack.auth import verify_token`
+- `from auth import SECRET_KEY` (lazy, inside `_get_enc_key()` line 30) → `from vpack.auth import SECRET_KEY`
+- `from auth import SECRET_KEY` (lazy, inside `_decrypt_value()` line 86) → `from vpack.auth import SECRET_KEY`
+**NOTE**: Plan previously said `verify_token` but actual import is `SECRET_KEY` (appears twice).
 
 #### `vpack/cloud_sync.py`
 - `import database` → `from vpack import database`
@@ -95,7 +97,8 @@ from vpack.routes import auth as routes_auth
 - `import database` → `from vpack import database`
 - `import recorder` → `from vpack import recorder`
 - `import telegram_bot` → `from vpack import telegram_bot`
-- `from vpack import state` (already done in Plan 69B, lazy imports)
+- `import api` (lazy, inside `_decrement_processing()` line 58) → `from vpack import state` (already done in Plan 69B)
+- `import api` (lazy, inside `_notify_sse_safe()` line 72) → `from vpack import state` (already done in Plan 69B)
 
 #### `vpack/telegram_bot.py`
 - `import database` → `from vpack import database`
@@ -107,33 +110,34 @@ from vpack.routes import auth as routes_auth
 - Any other root imports need `vpack.` prefix
 
 #### `vpack/routes/auth.py`
+- **`import api`** (line 13) → **remove** (already migrated to `from vpack import state` in Plan 69B)
 - `import auth` → `from vpack import auth`
 - `import database` → `from vpack import database`
-- `from vpack import state` (already done in Plan 69B)
+- `from auth import AdminUser, CurrentUser` → `from vpack.auth import AdminUser, CurrentUser`
 
 #### `vpack/routes/records.py`
+- **`import api`** (line 24) → **remove** (already migrated to `from vpack import state` in Plan 69B)
 - `import auth` → `from vpack import auth`
 - `from auth import AdminUser, CurrentUser` → `from vpack.auth import AdminUser, CurrentUser`
 - `import database` → `from vpack import database`
 - `import network` → `from vpack import network`
 - `import video_worker` → `from vpack import video_worker`
 - `from recorder import CameraRecorder` → `from vpack.recorder import CameraRecorder`
-- `from vpack import state` (already done in Plan 69B)
 
 #### `vpack/routes/stations.py`
+- **`import api`** (line 13) → **remove** (already migrated to `from vpack import state` in Plan 69B)
 - `import database` → `from vpack import database`
 - `import network` → `from vpack import network`
 - `from auth import AdminUser, CurrentUser` → `from vpack.auth import AdminUser, CurrentUser`
-- `from vpack import state` (already done in Plan 69B)
 
 #### `vpack/routes/system.py`
+- **`import api`** (line 32) → **remove** (already migrated to `from vpack import state` in Plan 69B)
 - `import cloud_sync` → `from vpack import cloud_sync`
 - `import database` → `from vpack import database`
 - `import video_worker` → `from vpack import video_worker`
-- `import telegram_bot` → `from vpack import telegram_bot`
-- `import network` → `from vpack import network`
+- `import telegram_bot` (lazy, inside function line 511) → `from vpack import telegram_bot` (can keep lazy pattern)
+- `import network` (lazy, inside function line 819) → `from vpack import network` (can keep lazy pattern)
 - `from auth import AdminUser, CurrentUser` → `from vpack.auth import AdminUser, CurrentUser`
-- `from vpack import state` (already done in Plan 69B)
 
 #### Files with NO cross-module imports (just move, no import changes):
 - `vpack/network.py` — no root module imports

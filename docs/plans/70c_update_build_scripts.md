@@ -16,7 +16,7 @@
 
 ## Goal
 
-Fix 3 files that reference `api.py` by file path (not Python import). These will break silently if not updated — CI shows green even when broken.
+Fix 3 files that reference `api.py` by file path (not Python import). These will break silently if not updated.
 
 ---
 
@@ -29,36 +29,22 @@ a = Analysis(["api.py"], ...)
 
 **After**:
 ```python
+from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
+# ... later:
 a = Analysis([str(PROJECT_ROOT / "vpack" / "app.py")], ...)
 ```
 
-Also update ALL `--hidden-import` flags:
+**NOTE**: Current `build.py` does NOT have `--hidden-import` flags for project modules — only third-party packages (telebot, uvicorn, fastapi, etc.). After moving to `vpack/`, you may need to ADD hidden-import lines if PyInstaller can't auto-detect them. Test build first, add only if needed:
 ```python
-# BEFORE:
-"--hidden-import=auth",
-"--hidden-import=database",
-"--hidden-import=routes_auth",
-# etc.
-
-# AFTER:
+# ADD these ONLY if PyInstaller fails to find vpack modules:
+"--hidden-import=vpack",
+"--hidden-import=vpack.app",
 "--hidden-import=vpack.auth",
-"--hidden-import=vpack.database",
-"--hidden-import=vpack.routes.auth",
-"--hidden-import=vpack.routes.records",
-"--hidden-import=vpack.routes.stations",
-"--hidden-import=vpack.routes.system",
-"--hidden-import=vpack.state",
-"--hidden-import=vpack.cloud_sync",
-"--hidden-import=vpack.network",
-"--hidden-import=vpack.telegram_bot",
-"--hidden-import=vpack.video_worker",
-"--hidden-import=vpack.recorder",
+# ... etc.
 ```
 
-**Read `build.py` fully** to find ALL hidden-import lines and update each one.
-
-Also check for any other `api.py` string references in the file.
+Also fix relative path: `os.chdir("web-ui")` → `os.chdir(PROJECT_ROOT / "web-ui")`.
 
 ---
 
@@ -94,9 +80,5 @@ api_file = root_dir / "vpack" / "app.py"
 
 1. `ruff check build.py scripts/bump_version.py scripts/check_version_consistency.py` — no errors
 2. `python scripts/check_version_consistency.py` — works, reports version consistency
-3. `grep -rn "api.py\|api:app" build.py scripts/bump_version.py scripts/check_version_consistency.py` — returns 0 results
+3. `grep -rn "api.py" build.py scripts/bump_version.py scripts/check_version_consistency.py` — returns 0 results
 4. `python build.py` — PyInstaller build succeeds (optional, takes time)
-
-## After This Plan
-
-Build and version tooling works with new `vpack/` layout. No silent failures. Plans 70A/B/C complete — all Python code in `vpack/`, all imports updated, all tools working.

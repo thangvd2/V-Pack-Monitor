@@ -31,6 +31,7 @@ active_recorders = {}        # used by routes_stations, routes_records, routes_s
 active_waybills = {}         # used by routes_stations, routes_records
 active_record_ids = {}       # used by routes_stations, routes_records
 _processing_count = {}       # NOTE: dict, not int!
+stream_managers = {}         # used by routes_stations, routes_records, routes_system — CRITICAL: do not forget this one!
 reconnect_status = {}        # used by routes_stations
 _camera_health = {}          # used by routes_stations
 _sse_clients = []            # NOTE: list, not set! Uses .append(), .remove(), .pop()
@@ -66,20 +67,20 @@ _RECORDING_WARNING_SECONDS = 540          # 9 minutes
 _logger = logging.getLogger("vpack")
 ```
 
-### Helper Functions
+### Helper Functions (copy EXACT signatures from api.py)
 
 ```python
-get_rtsp_url(stream_key, ...)
-get_rtsp_sub_url(stream_key, ...)
-notify_sse(event_type, data)
-_read_version()
-_parse_semver(version_str)
-_cancel_recording_timer(station_id)
-_preflight_checks(station_id)
-_auto_stop_recording(station_id)
-_emit_recording_warning(station_id)
-_mtx_remove_path(stream_key)
-_mtx_add_path(stream_key, cam_index)    # Coupled with CameraStreamManager
+get_rtsp_url(ip, safety_code, channel=1, brand="imou")           # routes_stations, routes_records, routes_system
+get_rtsp_sub_url(ip, safety_code, channel=1, brand="imou")       # routes_stations, routes_records, routes_system
+notify_sse(event_type, data)                                     # routes_records, routes_system, video_worker
+_read_version()                                                  # routes_system
+_parse_semver(version_str)                                       # routes_system
+_cancel_recording_timer(station_id)                              # routes_records
+_preflight_checks(station_id)                                    # routes_records
+_auto_stop_recording(station_id, expected_record_id)             # routes_records — NOTE: 2 params!
+_emit_recording_warning(station_id)                              # routes_records
+_mtx_remove_path(station_id, suffix="", station_name="")         # routes_stations
+_mtx_add_path(station_id, rtsp_url, suffix="", station_name="")  # Coupled with CameraStreamManager
 ```
 
 ### Class

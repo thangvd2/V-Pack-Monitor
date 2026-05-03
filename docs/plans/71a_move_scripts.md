@@ -28,7 +28,6 @@ Add at top of file (after `@echo off`):
 ```batch
 cd /d "%~dp0.."
 ```
-This sets cwd to project root regardless of where script is run from.
 
 Update uvicorn:
 ```batch
@@ -72,13 +71,16 @@ Fix ALL relative paths:
 
 ### 4. `Install V-Pack Monitor.command` → `scripts/Install V-Pack Monitor.command`
 
-Verify it calls `install_macos.sh` with correct path. If it uses relative path like `./install_macos.sh`, that will still work since both are now in `scripts/`.
+**WARNING**: This is a STANDALONE installer (120 lines), NOT a wrapper for `install_macos.sh`. It has its own Python check, Node.js check, venv creation, pip install, npm build, MediaMTX download.
 
-May need `cd "$(dirname "$0")/.."` at top for other path resolution.
+Changes needed:
+1. **Fix cd** (line 7): `cd "$(dirname "$0")"` → `cd "$(dirname "$0")/.."` (MODIFY existing line, don't add new one)
+2. **Add `pip install -e .`** after `pip install -r requirements.txt` (line 78)
+3. **Update echoed instructions** (lines 115, 118-119): `./start.sh` → `./scripts/start.sh`
 
 ### 5. `Start V-Pack Monitor.command` → `scripts/Start V-Pack Monitor.command`
 
-Add `cd "$(dirname "$0")/.."` if not present.
+**MODIFY** existing cd (line 2): `cd "$(dirname "$0")"` → `cd "$(dirname "$0")/.."` (already has cd, just needs `..` appended)
 
 Update uvicorn:
 ```bash
@@ -91,14 +93,9 @@ python3 -m uvicorn vpack.app:app
 
 ### 6. `install_windows.bat` → `scripts/install_windows.bat`
 
-Add at top:
-```batch
-cd /d "%~dp0.."
-```
+**MODIFY** existing cd (line 3): `cd /d "%~dp0"` → `cd /d "%~dp0.."` (already has cd, just needs `..` appended)
 
-Add `pip install -e .` after `pip install -r requirements.txt`.
-
-Verify all `%CD%` paths still resolve correctly from project root.
+Add `pip install -e .` after `pip install -r requirements.txt` (line 256).
 
 ### 7. `install_macos.sh` → `scripts/install_macos.sh`
 
@@ -107,14 +104,16 @@ Add at top:
 cd "$(dirname "$0")/.."
 ```
 
-Add `pip install -e .` after `pip install -r requirements.txt`.
+Add `pip install -e .` after `pip install -r requirements.txt` (line 123).
+
+**Update echoed instructions** (lines 167, 170-171): `./start.sh` → `./scripts/start.sh`
 
 ### 8. `inno_setup.iss` → `scripts/inno_setup.iss`
 
-Check for file paths inside the ISS file:
-- `OutputDir=.\installer` — may need update if relative to ISS location
-- Source executable path — update to `..\dist\...` or use absolute-ish path
-- Icon path — same check
+Exact fixes needed (all paths become relative to scripts/ instead of root):
+- Line 9: `OutputDir=.\installer` → `OutputDir=..\installer`
+- Line 17: `Source: "dist\V-Pack-Monitor.exe"` → `Source: "..\dist\V-Pack-Monitor.exe"`
+- Line 19: `Source: "README.md"` → `Source: "..\README.md"`
 
 ---
 

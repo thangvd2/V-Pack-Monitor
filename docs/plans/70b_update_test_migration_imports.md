@@ -44,10 +44,12 @@ from vpack.database import init_db
 ### File-by-file:
 
 #### `tests/conftest.py`
-- `import api` → `import vpack.app as api` (needs api.app FastAPI object)
-- `import routes_auth` → `from vpack.routes import auth as routes_auth`
+- `import auth` (line 11, top-level) → `from vpack import auth`
+- `import database` (line 12, top-level) → `from vpack import database`
+- `import api` (line 88, inside fixture) → `import vpack.app as api` (needs api.app FastAPI object)
+- `import routes_auth` (line 89, inside fixture) → `from vpack.routes import auth as routes_auth`
 - `from vpack import state` (already done in Plan 69C)
-- Remove `sys.path.insert(0, ...)` hack if present
+- Remove `sys.path.insert(0, ...)` hack (line 7)
 
 #### `tests/test_auth.py`
 - `import auth` → `from vpack import auth`
@@ -77,9 +79,13 @@ from vpack.database import init_db
 - `import database` → `from vpack import database`
 
 #### `tests/test_auto_stop_timer.py`
-- `from vpack import state` (already done in Plan 69C, verify)
+- **`import api`** (line 5, top-level) → `import vpack.app as api`
 - `import database` → `from vpack import database`
 - `import video_worker` → `from vpack import video_worker`
+- `from vpack import state` (already done in Plan 69C, verify)
+- **IMPORTANT**: Patch targets also need updating (done in Plan 69C, verify):
+  - `patch.object(api, "_preflight_checks", ...)` → `patch.object(state, "_preflight_checks", ...)`
+  - `patch.object(api, "notify_sse", ...)` → `patch.object(state, "notify_sse", ...)`
 
 #### `tests/test_recorder.py`
 - `import recorder` → `from vpack import recorder`
@@ -89,7 +95,10 @@ from vpack.database import init_db
 - `import database` → `from vpack import database`
 - `import video_worker` → `from vpack import video_worker`
 - Patches `"api._get_video_info_external"` → `"vpack.app._get_video_info_external"` (function stays in app.py)
-- `api._recover_pending_records()` → `vpack.app._recover_pending_records()` or `import vpack.app as api`
+- **Also update these patch targets:**
+  - `patch("video_worker._process_stop_and_save")` (line 37) → `patch("vpack.video_worker._process_stop_and_save")`
+  - `patch("video_worker._get_video_info")` (line 128) → `patch("vpack.video_worker._get_video_info")`
+- `api._recover_pending_records()` → `vpack.app._recover_pending_records()` or keep `import vpack.app as api`
 
 #### `tests/test_cloud_sync.py`
 - `import cloud_sync` → `from vpack import cloud_sync`

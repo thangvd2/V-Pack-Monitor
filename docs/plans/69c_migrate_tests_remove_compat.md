@@ -62,11 +62,15 @@ from vpack.state import get_rtsp_sub_url, get_rtsp_url
 - `api._processing_count`, `api._auto_stop_recording`, `api._emit_recording_warning`
 - `api._cancel_recording_timer`, `api._recording_timers_lock`
 
+**IMPORTANT — Also patch targets (may be missed by simple find-replace):**
+- `patch.object(api, "_preflight_checks", ...)` → `patch.object(state, "_preflight_checks", ...)`
+- `patch.object(api, "notify_sse", ...)` → `patch.object(state, "notify_sse", ...)`
+
 **After**:
 ```python
 from vpack import state
 # ... change ALL api.X → state.X for state variables
-# KEEP any references to api.app or api database if present
+# ... change ALL patch.object(api, ...) → patch.object(state, ...) for extracted symbols
 ```
 
 ---

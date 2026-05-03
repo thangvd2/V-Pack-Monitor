@@ -86,10 +86,7 @@ Same search-replace patterns as DESIGN_PATTERNS.md.
 ## Cleanup
 
 ### Delete `install_log.txt`
-Add to `.gitignore` if not already there. Remove from git tracking:
-```bash
-git rm install_log.txt
-```
+Already in `.gitignore` (line 15). If tracked by git, remove: `git rm install_log.txt`.
 
 ### Delete `scratch/` directory (local only)
 Already in `.gitignore`. Just `rm -rf scratch/` locally.
