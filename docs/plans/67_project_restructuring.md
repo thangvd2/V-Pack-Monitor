@@ -17,7 +17,7 @@ Root folder has 40 files. Python modules, configs, scripts, docs all mixed.
 | **68** | Create `vpack/` package skeleton | pyproject.toml, ruff.toml, __init__.py | LOW | 10 min |
 | **69** | Extract shared state from `api.py` | state.py + update 4 route modules | HIGH | 45 min |
 | **70** | Move all modules into `vpack/` | 12 files move + ~63 import updates | HIGH | 60 min |
-| **71** | Update configs, scripts, docs, cleanup | 10+ external files | MEDIUM | 30 min |
+| **71** | Update configs, move scripts, docs, cleanup | 8 scripts → scripts/ + 10+ external files | MEDIUM | 45 min |
 
 ## Target Structure
 
@@ -34,7 +34,13 @@ V-Pack-Monitor/
 │       ├── auth.py, records.py, stations.py, system.py
 ├── migrations/               ← Stays, update imports
 ├── tests/                    ← Stays, update imports
-├── scripts/                  ← Stays, update paths
+├── scripts/                  ← ALL scripts (install, start, build)
+│   ├── build.py, start.sh, start_windows.bat
+│   ├── install_macos.sh, install_windows.bat
+│   ├── inno_setup.iss
+│   ├── Install V-Pack Monitor.command
+│   ├── Start V-Pack Monitor.command
+│   ├── bump_version.py, check_version_consistency.py, test_rtsp.py
 ├── build.py, Dockerfile, docker-compose.yml, ...
 ├── pyproject.toml            ← NEW
 ```
