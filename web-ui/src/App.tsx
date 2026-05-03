@@ -1150,7 +1150,6 @@ const App: React.FC = () => {
               <button
                 onClick={() => {
                   setViewMode('grid');
-                  setAdminTab('operations');
                 }}
                 className="hidden md:flex h-10 items-center justify-center px-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/30 rounded-xl transition-all shadow-lg text-slate-400 hover:text-blue-400 font-medium text-sm gap-2"
                 title="Quay lại giao diện tổng quan"
