@@ -86,17 +86,24 @@ def sample_station_id():
 def client(isolate_db, monkeypatch):
     import api
     import routes_auth
+    import vpack.state
 
-    monkeypatch.setattr(api, "stream_managers", {})
-    monkeypatch.setattr(api, "active_recorders", {})
-    monkeypatch.setattr(api, "active_waybills", {})
-    monkeypatch.setattr(api, "active_record_ids", {})
-    monkeypatch.setattr(api, "_processing_count", {})
-    monkeypatch.setattr(api, "_station_locks", {})
-    monkeypatch.setattr(api, "reconnect_status", {})
-    monkeypatch.setattr(api, "_recording_timers", {})
-    monkeypatch.setattr(api, "_recording_start_times", {})
-    monkeypatch.setattr(api, "_recording_warning_timers", {})
+    for attr in [
+        "stream_managers",
+        "active_recorders",
+        "active_waybills",
+        "active_record_ids",
+        "_processing_count",
+        "_station_locks",
+        "reconnect_status",
+        "_recording_timers",
+        "_recording_start_times",
+        "_recording_warning_timers",
+    ]:
+        d = {}
+        monkeypatch.setattr(vpack.state, attr, d)
+        monkeypatch.setattr(api, attr, d)
+
     monkeypatch.setattr(routes_auth, "_login_attempts", {})
     with (
         patch.object(api.CameraStreamManager, "start"),
