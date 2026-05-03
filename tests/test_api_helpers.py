@@ -1,5 +1,5 @@
 import pytest
-from api import get_rtsp_sub_url, get_rtsp_url
+from vpack.state import get_rtsp_sub_url, get_rtsp_url
 
 
 class TestGetRtspUrl:
