@@ -6,6 +6,7 @@ Covers FTS5 search, pagination, date range, status filter, sorting, and API resp
 from datetime import date
 
 import database
+import pytest
 
 
 def _create_test_records(station_id, count, prefix="WB"):
@@ -21,6 +22,7 @@ def _create_test_records(station_id, count, prefix="WB"):
 # ---------------------------------------------------------------------------
 # Group 1: FTS5 Search
 # ---------------------------------------------------------------------------
+@pytest.mark.usefixtures("isolate_db")
 class TestFTS5Search:
     def test_fts5_exact_match(self, sample_station_id):
         rid = database.create_record(sample_station_id, "SPXVN123456", "SINGLE")
@@ -98,6 +100,7 @@ class TestFTS5Search:
 # ---------------------------------------------------------------------------
 # Group 1b: Trigram Substring Search (the key improvement over unicode61)
 # ---------------------------------------------------------------------------
+@pytest.mark.usefixtures("isolate_db")
 class TestTrigramSubstringSearch:
     """Verify that trigram tokenizer supports substring search, not just prefix."""
 
@@ -160,6 +163,7 @@ class TestTrigramSubstringSearch:
 # ---------------------------------------------------------------------------
 # Group 2: Pagination
 # ---------------------------------------------------------------------------
+@pytest.mark.usefixtures("isolate_db")
 class TestPagination:
     def test_pagination_default(self, sample_station_id):
         _create_test_records(sample_station_id, 25)
@@ -206,6 +210,7 @@ class TestPagination:
 # ---------------------------------------------------------------------------
 # Group 3: Date Range Filter
 # ---------------------------------------------------------------------------
+@pytest.mark.usefixtures("isolate_db")
 class TestDateRange:
     def test_date_from_filter(self, sample_station_id):
         rid = database.create_record(sample_station_id, "DATE-001", "SINGLE")
@@ -251,6 +256,7 @@ class TestDateRange:
 # ---------------------------------------------------------------------------
 # Group 4: Status Filter
 # ---------------------------------------------------------------------------
+@pytest.mark.usefixtures("isolate_db")
 class TestStatusFilter:
     def test_status_filter_ready(self, sample_station_id):
         rid = database.create_record(sample_station_id, "STATUS-001", "SINGLE")
@@ -280,6 +286,7 @@ class TestStatusFilter:
 # ---------------------------------------------------------------------------
 # Group 5: Sorting
 # ---------------------------------------------------------------------------
+@pytest.mark.usefixtures("isolate_db")
 class TestSorting:
     def test_sort_by_recorded_at_desc(self, sample_station_id):
         _create_test_records(sample_station_id, 5, prefix="SORT")
@@ -309,6 +316,7 @@ class TestSorting:
 # ---------------------------------------------------------------------------
 # Group 6: API Endpoint
 # ---------------------------------------------------------------------------
+@pytest.mark.usefixtures("isolate_db")
 class TestAPIRecordsEndpoint:
     def test_api_records_new_format(self, client, admin_headers, sample_station_id):
         rid = database.create_record(sample_station_id, "API-001", "SINGLE")

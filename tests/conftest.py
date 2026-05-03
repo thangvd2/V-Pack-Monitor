@@ -24,7 +24,7 @@ def patch_bcrypt_for_tests():
     bcrypt.gensalt = original_gensalt
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def isolate_db(tmp_path, monkeypatch):
     db_path = str(tmp_path / "test.db")
     monkeypatch.setattr(database, "DB_FILE", db_path)
@@ -34,7 +34,7 @@ def isolate_db(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def admin_user_id():
+def admin_user_id(isolate_db):
     user = database.get_user_by_username("admin")
     assert user is not None, "Default admin should exist after init_db"
     return user["id"]
@@ -51,7 +51,7 @@ def admin_headers(admin_token):
 
 
 @pytest.fixture
-def operator_user_id():
+def operator_user_id(isolate_db):
     uid = database.create_user("operator1", "TestPass123!", "OPERATOR", "Test Op")
     assert uid is not None
     return uid
@@ -68,7 +68,7 @@ def operator_headers(operator_token):
 
 
 @pytest.fixture
-def sample_station_id():
+def sample_station_id(isolate_db):
     return database.add_station(
         {
             "name": "Test Station",

@@ -9,3 +9,6 @@ requires-python = ">=3.10"
 
 [tool.setuptools.packages.find]
 include = ["vpack*"]
+
+[tool.pytest.ini_options]
+addopts = "-n auto"
