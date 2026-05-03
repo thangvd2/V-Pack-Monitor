@@ -811,7 +811,18 @@ def register_routes(app):
             alive = result.returncode == 0
         except Exception:
             pass
-        return {"ip": ip, "reachable": alive}
+
+        # Look up MAC from ARP table when reachable
+        mac = None
+        if alive:
+            try:
+                import network
+
+                mac = network.get_mac_for_ip(ip)
+            except Exception:
+                pass
+
+        return {"ip": ip, "reachable": alive, "mac": mac}
 
     # --- AUTO-UPDATE API ---
 
