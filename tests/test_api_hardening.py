@@ -1,8 +1,7 @@
 import threading
 import time
 
-import auth
-import database
+from vpack import auth, database
 
 # ---------------------------------------------------------------------------
 # Plan #19 – Station input validation (backend hardening)
@@ -229,7 +228,7 @@ class TestAutoUpdate:
 
     def test_update_check_returns_structure(self, client, admin_headers, monkeypatch):
         """Pre-populated cache is returned with the expected keys."""
-        import routes_system
+        from vpack.routes import system as routes_system
 
         cached = {
             "current_version": "2.0.0",
@@ -256,7 +255,7 @@ class TestAutoUpdate:
 
     def test_update_check_caches_result(self, client, admin_headers, monkeypatch):
         """Two consecutive calls return the identical cached payload."""
-        import routes_system
+        from vpack.routes import system as routes_system
 
         cached = {
             "current_version": "1.0.0",
@@ -281,7 +280,7 @@ class TestAutoUpdate:
 
     def test_update_concurrent_rejected_by_lock(self, client, admin_headers, monkeypatch):
         """Second update attempt is rejected when ``_update_lock`` is held."""
-        import routes_system
+        from vpack.routes import system as routes_system
 
         new_lock = threading.Lock()
         monkeypatch.setattr(routes_system, "_update_lock", new_lock)
@@ -298,7 +297,7 @@ class TestAutoUpdate:
 
     def test_update_rejected_when_flag_set(self, client, admin_headers, monkeypatch):
         """``_is_updating`` flag blocks even when lock is free."""
-        import routes_system
+        from vpack.routes import system as routes_system
 
         monkeypatch.setattr(routes_system, "_update_lock", threading.Lock())
         monkeypatch.setattr(routes_system, "_is_updating", True)

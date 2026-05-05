@@ -1,7 +1,6 @@
 import time
 
-import auth
-import database
+from vpack import auth, database
 
 
 class TestSecurityRegression:

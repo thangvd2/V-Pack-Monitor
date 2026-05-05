@@ -2,9 +2,8 @@ import os
 import sqlite3
 
 import pytest
-
-import database
-from database import (
+from vpack import database
+from vpack.database import (
     add_station,
     cleanup_old_records,
     create_record,
@@ -21,6 +20,7 @@ from database import (
 )
 
 
+@pytest.mark.usefixtures("isolate_db")
 class TestSQLInjectionGuards:
     """Tests verifying SQL injection prevention mechanisms."""
 
@@ -67,6 +67,7 @@ class TestSQLInjectionGuards:
         assert get_station(sid)["ip_camera_1"] == "10.0.0.99"
 
 
+@pytest.mark.usefixtures("isolate_db")
 class TestBoundaryConditions:
     """Tests for boundary and off-by-one conditions."""
 
@@ -173,6 +174,7 @@ class TestBoundaryConditions:
         assert all(s["count"] == 0 for s in stats)
 
 
+@pytest.mark.usefixtures("isolate_db")
 class TestInputLimits:
     """Tests for handling extreme and edge-case inputs."""
 

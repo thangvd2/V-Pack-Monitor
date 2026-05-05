@@ -1,5 +1,5 @@
-# Sử dụng Python 3.14
-FROM python:3.14-slim
+# Sử dụng Python 3.13
+FROM python:3.13-slim
 
 LABEL maintainer="VDT - Vu Duc Thang <thangvd2>"
 LABEL org.opencontainers.image.title="V-Pack Monitor"
@@ -10,7 +10,7 @@ ARG MTX_VERSION=1.17.1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y ffmpeg libsm6 libxext6 libgl1 curl tar && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ffmpeg curl tar && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -30,4 +30,4 @@ RUN mkdir -p recordings
 
 EXPOSE 8001 8889 9997
 
-CMD ["sh", "-c", "bin/mediamtx/mediamtx bin/mediamtx/mediamtx.yml & python -m uvicorn api:app --host 0.0.0.0 --port 8001"]
+CMD ["sh", "-c", "bin/mediamtx/mediamtx bin/mediamtx/mediamtx.yml & python -m uvicorn vpack.app:app --host 0.0.0.0 --port 8001"]

@@ -1145,17 +1145,16 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {/* Back to Tổng quan (Admin only) */}
+            {/* Back to Vận hành (Admin only) */}
             {viewMode === 'single' && currentUser?.role === 'ADMIN' && (
               <button
                 onClick={() => {
                   setViewMode('grid');
-                  setAdminTab('operations');
                 }}
                 className="hidden md:flex h-10 items-center justify-center px-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/30 rounded-xl transition-all shadow-lg text-slate-400 hover:text-blue-400 font-medium text-sm gap-2"
-                title="Quay lại giao diện tổng quan"
+                title="Quay lại giao diện vận hành"
               >
-                ← Tổng quan
+                ← Vận hành
               </button>
             )}
 
@@ -1185,7 +1184,7 @@ const App: React.FC = () => {
               </button>
             )}
 
-            {!(currentUser?.role === 'ADMIN' && viewMode === 'grid') && (
+            {currentUser?.role !== 'ADMIN' && (
               <button
                 onClick={() => setShowDashboard((prev) => !prev)}
                 className={`hidden md:flex h-10 w-10 items-center justify-center border rounded-xl transition-all shadow-lg ${showDashboard ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-blue-500/30 text-slate-400 hover:text-blue-400'}`}

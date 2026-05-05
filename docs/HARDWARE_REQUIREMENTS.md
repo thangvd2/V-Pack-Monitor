@@ -93,7 +93,7 @@
 
 **Tại sao Intel Quick Sync quan trọng**:
 - H.265 → H.264 transcode: giảm từ **40-80% CPU** → **~5-15% CPU**
-- Được tự động nhận diện bởi `recorder.py` (ưu tiên QSV đầu tiên)
+- Được tự động nhận diện bởi `vpack/recorder.py` (ưu tiên QSV đầu tiên)
 - Không cần mua GPU rời — có sẵn trong mọi CPU Intel từ thế hệ 6+
 - PIP mode encode cũng dùng QSV → giảm CPU đáng kể
 

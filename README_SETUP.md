@@ -13,15 +13,15 @@ Tài liệu dành cho nhân viên kinh doanh / kỹ thuật viên đem V-Pack Mo
 
 ### Trên Windows
 1. Tải và giải nén `V-Pack-Monitor` vào ổ đĩa (VD: `E:\V-Pack-Monitor`).
-2. Nhấn chuột phải vào `install_windows.bat` → **Run as administrator**.
+2. Nhấn chuột phải vào `scripts/install_windows.bat` → **Run as administrator**.
 3. Script tự động xử lý: tải Python 3.13, Node.js 22, FFmpeg, MediaMTX, tạo venv, build frontend, mở port tường lửa, tạo shortcut Desktop.
 
 ### Trên macOS
 1. Tải và giải nén `V-Pack-Monitor`.
 2. Mở Terminal, di chuyển vào thư mục vừa giải nén:
 ```bash
-chmod +x install_macos.sh
-./install_macos.sh
+chmod +x scripts/install_macos.sh
+./scripts/install_macos.sh
 ```
 3. Script tự động: kiểm tra Python 3.10+, Node.js, tạo venv, cài thư viện, build frontend.
 
@@ -30,13 +30,13 @@ chmod +x install_macos.sh
 ## Bước 2: Khởi Động Phần Mềm
 
 ### Windows
-Nháy đúp vào biểu tượng **V-Pack Monitor** trên Desktop. Hoặc chạy `start_windows.bat`. Hệ thống khởi động 2 tiến trình:
+Nháy đúp vào biểu tượng **V-Pack Monitor** trên Desktop. Hoặc chạy `scripts/start_windows.bat`. Hệ thống khởi động 2 tiến trình:
 - **MediaMTX** — WebRTC live view (port 8889)
 - **Python API** — Backend ghi hình, quét mã, cloud sync (port 8001)
 
 ### macOS
 ```bash
-./start.sh
+./scripts/start.sh
 ```
 
 ### Docker

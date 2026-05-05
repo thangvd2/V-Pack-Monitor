@@ -31,7 +31,7 @@
 ## BACKLOG (Theo mức ưu tiên)
 
 ### 1. ~~Unit Test Suite~~ ✅ DONE (322 tests)
-- Phase 1+2: 84 tests (database.py + auth.py)
+- Phase 1+2: 84 tests (vpack/database.py + vpack/auth.py)
 - Phase 3+4: 77 tests (API routes + helpers)
 - Phase 5-10: 108 tests (security regression, network, video worker, API hardening, DB edge cases, cloud sync, telegram)
 - Phase 11: 28 tests (video search FTS5 + pagination)

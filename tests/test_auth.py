@@ -1,9 +1,7 @@
 import time
 
 import pytest
-
-import auth
-import database
+from vpack import auth, database
 
 
 class TestJWT:
@@ -61,6 +59,7 @@ class TestJWT:
             auth.decode_token(token)
 
 
+@pytest.mark.usefixtures("isolate_db")
 class TestTokenRevocation:
     def test_revoke_token(self, isolate_db):
         token = auth.create_access_token({"sub": "1", "role": "ADMIN"})

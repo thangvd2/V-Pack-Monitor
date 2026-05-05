@@ -97,7 +97,9 @@ jobs:
           restore-keys: ${{ runner.os }}-pip-
 
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -e .
 
       - name: Run tests
         run: python -m pytest tests/ -v --tb=short
@@ -171,7 +173,9 @@ jobs:
           restore-keys: ${{ runner.os }}-pip-
 
       - name: Install Python dependencies
-        run: pip install -r requirements-dev.txt
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -e .
 
       - name: Install Frontend dependencies
         working-directory: web-ui

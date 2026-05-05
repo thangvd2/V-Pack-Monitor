@@ -21,7 +21,7 @@ Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa 
 - **PATCH** (x.x.Z): bugfix only
 - **MINOR** (x.Y.0): new feature, backward-compatible
 - **MAJOR** (X.0.0): breaking change (API format, DB schema, response structure)
-- Update `VERSION` file + `api.py` header + `RELEASE_NOTES.md` on release
+- **ALWAYS use `python scripts/bump_version.py X.Y.Z`** to bump — it syncs all 5 files (`VERSION`, `vpack/app.py`, `README.md`, `web-ui/package.json`, `web-ui/package-lock.json`). Edit `RELEASE_NOTES.md` manually.
 
 ## Language
 
@@ -44,10 +44,23 @@ Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa 
 - Release PR → master: use `--merge` (keep shared history, prevent future conflicts)
 - NEVER merge any PR without explicit user confirmation. Always ask first.
 
+## IMPLEMENTATION WORKFLOW (MANDATORY — ALL AGENTS)
+
+```
+PLAN → git checkout -b feature/xxx dev → IMPLEMENT → TEST → COMMIT → gh pr create → WAIT FOR REVIEW → USER MERGES
+```
+
+1. **CREATE BRANCH BEFORE any code**: `git checkout -b {type}/{desc} dev`. NEVER write code on `dev` or `master`. If already on `dev`, stash → create branch → pop stash.
+2. **IMPLEMENT on feature branch**: All changes, tests, fixes on this branch. Run `pytest tests/ -v` and `npm run build && npm run lint` before committing.
+3. **CREATE PR AFTER implementation**: `gh pr create --base dev`. PR must include: plan reference, files changed, test results, any deviations. PR enables OpenCode review.
+4. **WAIT for review**: OpenCode reviews PR. Fix issues on same branch. ONLY merge after explicit user approval.
+
 ## RELEASE RULES (MANDATORY)
 
 - Release PR is ALWAYS `dev` → `master`, merged with `gh pr merge <N> --merge` (NOT --squash)
-- ALWAYS update `VERSION`, `api.py` header, and `RELEASE_NOTES.md` ON `dev` BEFORE creating release PR
+- **ALWAYS use `python scripts/bump_version.py X.Y.Z` to sync ALL version locations** — NEVER edit version files manually. Script updates: `VERSION`, `vpack/app.py`, `README.md`, `web-ui/package.json`, `web-ui/package-lock.json`
+- **ALWAYS run `python scripts/check_version_consistency.py` BEFORE and AFTER bump** to verify all 5 files in sync
+- Update `RELEASE_NOTES.md` manually (the bump script does NOT touch release notes)
 - NEVER squash or rebase dev → master — this destroys shared history and causes permanent conflicts
 - Full process: see `CONTRIBUTING.md` → "Release Process (dev → master)"
 
@@ -73,6 +86,20 @@ Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa 
 - **Frontend-Backend sync**: When adding SSE event or API response field in backend, MUST add frontend handler in the SAME commit
 - **React stale closures**: Variables used inside useEffect/useState callbacks must be in deps array or accessed via ref (enforced by `eslint-plugin-react-hooks`)
 
+## PLAN FILE RULES (MANDATORY)
+
+- Plan files live in `docs/plans/` with header `> **Status:** READY | DONE | SKIPPED`
+- **OpenCode MUST commit plan file to `dev` BEFORE handing it to Antigravity** — create a quick PR or direct commit on a feature branch, merge to dev. Plan file MUST exist on `dev` before implementation starts.
+- **Antigravity MUST NOT include plan file in implementation PR** — it should already be on `dev`. Antigravity only implements what the plan says.
+- If approach changes during implementation, document deviations in PR description, not in the plan file
+- After PR is merged to `dev`, update plan status from `READY` → `DONE` in a separate commit on `dev`
+
+### Why plan must be on dev before implement?
+- Clear paper trail: plan → review → implement → review → merge
+- Prevents Antigravity from modifying plan mid-implementation
+- Separates planning (OpenCode) from execution (Antigravity)
+- Plan acts as "contract" both agents reference from repo
+
 ## MANDATORY PRE-PUSH REVIEW (EVERY FEATURE)
 
 Before pushing ANY new feature or significant change:
@@ -88,20 +115,16 @@ Before pushing ANY new feature or significant change:
 ## CODE REVIEW ANTI-FALSE-POSITIVE RULES (MANDATORY)
 
 When flagging a potential issue during code review, you MUST:
-1. **Read ALL files in the dependency chain** — not just the immediate file. If issue is in `api.py`, also read callers (`routes_*.py`), callees (`video_worker.py`, `database.py`), and config (`auth.py`).
-2. **Trace the FULL call path** — callers, callees, related modules. A lock in one function is only a deadlock risk if another code path acquires locks in reverse order.
-3. **Check mitigations FIRST** — before flagging, ask: "Is this already handled elsewhere?" (e.g., a random key fallback in `database.py` is mitigated by `auth.py` persisting SECRET_KEY in DB).
+1. **Read ALL files in the dependency chain** — not just the immediate file
+2. **Trace the FULL call path** — callers, callees, related modules
+3. **Check mitigations FIRST** — before flagging, ask: "Is this already handled elsewhere?"
 4. **Provide FOR and AGAINST evidence** — every flagged issue MUST include:
    - EVIDENCE FOR: why this seems like a real issue (with file:line)
-   - EVIDENCE AGAINST: why this might NOT be a real issue — check guards, related code, production config
-   - DEPENDENCY CHAIN: list ALL related files/modules that affect this issue
-5. **Classify before reporting** — every issue gets one of:
-   - `REAL`: Confirmed with full dependency trace. Has user impact.
-   - `SPECULATIVE`: Plausible but unverified. Needs deeper investigation.
-   - `FALSE POSITIVE`: Initially seemed real, but mitigated elsewhere.
+   - EVIDENCE AGAINST: why this might NOT be a real issue
+   - DEPENDENCY CHAIN: list ALL related files/modules
+5. **Classify**: `REAL` (confirmed) / `SPECULATIVE` (unverified) / `FALSE POSITIVE` (mitigated)
 
 **Issue without full dependency trace = SPECULATIVE, not actionable.**
-**Issue without AGAINST evidence = incomplete review.**
 
 ## REVIEW PROMPT TEMPLATE (USE WHEN DELEGATING REVIEW TASKS)
 When firing explore/librarian agents for code review, include this structure in the prompt:
@@ -141,7 +164,7 @@ For release PRs, security audits, and critical code changes — use this two-pas
 - SPECULATIVE issues are reported with clear caveat
 - FALSE POSITIVE issues are documented with explanation of why they're safe
 
-**Why 2 passes?** A single pass creates confirmation bias — agents find "evidence" to support their initial concern without checking if it's already mitigated. Two passes separate "detection" (Pass 1) from "verification" (Pass 2), dramatically reducing false positives.
+
 
 ## MANDATORY SELF-VERIFICATION CHECKLIST (BEFORE SAYING "DONE")
 You MUST NOT report a task as complete until EVERY item below passes.
@@ -175,21 +198,31 @@ No exceptions. If you skip any item, the user WILL find the bug on double-check.
 - [ ] If adding `if:` conditions — verified that skipped jobs still satisfy branch protection
 
 ### For docs/config changes (AGENTS.md, CONTRIBUTING.md, VERSION):
-- [ ] VERSION file matches api.py header
+- [ ] VERSION file matches vpack/app.py header
 - [ ] Cross-references between docs are accurate (section names, file paths)
 - [ ] No contradictory rules between AGENTS.md and CONTRIBUTING.md
 
 ### For release PRs:
 - [ ] `gh pr merge <N> --merge` (NOT --squash)
-- [ ] VERSION, api.py header, RELEASE_NOTES.md all updated on dev BEFORE creating PR
+- [ ] VERSION, vpack/app.py header, RELEASE_NOTES.md all updated on dev BEFORE creating PR
 
 ## PROJECT STRUCTURE
-- `api.py` — FastAPI app, shared state, lifespan, helpers (DO NOT add routes here)
-- `routes_*.py` — Route modules, each exports `register_routes(app)`
-- `database.py` — DB layer, Fernet encryption, FTS5 search
-- `auth.py` — JWT, password hashing, token revocation
-- `video_worker.py` — Video processing queue (bounded, max 10 pending)
-- `recorder.py` — FFmpeg recording
+```
+vpack/                    ← Python package
+  __init__.py
+  app.py                  ← FastAPI app (DO NOT add routes here)
+  state.py                ← Shared state (extracted from api.py)
+  auth.py, database.py, network.py, recorder.py
+  video_worker.py, cloud_sync.py, telegram_bot.py
+  routes/
+    __init__.py
+    auth.py, records.py, stations.py, system.py
+scripts/                  ← ALL scripts
+  build.py, start.sh, start_windows.bat
+  install_macos.sh, install_windows.bat
+  inno_setup.iss
+  bump_version.py, check_version_consistency.py, test_rtsp.py
+```
 - `tests/` — Pytest suite with tmp_path isolation
 
 ## AGENT SYSTEM (OpenCode Only)

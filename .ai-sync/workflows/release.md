@@ -15,7 +15,7 @@
 ```bash
 git checkout dev && git pull origin dev
 # Update VERSION file: v3.0.0 → v3.1.0
-# Update api.py header: v3.0.0 → v3.1.0
+# Update vpack/app.py header: v3.0.0 → v3.1.0
 # Add RELEASE_NOTES.md entry for new version
 git commit -m "release: vX.Y.Z — update VERSION, release notes"
 git push origin dev
@@ -68,7 +68,7 @@ gh release create "v${VERSION}" \
 
 ## Step 7: Sync dev from master (CRITICAL)
 
-After release merge, dev must receive the merge commit + version bump from master. Without this, dev falls behind master on VERSION/api.py/RELEASE_NOTES → next release will conflict.
+After release merge, dev must receive the merge commit + version bump from master. Without this, dev falls behind master on VERSION/vpack/app.py/RELEASE_NOTES → next release will conflict.
 
 ```bash
 git checkout dev && git pull origin dev
@@ -76,7 +76,7 @@ git merge origin/master --no-edit
 git push origin dev
 ```
 
-**Why**: The `--merge` release PR creates a merge commit on master that dev doesn't have. If dev isn't synced, the next release branch (created from dev) will conflict on VERSION/api.py/RELEASE_NOTES when Step 4 merges master into it.
+**Why**: The `--merge` release PR creates a merge commit on master that dev doesn't have. If dev isn't synced, the next release branch (created from dev) will conflict on VERSION/vpack/app.py/RELEASE_NOTES when Step 4 merges master into it.
 
 ## Step 8: Verify
 
@@ -97,4 +97,4 @@ git log --oneline dev..master  # Should be empty or only merge commit
 - ❌ `git rebase` dev onto master → rewrites history
 - ❌ `git push --force` master → loses release history
 - ❌ Forget to create git tag + GitHub release → no version tracking in GitHub
-- ❌ Skip Step 7 (sync dev from master) → next release WILL conflict on VERSION/api.py/RELEASE_NOTES
+- ❌ Skip Step 7 (sync dev from master) → next release WILL conflict on VERSION/vpack/app.py/RELEASE_NOTES

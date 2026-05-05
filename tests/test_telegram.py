@@ -1,14 +1,14 @@
 from unittest.mock import MagicMock, patch
 
-import telegram_bot
+from vpack import telegram_bot
 
 
 class TestSendMessage:
     """Tests for send_telegram_message function."""
 
-    @patch("telegram_bot._bot", None)
+    @patch("vpack.telegram_bot._bot", None)
     @patch("requests.post")
-    @patch("database.get_setting")
+    @patch("vpack.database.get_setting")
     def test_send_message_success(self, mock_get_setting, mock_post):
         """Successful raw API call returns (True, ...) with correct URL and payload."""
         mock_get_setting.side_effect = lambda key, default="": {
@@ -37,7 +37,7 @@ class TestSendMessage:
         assert payload["text"] == "Test alert message"
         assert payload["parse_mode"] == "HTML"
 
-    @patch("database.get_setting")
+    @patch("vpack.database.get_setting")
     def test_send_message_missing_token(self, mock_get_setting):
         """Missing bot token should return (False, ...) without crashing."""
         # Reset cached token so _get_bot_token() re-reads from DB
@@ -55,7 +55,7 @@ class TestSendMessage:
         assert "Chưa cấu hình" in msg
 
     @patch("requests.post")
-    @patch("database.get_setting")
+    @patch("vpack.database.get_setting")
     def test_send_message_formatting(self, mock_get_setting, mock_post):
         """Verify HTML-formatted message content is passed through correctly."""
         mock_get_setting.side_effect = lambda key, default="": {
@@ -80,7 +80,7 @@ class TestSendMessage:
         assert "S3 thành công" in payload["text"]
 
     @patch("requests.post")
-    @patch("database.get_setting")
+    @patch("vpack.database.get_setting")
     def test_send_message_api_error(self, mock_get_setting, mock_post):
         """Telegram API error should return (False, ...) without crashing."""
         mock_get_setting.side_effect = lambda key, default="": {

@@ -22,8 +22,8 @@ def main():
         version_file.write_text(f"v{new_version}\n", encoding="utf-8")
         print("Updated VERSION")
 
-    # 2. Update api.py header
-    api_file = root_dir / "api.py"
+    # 2. Update vpack/app.py header
+    api_file = root_dir / "vpack" / "app.py"
     header_pattern = re.compile(r"^((?:#| \*) V-Pack Monitor(?: - CamDongHang)?\s+v)\d+\.\d+\.\d+", flags=re.MULTILINE)
     if api_file.exists():
         content = api_file.read_text(encoding="utf-8")

@@ -1,6 +1,6 @@
 # Plan 62: Documentation Production Readiness & Code Hardening
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** HIGH — Blocker for sales
 > **Scope:** 3 critical doc rewrites + README fixes + code cleanup + version bumps + archive
 > **Estimated Effort:** 3-4 hours
@@ -348,9 +348,9 @@ Phase 1 (Critical doc rewrites) — AFTER understanding current UI
 ## Verification Checklist
 
 After all changes:
-- [ ] `grep -r "v2.1.0" docs/ README_SETUP.md` returns 0 results in customer-facing files
-- [ ] `grep -r "v3.4.0" docs/` returns 0 results (all bumped to v3.5.0)
-- [ ] README.md has no broken image references
+- [x] `grep -r "v2.1.0" docs/ README_SETUP.md` returns 0 results in customer-facing files
+- [x] `grep -r "v3.4.0" docs/` returns 0 results (all bumped to v3.5.0)
+- [x] README.md has no broken image references
 - [ ] `placeholder.png` reference removed or replaced
 - [ ] CORS origins in `api.py` have no dev-only entries
 - [ ] `test_rtsp.py` not in project root

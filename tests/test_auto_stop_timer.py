@@ -2,9 +2,8 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 
-import api
-import database
-import video_worker
+import vpack.state
+from vpack import database, video_worker
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -22,21 +21,21 @@ def _start_recording(client, op_headers, station_id, barcode="TESTWB001"):
         params={"station_id": station_id},
     )
     mock_rec = MagicMock()
-    with patch.object(api, "_preflight_checks", return_value=(True, "")):
-        with patch("network.validate_mac", return_value=False):
-            with patch("routes_records.CameraRecorder", return_value=mock_rec):
+    with patch.object(vpack.state, "_preflight_checks", return_value=(True, "")):
+        with patch("vpack.network.validate_mac", return_value=False):
+            with patch("vpack.routes.records.CameraRecorder", return_value=mock_rec):
                 r = client.post(
                     "/api/scan",
                     headers=op_headers,
                     json={"barcode": barcode, "station_id": station_id},
                 )
-    rid = api.active_record_ids.get(station_id)
+    rid = vpack.state.active_record_ids.get(station_id)
     return r, mock_rec, rid
 
 
 def _cancel_real_timers(sid):
     """Pop & cancel any real ``threading.Timer`` objects for *sid*."""
-    for store in (api._recording_timers, api._recording_warning_timers):
+    for store in (vpack.state._recording_timers, vpack.state._recording_warning_timers):
         t = store.pop(sid, None)
         if t is not None:
             try:
@@ -61,13 +60,13 @@ class TestAutoStopTimer:
         assert r.json()["status"] == "recording"
         sid = sample_station_id
 
-        assert sid in api._recording_timers
-        assert sid in api._recording_warning_timers
-        assert sid in api._recording_start_times
+        assert sid in vpack.state._recording_timers
+        assert sid in vpack.state._recording_warning_timers
+        assert sid in vpack.state._recording_start_times
 
-        assert isinstance(api._recording_timers[sid], threading.Timer)
-        assert isinstance(api._recording_warning_timers[sid], threading.Timer)
-        assert isinstance(api._recording_start_times[sid], float)
+        assert isinstance(vpack.state._recording_timers[sid], threading.Timer)
+        assert isinstance(vpack.state._recording_warning_timers[sid], threading.Timer)
+        assert isinstance(vpack.state._recording_start_times[sid], float)
 
     # ------------------------------------------------------------------
     # 2. Timer cancelled on manual STOP
@@ -77,8 +76,8 @@ class TestAutoStopTimer:
         sid = sample_station_id
 
         # Grab refs before STOP (so we can verify cancel was called)
-        stop_timer = api._recording_timers.get(sid)
-        warn_timer = api._recording_warning_timers.get(sid)
+        stop_timer = vpack.state._recording_timers.get(sid)
+        warn_timer = vpack.state._recording_warning_timers.get(sid)
         assert stop_timer is not None
         assert warn_timer is not None
 
@@ -96,8 +95,8 @@ class TestAutoStopTimer:
             )
 
         assert r.json()["status"] == "processing"
-        assert api._recording_timers.get(sid) is None
-        assert api._recording_warning_timers.get(sid) is None
+        assert vpack.state._recording_timers.get(sid) is None
+        assert vpack.state._recording_warning_timers.get(sid) is None
         stop_cancel_spy.assert_called()
         warn_cancel_spy.assert_called()
 
@@ -109,8 +108,8 @@ class TestAutoStopTimer:
         sid = sample_station_id
 
         # Grab refs before EXIT (so we can verify cancel was called)
-        stop_timer = api._recording_timers.get(sid)
-        warn_timer = api._recording_warning_timers.get(sid)
+        stop_timer = vpack.state._recording_timers.get(sid)
+        warn_timer = vpack.state._recording_warning_timers.get(sid)
         assert stop_timer is not None
         assert warn_timer is not None
 
@@ -128,8 +127,8 @@ class TestAutoStopTimer:
             )
 
         assert r.json()["status"] == "processing"
-        assert api._recording_timers.get(sid) is None
-        assert api._recording_warning_timers.get(sid) is None
+        assert vpack.state._recording_timers.get(sid) is None
+        assert vpack.state._recording_warning_timers.get(sid) is None
         stop_cancel_spy.assert_called()
         warn_cancel_spy.assert_called()
 
@@ -139,18 +138,18 @@ class TestAutoStopTimer:
     def test_record_id_verification_prevents_wrong_stop(self, client, operator_headers, sample_station_id):
         _start_recording(client, operator_headers, sample_station_id)
         sid = sample_station_id
-        actual_rid = api.active_record_ids.get(sid)
+        actual_rid = vpack.state.active_record_ids.get(sid)
         assert actual_rid is not None
 
         _cancel_real_timers(sid)
 
         with patch.object(database, "update_record_status") as mock_db:
-            api._auto_stop_recording(sid, 99999)
+            vpack.state._auto_stop_recording(sid, 99999)
             mock_db.assert_not_called()
 
         # Recording must remain active
-        assert sid in api.active_recorders
-        assert api.active_record_ids.get(sid) == actual_rid
+        assert sid in vpack.state.active_recorders
+        assert vpack.state.active_record_ids.get(sid) == actual_rid
 
     # ------------------------------------------------------------------
     # 5. Matching record_id allows auto-stop to proceed
@@ -158,19 +157,19 @@ class TestAutoStopTimer:
     def test_record_id_match_allows_auto_stop(self, client, operator_headers, sample_station_id):
         _start_recording(client, operator_headers, sample_station_id)
         sid = sample_station_id
-        actual_rid = api.active_record_ids.get(sid)
+        actual_rid = vpack.state.active_record_ids.get(sid)
         assert actual_rid is not None
 
         _cancel_real_timers(sid)
 
         with patch.object(video_worker, "submit_stop_and_save", return_value=True):
-            with patch.object(api, "notify_sse") as mock_sse:
-                api._auto_stop_recording(sid, actual_rid)
+            with patch.object(vpack.state, "notify_sse") as mock_sse:
+                vpack.state._auto_stop_recording(sid, actual_rid)
 
         # Recorders cleaned up
-        assert sid not in api.active_recorders
-        assert sid not in api.active_record_ids
-        assert sid not in api.active_waybills
+        assert sid not in vpack.state.active_recorders
+        assert sid not in vpack.state.active_record_ids
+        assert sid not in vpack.state.active_waybills
 
         # DB status changed to PROCESSING
         rec = database.get_record_by_id(actual_rid)
@@ -191,7 +190,7 @@ class TestAutoStopTimer:
     # ------------------------------------------------------------------
     def test_auto_stop_noop_when_already_stopped(self, client):
         with patch.object(database, "update_record_status") as mock_db:
-            api._auto_stop_recording(99999, 123)
+            vpack.state._auto_stop_recording(99999, 123)
             mock_db.assert_not_called()
 
     # ------------------------------------------------------------------
@@ -201,13 +200,13 @@ class TestAutoStopTimer:
         _start_recording(client, operator_headers, sample_station_id)
         sid = sample_station_id
 
-        warn_timer = api._recording_warning_timers.get(sid)
+        warn_timer = vpack.state._recording_warning_timers.get(sid)
         assert warn_timer is not None
 
         _cancel_real_timers(sid)
 
         with patch.object(video_worker, "submit_stop_and_save", return_value=True):
-            with patch.object(api, "notify_sse") as mock_sse:
+            with patch.object(vpack.state, "notify_sse") as mock_sse:
                 client.post(
                     "/api/scan",
                     headers=operator_headers,
@@ -219,15 +218,15 @@ class TestAutoStopTimer:
                 warning_calls = [c for c in mock_sse.call_args_list if c[0][0] == "recording_warning"]
                 assert len(warning_calls) == 0
 
-        assert api._recording_warning_timers.get(sid) is None
-        assert api._recording_timers.get(sid) is None
+        assert vpack.state._recording_warning_timers.get(sid) is None
+        assert vpack.state._recording_timers.get(sid) is None
 
     # ------------------------------------------------------------------
     # 8. Warning not emitted when no recorder exists
     # ------------------------------------------------------------------
     def test_warning_not_emitted_when_not_recording(self, client):
-        with patch.object(api, "notify_sse") as mock_sse:
-            api._emit_recording_warning(99999)
+        with patch.object(vpack.state, "notify_sse") as mock_sse:
+            vpack.state._emit_recording_warning(99999)
             mock_sse.assert_not_called()
 
     # ------------------------------------------------------------------
@@ -238,8 +237,8 @@ class TestAutoStopTimer:
         sid = sample_station_id
         _cancel_real_timers(sid)
 
-        with patch.object(api, "notify_sse") as mock_sse:
-            api._emit_recording_warning(sid)
+        with patch.object(vpack.state, "notify_sse") as mock_sse:
+            vpack.state._emit_recording_warning(sid)
             mock_sse.assert_called_once()
 
         event_type, data = mock_sse.call_args[0]
@@ -254,7 +253,7 @@ class TestAutoStopTimer:
     def test_start_times_cleaned_on_stop(self, client, operator_headers, sample_station_id):
         _start_recording(client, operator_headers, sample_station_id)
         sid = sample_station_id
-        assert sid in api._recording_start_times
+        assert sid in vpack.state._recording_start_times
 
         _cancel_real_timers(sid)
 
@@ -265,7 +264,7 @@ class TestAutoStopTimer:
                 json={"barcode": "STOP", "station_id": sid},
             )
 
-        assert api._recording_start_times.get(sid) is None
+        assert vpack.state._recording_start_times.get(sid) is None
 
     # ------------------------------------------------------------------
     # 11. New recording cancels old timer (via _cancel_recording_timer)
@@ -274,7 +273,7 @@ class TestAutoStopTimer:
         # Start recording A — creates real timers
         _start_recording(client, operator_headers, sample_station_id, barcode="OLDWB001")
         sid = sample_station_id
-        assert sid in api._recording_timers
+        assert sid in vpack.state._recording_timers
 
         # Cancel real timers so they don't fire
         _cancel_real_timers(sid)
@@ -282,16 +281,16 @@ class TestAutoStopTimer:
         # Install mock timers to verify .cancel() is called
         mock_stop = MagicMock()
         mock_warn = MagicMock()
-        api._recording_timers[sid] = mock_stop
-        api._recording_warning_timers[sid] = mock_warn
+        vpack.state._recording_timers[sid] = mock_stop
+        vpack.state._recording_warning_timers[sid] = mock_warn
 
         # _cancel_recording_timer is called at the top of every new recording
-        api._cancel_recording_timer(sid)
+        vpack.state._cancel_recording_timer(sid)
 
         mock_stop.cancel.assert_called_once()
         mock_warn.cancel.assert_called_once()
-        assert api._recording_timers.get(sid) is None
-        assert api._recording_warning_timers.get(sid) is None
+        assert vpack.state._recording_timers.get(sid) is None
+        assert vpack.state._recording_warning_timers.get(sid) is None
 
     # ------------------------------------------------------------------
     # 12. Lifespan shutdown cancels all timers
@@ -300,8 +299,8 @@ class TestAutoStopTimer:
         _start_recording(client, operator_headers, sample_station_id)
         sid = sample_station_id
 
-        stop_timer = api._recording_timers.get(sid)
-        warn_timer = api._recording_warning_timers.get(sid)
+        stop_timer = vpack.state._recording_timers.get(sid)
+        warn_timer = vpack.state._recording_warning_timers.get(sid)
         assert stop_timer is not None
         assert warn_timer is not None
 
@@ -310,20 +309,20 @@ class TestAutoStopTimer:
         stop_timer.cancel = stop_cancel_spy
         warn_timer.cancel = warn_cancel_spy
 
-        with api._recording_timers_lock:
-            for timer in api._recording_timers.values():
+        with vpack.state._recording_timers_lock:
+            for timer in vpack.state._recording_timers.values():
                 timer.cancel()
-            api._recording_timers.clear()
-            for timer in api._recording_warning_timers.values():
+            vpack.state._recording_timers.clear()
+            for timer in vpack.state._recording_warning_timers.values():
                 timer.cancel()
-            api._recording_warning_timers.clear()
-            api._recording_start_times.clear()
+            vpack.state._recording_warning_timers.clear()
+            vpack.state._recording_start_times.clear()
 
         stop_cancel_spy.assert_called()
         warn_cancel_spy.assert_called()
-        assert len(api._recording_timers) == 0
-        assert len(api._recording_warning_timers) == 0
-        assert len(api._recording_start_times) == 0
+        assert len(vpack.state._recording_timers) == 0
+        assert len(vpack.state._recording_warning_timers) == 0
+        assert len(vpack.state._recording_start_times) == 0
 
     # ------------------------------------------------------------------
     # 13. Auto-stop sets FAILED when submit_stop_and_save returns False
@@ -331,14 +330,14 @@ class TestAutoStopTimer:
     def test_auto_stop_sets_failed_when_queue_full(self, client, operator_headers, sample_station_id):
         _start_recording(client, operator_headers, sample_station_id)
         sid = sample_station_id
-        actual_rid = api.active_record_ids.get(sid)
+        actual_rid = vpack.state.active_record_ids.get(sid)
         assert actual_rid is not None
 
         _cancel_real_timers(sid)
 
         with patch.object(video_worker, "submit_stop_and_save", return_value=False):
-            with patch.object(api, "notify_sse") as mock_sse:
-                api._auto_stop_recording(sid, actual_rid)
+            with patch.object(vpack.state, "notify_sse") as mock_sse:
+                vpack.state._auto_stop_recording(sid, actual_rid)
 
         rec = database.get_record_by_id(actual_rid)
         assert rec is not None
@@ -351,6 +350,6 @@ class TestAutoStopTimer:
         assert failed_data["status"] == "FAILED"
         assert failed_data["record_id"] == actual_rid
 
-        assert sid not in api._processing_count
-        assert sid not in api.active_recorders
-        assert sid not in api.active_record_ids
+        assert sid not in vpack.state._processing_count
+        assert sid not in vpack.state.active_recorders
+        assert sid not in vpack.state.active_record_ids

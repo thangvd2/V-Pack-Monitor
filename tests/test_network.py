@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-import database
-import network
+from vpack import database, network
 
 # ---------------------------------------------------------------------------
 # validate_mac
@@ -77,7 +76,7 @@ class TestNormalizeMac:
 class TestGetLocalSubnet:
     """Tests for network.get_local_subnet()."""
 
-    @patch("network.socket")
+    @patch("vpack.network.socket")
     def test_returns_cidr_on_socket_success(self, mock_socket_mod):
         mock_sock = MagicMock()
         mock_sock.getsockname.return_value = ("192.168.10.55", 12345)
@@ -87,7 +86,7 @@ class TestGetLocalSubnet:
         result = network.get_local_subnet()
         assert result == "192.168.10.0/24"
 
-    @patch("network.socket")
+    @patch("vpack.network.socket")
     def test_fallback_default_on_failure(self, mock_socket_mod):
         mock_socket_mod.socket.side_effect = Exception("no network")
         mock_socket_mod.gethostname.side_effect = Exception("no hostname")
@@ -95,7 +94,7 @@ class TestGetLocalSubnet:
         result = network.get_local_subnet()
         assert result == "192.168.1.0/24"
 
-    @patch("network.socket")
+    @patch("vpack.network.socket")
     def test_fallback_hostname_when_socket_fails(self, mock_socket_mod):
         mock_socket_mod.socket.side_effect = Exception("fail")
         mock_socket_mod.gethostname.return_value = "mypc"
@@ -117,7 +116,7 @@ class TestScanLan:
     def test_invalid_mac_returns_none(self):
         assert network.scan_lan_for_mac("garbage") is None
 
-    @patch("network._parse_arp_table")
+    @patch("vpack.network._parse_arp_table")
     def test_found_in_arp_immediately(self, mock_arp):
         mock_arp.return_value = [
             {"ip": "192.168.1.42", "mac": "AA:BB:CC:DD:EE:FF"},
@@ -125,8 +124,8 @@ class TestScanLan:
         result = network.scan_lan_for_mac("AA:BB:CC:DD:EE:FF")
         assert result == "192.168.1.42"
 
-    @patch("network._ping_host")
-    @patch("network._parse_arp_table")
+    @patch("vpack.network._ping_host")
+    @patch("vpack.network._parse_arp_table")
     def test_found_after_sweep(self, mock_arp, mock_ping):
         # First call: not found; second call: found
         mock_arp.side_effect = [
@@ -136,14 +135,14 @@ class TestScanLan:
         result = network.scan_lan_for_mac("aa-bb-cc-dd-ee-ff", subnet="192.168.1.0/24")
         assert result == "192.168.1.99"
 
-    @patch("network._ping_host")
-    @patch("network._parse_arp_table")
+    @patch("vpack.network._ping_host")
+    @patch("vpack.network._parse_arp_table")
     def test_not_found_returns_none(self, mock_arp, mock_ping):
         mock_arp.return_value = []
         result = network.scan_lan_for_mac("AA:BB:CC:DD:EE:FF", subnet="192.168.1.0/24")
         assert result is None
 
-    @patch("network._parse_arp_table")
+    @patch("vpack.network._parse_arp_table")
     def test_case_insensitive_match(self, mock_arp):
         mock_arp.return_value = [
             {"ip": "192.168.1.10", "mac": "AA:BB:CC:DD:EE:FF"},
@@ -151,7 +150,7 @@ class TestScanLan:
         result = network.scan_lan_for_mac("aa:bb:cc:dd:ee:ff")
         assert result == "192.168.1.10"
 
-    @patch("network._parse_arp_table")
+    @patch("vpack.network._parse_arp_table")
     def test_scan_lan_all_returns_entries(self, mock_arp):
         mock_arp.return_value = [
             {"ip": "192.168.1.1", "mac": "00:11:22:33:44:55"},
@@ -175,7 +174,7 @@ class TestDiscoverAPI:
         assert r.status_code == 200
         assert r.json()["status"] == "error"
 
-    @patch("network.scan_lan_for_mac", return_value="192.168.1.77")
+    @patch("vpack.network.scan_lan_for_mac", return_value="192.168.1.77")
     def test_discover_mac_found(self, mock_scan, client, admin_headers):
         r = client.get(
             "/api/discover-mac",
@@ -185,7 +184,7 @@ class TestDiscoverAPI:
         assert r.json()["status"] == "found"
         assert r.json()["ip"] == "192.168.1.77"
 
-    @patch("network.scan_lan_for_mac", return_value=None)
+    @patch("vpack.network.scan_lan_for_mac", return_value=None)
     def test_discover_mac_not_found(self, mock_scan, client, admin_headers):
         r = client.get(
             "/api/discover-mac",
@@ -198,12 +197,12 @@ class TestDiscoverAPI:
         r = client.get("/api/discover/9999", headers=admin_headers)
         assert r.json()["status"] == "error"
 
-    @patch("network.scan_lan_for_mac", return_value=None)
+    @patch("vpack.network.scan_lan_for_mac", return_value=None)
     def test_discover_station_not_found(self, mock_scan, client, admin_headers, sample_station_id):
         r = client.get(f"/api/discover/{sample_station_id}", headers=admin_headers)
         assert r.json()["status"] == "not_found"
 
-    @patch("network.scan_lan_for_mac", return_value="192.168.1.18")
+    @patch("vpack.network.scan_lan_for_mac", return_value="192.168.1.18")
     def test_discover_station_same_ip(self, mock_scan, client, admin_headers, sample_station_id):
         # Station was created with ip_camera_1="192.168.5.18", mock returns different
         # so let's update station IP to match what mock returns
@@ -211,7 +210,7 @@ class TestDiscoverAPI:
         r = client.get(f"/api/discover/{sample_station_id}", headers=admin_headers)
         assert r.json()["status"] == "same_ip"
 
-    @patch("network.scan_lan_for_mac", return_value="192.168.1.200")
+    @patch("vpack.network.scan_lan_for_mac", return_value="192.168.1.200")
     def test_discover_station_new_ip(self, mock_scan, client, admin_headers, sample_station_id):
         r = client.get(f"/api/discover/{sample_station_id}", headers=admin_headers)
         assert r.json()["status"] == "found"
@@ -240,3 +239,83 @@ class TestDiscoverAPI:
     def test_discover_station_requires_auth(self, client, sample_station_id):
         r = client.get(f"/api/discover/{sample_station_id}")
         assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# get_mac_for_ip
+# ---------------------------------------------------------------------------
+
+
+class TestGetMacForIp:
+    """Tests for network.get_mac_for_ip()."""
+
+    @patch("vpack.network._parse_arp_table")
+    def test_found_immediately(self, mock_arp):
+        mock_arp.return_value = [
+            {"ip": "192.168.1.42", "mac": "AA:BB:CC:DD:EE:FF"},
+        ]
+        result = network.get_mac_for_ip("192.168.1.42")
+        assert result == "AA:BB:CC:DD:EE:FF"
+
+    @patch("vpack.network.time.sleep")
+    @patch("vpack.network._ping_host")
+    @patch("vpack.network._parse_arp_table")
+    def test_found_after_ping(self, mock_arp, mock_ping, mock_sleep):
+        mock_arp.side_effect = [
+            [],
+            [{"ip": "192.168.1.42", "mac": "AA:BB:CC:DD:EE:FF"}],
+        ]
+        result = network.get_mac_for_ip("192.168.1.42")
+        assert result == "AA:BB:CC:DD:EE:FF"
+        mock_ping.assert_called_once_with("192.168.1.42")
+        mock_sleep.assert_called_once_with(0.3)
+
+    @patch("vpack.network.time.sleep")
+    @patch("vpack.network._ping_host")
+    @patch("vpack.network._parse_arp_table")
+    def test_not_found(self, mock_arp, mock_ping, mock_sleep):
+        mock_arp.return_value = []
+        result = network.get_mac_for_ip("192.168.1.42")
+        assert result is None
+        mock_sleep.assert_called_once_with(0.3)
+
+    def test_different_ip_not_matched(self):
+        """Ensure we match exact IP, not partial."""
+        with patch("vpack.network._parse_arp_table") as mock_arp:
+            mock_arp.return_value = [
+                {"ip": "192.168.1.4", "mac": "AA:BB:CC:DD:EE:FF"},  # .4 not .42
+            ]
+            result = network.get_mac_for_ip("192.168.1.42")
+            assert result is None or result != "AA:BB:CC:DD:EE:FF"
+
+
+# ---------------------------------------------------------------------------
+# /api/ping with MAC
+# ---------------------------------------------------------------------------
+
+
+class TestPingWithMac:
+    """Tests for /api/ping enhanced with MAC lookup."""
+
+    @patch("vpack.network.get_mac_for_ip", return_value="AA:BB:CC:DD:EE:FF")
+    @patch("subprocess.run")
+    def test_ping_reachable_with_mac(self, mock_run, mock_get_mac, client, admin_headers):
+        mock_run.return_value = MagicMock(returncode=0)
+        r = client.get("/api/ping", headers=admin_headers, params={"ip": "192.168.1.10"})
+        assert r.json()["reachable"] is True
+        assert r.json()["mac"] == "AA:BB:CC:DD:EE:FF"
+
+    @patch("vpack.network.get_mac_for_ip", return_value=None)
+    @patch("subprocess.run")
+    def test_ping_reachable_no_mac(self, mock_run, mock_get_mac, client, admin_headers):
+        mock_run.return_value = MagicMock(returncode=0)
+        r = client.get("/api/ping", headers=admin_headers, params={"ip": "192.168.1.10"})
+        assert r.json()["reachable"] is True
+        assert r.json()["mac"] is None
+
+    @patch("subprocess.run")
+    def test_ping_unreachable_no_mac_lookup(self, mock_run, client, admin_headers):
+        mock_run.return_value = MagicMock(returncode=1)
+        r = client.get("/api/ping", headers=admin_headers, params={"ip": "192.168.1.10"})
+        assert r.json()["reachable"] is False
+        assert "mac" not in r.json() or r.json()["mac"] is None

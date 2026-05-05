@@ -1,13 +1,11 @@
-version: '3.8'
-
 services:
   vpack-server:
     build: .
     container_name: vpack_monitor
     ports:
       - "8001:8001"
+      - "8889:8889"
+      - "9997:9997"
     volumes:
       - ./recordings:/app/recordings
-      # Mapping database file để giữ dữ liệu cấu hình và lịch sử khi Reset Container
-      - ./vpack.db:/app/vpack.db 
     restart: unless-stopped

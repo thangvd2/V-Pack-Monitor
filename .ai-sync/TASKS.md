@@ -24,7 +24,7 @@ _(No active tasks)_
 - PR #12 merged to dev
 
 ### [DONE] Release v3.1.1 — 2025-04-17 — Tool: OpenCode
-- VERSION + api.py header + RELEASE_NOTES.md updated
+- VERSION + vpack/app.py header + RELEASE_NOTES.md updated
 - PR #14 merged to master (--merge)
 
 ### [DONE] Release process lessons documentation — 2025-04-17 — Tool: OpenCode
