@@ -1,6 +1,6 @@
 # Plan 68: Create `vpack/` Package Skeleton
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** HIGH — Step 1 of restructuring
 > **Scope:** 3 new files, 1 config update
 > **Estimated Effort:** 10 min

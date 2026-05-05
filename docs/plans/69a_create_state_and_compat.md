@@ -1,6 +1,6 @@
 # Plan 69A: Create `vpack/state.py` + Backward-Compat Re-exports
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** HIGH — Step 2A of restructuring
 > **Scope:** 1 new file + 1 file update
 > **Estimated Effort:** 20 min

@@ -1,6 +1,6 @@
 # Plan 71D: Update Developer Docs + Cleanup
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** MEDIUM — Step 4D of restructuring (final)
 > **Scope:** 9 doc files + 2 deletions
 > **Estimated Effort:** 20 min

@@ -1,6 +1,6 @@
 # Plan 71C: Update `.ai-sync/` Source Files + Sync
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** HIGH — Step 4C of restructuring
 > **Scope:** 7 `.ai-sync/` files + sync.py regeneration
 > **Estimated Effort:** 15 min

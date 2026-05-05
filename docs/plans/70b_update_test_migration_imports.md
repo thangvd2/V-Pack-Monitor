@@ -1,6 +1,6 @@
 # Plan 70B: Update Test + Migration File Imports
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** HIGH — Step 3B of restructuring
 > **Scope:** 16 test files + 2 migration files
 > **Estimated Effort:** 20 min
