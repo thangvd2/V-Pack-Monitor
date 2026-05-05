@@ -2,6 +2,38 @@
 
 > **Tác giả:** VDT - Vũ Đức Thắng | [GitHub](https://github.com/thangvd2)
 
+## [v3.6.0] - 2026-05-05 (Project Restructuring & Codebase Modernization) 🔧 MINOR RELEASE
+
+### 🏗️ Restructuring
+- **Python Package `vpack/`** (Plans 67-71D, PRs #102-#109):
+  - Migrated entire codebase from flat root-level modules to proper `vpack/` Python package.
+  - All source modules (`app.py`, `auth.py`, `database.py`, `network.py`, `recorder.py`, `video_worker.py`, `cloud_sync.py`, `telegram_bot.py`) now live under `vpack/`.
+  - Shared state extracted into `vpack/state.py` with dedicated helpers.
+  - API routes organized under `vpack/routes/` (`auth.py`, `records.py`, `stations.py`, `system.py`).
+  - All scripts moved to `scripts/` directory with CWD-aware path handling.
+- **`pyproject.toml` Package Config** (PR #103):
+  - Proper Python package with `[build-system]`, `[tool.ruff]`, `[tool.pytest.ini_options]`.
+  - `pip install -e .` for editable install.
+
+### ⚡ Performance
+- **pytest-xdist Parallel Execution** (PR #106):
+  - 335 tests run in ~34-42s (down from ~5min sequential).
+  - `pytest-xdist` with `-n auto` for automatic CPU core utilization.
+  - Removed `autouse` fixture isolation in favor of explicit `@pytest.mark.usefixtures`.
+
+### 🐛 Bug Fixes
+- **E2E Test Stale Selector** (PR #110):
+  - Fixed `admin_grid.spec.ts` back button selector mismatch introduced in PR #94.
+
+### 🔧 Infrastructure
+- **CI Pipeline Updated**:
+  - `pip install -e .` added to `python-test` and `frontend-e2e` jobs.
+  - Playwright config updated to `uvicorn vpack.app:app`.
+  - Dockerfile entry point updated to `vpack.app:app`.
+- **Build Scripts Updated**:
+  - `scripts/build.py` PyInstaller entry points point to `vpack/app.py`.
+  - `scripts/bump_version.py` and `scripts/check_version_consistency.py` reference `vpack/app.py`.
+
 ## [v3.5.0] - 2026-05-02 (Infrastructure & Quality Overhaul) 🚀 MINOR RELEASE
 
 ### 🚀 Tính Năng Mới
