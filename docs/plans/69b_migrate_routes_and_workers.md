@@ -1,6 +1,6 @@
 # Plan 69B: Migrate Route Modules + video_worker to `state.X`
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** HIGH — Step 2B of restructuring
 > **Scope:** 5 file updates (mechanical import changes)
 > **Estimated Effort:** 20 min

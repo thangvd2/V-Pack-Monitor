@@ -1,6 +1,6 @@
 # Plan 70C: Update Build Scripts + Version Scripts
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** HIGH — Step 3C of restructuring
 > **Scope:** 3 file updates (file-path references, NOT Python imports)
 > **Estimated Effort:** 10 min

@@ -1,6 +1,6 @@
 # Plan 70A: Move ALL Modules into `vpack/` + Update Production Imports
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** HIGH — Step 3A of restructuring (ATOMIC)
 > **Scope:** 12 files moved + 10 production import updates
 > **Estimated Effort:** 30 min

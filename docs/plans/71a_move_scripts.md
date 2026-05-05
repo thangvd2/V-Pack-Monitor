@@ -1,6 +1,6 @@
 # Plan 71A: Move Scripts to `scripts/` + CWD Fixes
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** HIGH — Step 4A of restructuring
 > **Scope:** 8 scripts moved from root to `scripts/`
 > **Estimated Effort:** 20 min

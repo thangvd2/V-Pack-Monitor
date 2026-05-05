@@ -1,6 +1,6 @@
 # Plan 71B: Update Runtime Configs
 
-> **Status:** READY
+> **Status:** DONE
 > **Priority:** HIGH — Step 4B of restructuring
 > **Scope:** 5 config files
 > **Estimated Effort:** 10 min
