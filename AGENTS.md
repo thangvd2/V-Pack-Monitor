@@ -21,7 +21,7 @@ Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa 
 - **PATCH** (x.x.Z): bugfix only
 - **MINOR** (x.Y.0): new feature, backward-compatible
 - **MAJOR** (X.0.0): breaking change (API format, DB schema, response structure)
-- Update `VERSION` file + `vpack/app.py` header + `RELEASE_NOTES.md` on release
+- **ALWAYS use `python scripts/bump_version.py X.Y.Z`** to bump — it syncs all 5 files (`VERSION`, `vpack/app.py`, `README.md`, `web-ui/package.json`, `web-ui/package-lock.json`). Edit `RELEASE_NOTES.md` manually.
 
 ## Language
 
@@ -58,7 +58,9 @@ PLAN → git checkout -b feature/xxx dev → IMPLEMENT → TEST → COMMIT → g
 ## RELEASE RULES (MANDATORY)
 
 - Release PR is ALWAYS `dev` → `master`, merged with `gh pr merge <N> --merge` (NOT --squash)
-- ALWAYS update `VERSION`, `vpack/app.py` header, and `RELEASE_NOTES.md` ON `dev` BEFORE creating release PR
+- **ALWAYS use `python scripts/bump_version.py X.Y.Z` to sync ALL version locations** — NEVER edit version files manually. Script updates: `VERSION`, `vpack/app.py`, `README.md`, `web-ui/package.json`, `web-ui/package-lock.json`
+- **ALWAYS run `python scripts/check_version_consistency.py` BEFORE and AFTER bump** to verify all 5 files in sync
+- Update `RELEASE_NOTES.md` manually (the bump script does NOT touch release notes)
 - NEVER squash or rebase dev → master — this destroys shared history and causes permanent conflicts
 - Full process: see `CONTRIBUTING.md` → "Release Process (dev → master)"
 
@@ -113,20 +115,16 @@ Before pushing ANY new feature or significant change:
 ## CODE REVIEW ANTI-FALSE-POSITIVE RULES (MANDATORY)
 
 When flagging a potential issue during code review, you MUST:
-1. **Read ALL files in the dependency chain** — not just the immediate file. If issue is in `vpack/app.py`, also read callers (`routes_*.py`), callees (`vpack/video_worker.py`, `vpack/database.py`), and config (`vpack/auth.py`).
-2. **Trace the FULL call path** — callers, callees, related modules. A lock in one function is only a deadlock risk if another code path acquires locks in reverse order.
-3. **Check mitigations FIRST** — before flagging, ask: "Is this already handled elsewhere?" (e.g., a random key fallback in `vpack/database.py` is mitigated by `vpack/auth.py` persisting SECRET_KEY in DB).
+1. **Read ALL files in the dependency chain** — not just the immediate file
+2. **Trace the FULL call path** — callers, callees, related modules
+3. **Check mitigations FIRST** — before flagging, ask: "Is this already handled elsewhere?"
 4. **Provide FOR and AGAINST evidence** — every flagged issue MUST include:
    - EVIDENCE FOR: why this seems like a real issue (with file:line)
-   - EVIDENCE AGAINST: why this might NOT be a real issue — check guards, related code, production config
-   - DEPENDENCY CHAIN: list ALL related files/modules that affect this issue
-5. **Classify before reporting** — every issue gets one of:
-   - `REAL`: Confirmed with full dependency trace. Has user impact.
-   - `SPECULATIVE`: Plausible but unverified. Needs deeper investigation.
-   - `FALSE POSITIVE`: Initially seemed real, but mitigated elsewhere.
+   - EVIDENCE AGAINST: why this might NOT be a real issue
+   - DEPENDENCY CHAIN: list ALL related files/modules
+5. **Classify**: `REAL` (confirmed) / `SPECULATIVE` (unverified) / `FALSE POSITIVE` (mitigated)
 
 **Issue without full dependency trace = SPECULATIVE, not actionable.**
-**Issue without AGAINST evidence = incomplete review.**
 
 ## REVIEW PROMPT TEMPLATE (USE WHEN DELEGATING REVIEW TASKS)
 When firing explore/librarian agents for code review, include this structure in the prompt:

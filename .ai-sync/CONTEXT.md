@@ -21,7 +21,7 @@ Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa 
 - **PATCH** (x.x.Z): bugfix only
 - **MINOR** (x.Y.0): new feature, backward-compatible
 - **MAJOR** (X.0.0): breaking change (API format, DB schema, response structure)
-- Update `VERSION` file + `vpack/app.py` header + `RELEASE_NOTES.md` on release
+- **ALWAYS use `python scripts/bump_version.py X.Y.Z`** to bump — it syncs all 5 files (`VERSION`, `vpack/app.py`, `README.md`, `web-ui/package.json`, `web-ui/package-lock.json`). Edit `RELEASE_NOTES.md` manually.
 
 ## Language
 
