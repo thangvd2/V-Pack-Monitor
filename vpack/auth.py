@@ -25,6 +25,7 @@ def _load_or_create_secret():
     env_secret = os.environ.get("VPACK_SECRET")
     if env_secret:
         return env_secret
+    database.init_db()
     db_secret = database.get_setting("JWT_SECRET")
     if db_secret:
         return db_secret

@@ -399,6 +399,7 @@ if not os.path.exists("recordings"):
     os.makedirs("recordings")
 
 # Tự động dọn dẹp các video cũ
+database.init_db()
 try:
     keep_days = int(database.get_setting("RECORD_KEEP_DAYS", 365))
     if keep_days > 0:
