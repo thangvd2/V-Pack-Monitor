@@ -1,0 +1,126 @@
+# Plan 72: Configurable Recording Storage Directory
+
+> **Status:** READY
+> **Priority:** HIGH — User-requested feature
+> **Scope:** Backend (8 files), Frontend (1 file), DB migration
+> **Estimated Effort:** 2-3 hours
+
+---
+
+## Background
+
+Currently, the recording output directory is **hardcoded as `"recordings"`** in 20+ locations across 8 backend files. There is zero configurability — no env var, no DB setting, no API endpoint, no UI control. Admin users cannot choose where video files are stored (e.g., external drive, NAS mount).
+
+## Goal
+
+Allow admin to configure the storage directory for video recordings via the Setup Modal UI. The database file (`packing_records.db`) stays in its current location inside `recordings/` — only video file storage moves.
+
+## Current Architecture
+
+### Hardcoded `"recordings"` references (20+ locations in 8 files):
+
+| File | Line(s) | Usage |
+|---|---|---|
+| `vpack/recorder.py` | 166 | `output_dir="recordings"` default param |
+| `vpack/app.py` | 398-399 | Creates `recordings/` dir at module level |
+| `vpack/app.py` | 403 | `get_setting("RECORD_KEEP_DAYS", 365)` for cleanup |
+| `vpack/state.py` | 257 | `shutil.disk_usage("recordings")` in preflight |
+| `vpack/database.py` | 23, 129 | `_DB_DIR` + `DB_FILE` (absolute path from package) |
+| `vpack/database.py` | 311-312 | Creates `recordings/` in `init_db()` (CWD-relative) |
+| `vpack/cloud_sync.py` | 34, 92 | Path validation + zip output |
+| `vpack/telegram_bot.py` | 65 | `shutil.disk_usage("recordings")` |
+| `vpack/routes/records.py` | 182, 290, 414 | Recorder instantiation, download guard, storage info |
+| `vpack/routes/system.py` | 288, 294, 370, 383, 476, 670 | DB backup/restore, disk health |
+
+### Key Insight
+`vpack/database.py` computes `_DB_DIR` as an **absolute path** from the package location (line 23), while all other code uses **CWD-relative** `"recordings"`. The DB must stay in its current location for backward compat.
+
+## Implementation Steps
+
+### Step 1: Centralize storage path in `vpack/state.py`
+
+Add a new helper function to resolve the recordings directory:
+
+```python
+import os
+from vpack.database import get_setting, set_setting
+
+def get_recordings_dir() -> str:
+    """Return the configured recordings directory (absolute path).
+    Falls back to 'recordings' relative to CWD if not configured."""
+    custom = get_setting("RECORDINGS_DIR", "")
+    if custom and os.path.isabs(custom):
+        return custom
+    return os.path.abspath(custom or "recordings")
+```
+
+### Step 2: Replace all hardcoded `"recordings"` with `state.get_recordings_dir()`
+
+**Do NOT change** `vpack/database.py` `_DB_DIR` — the DB stays in its original location.
+
+Files to update:
+- `vpack/recorder.py` — change default param to call `state.get_recordings_dir()`
+- `vpack/app.py` — replace `"recordings"` in cleanup/auto-cleanup logic
+- `vpack/state.py` — replace `shutil.disk_usage("recordings")` in `_preflight_checks()`
+- `vpack/cloud_sync.py` — replace `"recordings"` in `_safe_video_path()` and zip output
+- `vpack/telegram_bot.py` — replace `shutil.disk_usage("recordings")`
+- `vpack/routes/records.py` — replace in recorder instantiation, download guard, storage info
+- `vpack/routes/system.py` — replace in disk health endpoints (NOT in DB backup/restore which uses `_DB_DIR`)
+
+### Step 3: Add API endpoint for storage path config
+
+In `vpack/routes/system.py`, extend existing `POST /api/settings` to accept `RECORDINGS_DIR`:
+
+- Validate the path: must exist or be creatable, must be absolute, must have write permission
+- Reject paths that overlap with system directories (C:\Windows, /etc, etc.)
+- On change: create the new directory if it doesn't exist, log the change
+
+### Step 4: Add `GET /api/storage/info` enhancement
+
+Update the existing endpoint to report current configured path alongside disk usage stats.
+
+### Step 5: Frontend UI in SetupModal
+
+Add a new section in the Setup Modal for storage directory config:
+- Text input showing current path
+- Display current path, disk usage (free/total)
+- Save button calls `POST /api/settings` with `RECORDINGS_DIR`
+- Warning if path doesn't exist or disk space is low
+
+### Step 6: Handle path migration (optional, admin-triggered)
+
+Add a button/endpoint to **move existing recordings** from old directory to new directory:
+- `POST /api/storage/migrate` — moves all `.mp4`, `.tmp.ts` files, updates DB records
+- Must be admin-only
+- Must stop all recording operations during migration
+- Must verify target has enough space before starting
+
+## Edge Cases
+
+1. **CWD changes**: Since we use `os.path.abspath()`, the path is resolved once and stored as absolute. No CWD dependency.
+2. **Network drives on Windows**: `Z:\recordings` or `\\NAS\share\recordings` — must handle UNC paths and drive letters.
+3. **Path doesn't exist yet**: Create it on first access. If creation fails, fall back to default and log warning.
+4. **Path becomes unavailable mid-operation**: Recorder should catch `OSError` and log. Don't crash the entire server.
+5. **DB location unchanged**: `_DB_DIR` in `database.py` stays absolute from package location. Only video files move.
+
+## Testing
+
+- Unit test `get_recordings_dir()` with various settings (empty, relative, absolute, UNC path)
+- Unit test recorder with custom output_dir
+- API test for `POST /api/settings` with `RECORDINGS_DIR`
+- API test for storage info endpoint with custom path
+- Test fallback when custom path is invalid/unwritable
+
+## Files Changed (estimated)
+
+| File | Change |
+|---|---|
+| `vpack/state.py` | Add `get_recordings_dir()` helper |
+| `vpack/recorder.py` | Use `state.get_recordings_dir()` |
+| `vpack/app.py` | Use `state.get_recordings_dir()` for cleanup |
+| `vpack/cloud_sync.py` | Use `state.get_recordings_dir()` |
+| `vpack/telegram_bot.py` | Use `state.get_recordings_dir()` |
+| `vpack/routes/records.py` | Use `state.get_recordings_dir()` |
+| `vpack/routes/system.py` | Use `state.get_recordings_dir()` + validate setting |
+| `web-ui/src/SetupModal.tsx` | Add storage directory config UI |
+| `tests/test_storage_config.py` | New test file |
