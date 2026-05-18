@@ -42,8 +42,8 @@ def _detect_hw_encoder():
         return _hw_encoder_cache
     candidates = [
         ("h264_qsv", "-hwaccel qsv"),
-        ("h264_nvenc", ""),
-        ("h264_amf", ""),
+        ("h264_nvenc", "-hwaccel cuda"),
+        ("h264_amf", "-hwaccel d3d11va"),
         ("h264_videotoolbox", ""),
     ]
     for enc, extra in candidates:

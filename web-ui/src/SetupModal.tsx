@@ -92,9 +92,9 @@ const SetupModal: React.FC<SetupModalProps> = ({
   isOpen,
   onSaved,
   onCancel,
-  currentStation = {},
+  currentStation,
   isNewStation = false,
-  initialSettings = {},
+  initialSettings,
 }) => {
   const [name, setName] = useState<string>(currentStation?.name || '');
   const [ip1, setIp1] = useState(currentStation?.ip_camera_1 || '');
@@ -109,8 +109,8 @@ const SetupModal: React.FC<SetupModalProps> = ({
   const [cloudProvider, setCloudProvider] = useState(initialSettings?.CLOUD_PROVIDER || 'NONE');
   const [cloudSyncScheduled, setCloudSyncScheduled] = useState(initialSettings?.CLOUD_SYNC_SCHEDULED === 'true');
   const [cloudSyncTime, setCloudSyncTime] = useState(initialSettings?.CLOUD_SYNC_TIME || '02:00');
-  const [cameraHealthCheckInterval, setCameraHealthCheckInterval] = useState<number>(initialSettings?.CAMERA_HEALTH_CHECK_INTERVAL || 60);
-  const [cameraDownAlertMinutes, setCameraDownAlertMinutes] = useState<number>(initialSettings?.CAMERA_DOWN_ALERT_MINUTES || 5);
+  const [cameraHealthCheckInterval, setCameraHealthCheckInterval] = useState<number>(Number(initialSettings?.CAMERA_HEALTH_CHECK_INTERVAL || 60));
+  const [cameraDownAlertMinutes, setCameraDownAlertMinutes] = useState<number>(Number(initialSettings?.CAMERA_DOWN_ALERT_MINUTES || 5));
   const [gDriveFolderId, setGDriveFolderId] = useState(initialSettings?.GDRIVE_FOLDER_ID || '');
   const [gDriveCreds, setGDriveCreds] = useState('');
   const [s3Endpoint, setS3Endpoint] = useState(initialSettings?.S3_ENDPOINT || '');
@@ -278,8 +278,20 @@ const SetupModal: React.FC<SetupModalProps> = ({
       }
 
       onSaved();
-    } catch {
-      setError('Lỗi kết nối tới Server. Vui lòng thử lại.');
+    } catch (err: any) {
+      console.error('Save Station Error:', err);
+      let errMsg = 'Lỗi kết nối tới Server. Vui lòng thử lại.';
+      if (err.response?.data) {
+        if (err.response.data.detail && Array.isArray(err.response.data.detail)) {
+          const firstErr = err.response.data.detail[0];
+          errMsg = `Lỗi dữ liệu: ${firstErr.loc?.join('.')} - ${firstErr.msg}`;
+        } else {
+          errMsg = `Lỗi máy chủ: ${err.response.data.message || err.response.data.detail || 'Không xác định'}`;
+        }
+      } else if (err.message) {
+        errMsg = `Lỗi mạng: ${err.message}`;
+      }
+      setError(errMsg);
     } finally {
       setLoading(false);
     }

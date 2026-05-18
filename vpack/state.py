@@ -285,12 +285,14 @@ class CameraStreamManager:
         self._fail_count = 0
         self._cam2_fail_count = 0
         self._lock = threading.Lock()
+        self._stop_event = threading.Event()
 
     def start(self):
         if not self.is_running and self.url:
             self.is_running = True
             self._fail_count = 0
             self._cam2_fail_count = 0
+            self._stop_event.clear()
             self._mtx_register()
             if self.cam2_url:
                 _mtx_add_path(self.station_id, self.cam2_url, suffix="_cam2")
@@ -299,12 +301,13 @@ class CameraStreamManager:
 
     def stop(self):
         self.is_running = False
+        self._stop_event.set()
         if self.station_id:
             _mtx_remove_path(self.station_id, station_name=self.station_name)
             if self.cam2_url:
                 _mtx_remove_path(self.station_id, suffix="_cam2", station_name=self.station_name)
         if self.thread:
-            self.thread.join()
+            self.thread.join(timeout=2.0)
 
     def _mtx_register(self):
         if self.station_id and self.url:
@@ -343,7 +346,7 @@ class CameraStreamManager:
 
     def _monitor_loop(self):
         while self.is_running:
-            time.sleep(15)
+            self._stop_event.wait(15)
             if not self.is_running:
                 break
             if not self.station_id:

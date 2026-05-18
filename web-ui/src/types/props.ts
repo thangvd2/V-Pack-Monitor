@@ -55,6 +55,7 @@ export interface AdminDashboardProps {
   isDualCamStation: (station: Station) => boolean;
   MTX_HOST: string;
   onStationClick: (stationId: number) => void;
+  onRetryMtx?: () => void;
 }
 
 export interface SystemHealthProps {

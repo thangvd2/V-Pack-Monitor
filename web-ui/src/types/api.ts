@@ -8,6 +8,12 @@ export interface Station {
   safety_code?: string;
   mac_address?: string;
   processing_count?: number;
+  camera_health?: {
+    online: boolean;
+    last_check?: string;
+    downtime_minutes?: number;
+    latency_ms?: number;
+  };
 }
 
 export interface PackingRecord {
@@ -35,6 +41,10 @@ export interface Settings {
   RECORD_KEEP_DAYS?: number;
   RECORD_STREAM_TYPE?: string;
   CLOUD_PROVIDER?: string;
+  CLOUD_SYNC_SCHEDULED?: string;
+  CLOUD_SYNC_TIME?: string;
+  CAMERA_HEALTH_CHECK_INTERVAL?: string | number;
+  CAMERA_DOWN_ALERT_MINUTES?: string | number;
   GDRIVE_FOLDER_ID?: string;
   S3_ENDPOINT?: string;
   S3_ACCESS_KEY?: string;
