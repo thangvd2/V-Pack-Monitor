@@ -49,6 +49,10 @@ const isValidIPv6 = (ip: string): boolean => {
 
 const isValidIP = (ip: string): boolean => isValidIPv4(ip) || isValidIPv6(ip);
 
+function isAxiosError(err: unknown): err is { response?: { data?: { detail?: string | { loc?: string[]; msg?: string }[]; message?: string } }; message?: string } {
+  return typeof err === 'object' && err !== null && 'response' in err;
+}
+
 const isReservedIP = (ip: string): boolean => {
   if (isValidIPv4(ip)) {
     const [a] = ip.split('.').map(Number);
@@ -278,17 +282,18 @@ const SetupModal: React.FC<SetupModalProps> = ({
       }
 
       onSaved();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Save Station Error:', err);
       let errMsg = 'Lỗi kết nối tới Server. Vui lòng thử lại.';
-      if (err.response?.data) {
-        if (err.response.data.detail && Array.isArray(err.response.data.detail)) {
-          const firstErr = err.response.data.detail[0];
-          errMsg = `Lỗi dữ liệu: ${firstErr.loc?.join('.')} - ${firstErr.msg}`;
+      if (isAxiosError(err) && err.response?.data) {
+        const d = err.response.data;
+        if (Array.isArray(d.detail) && d.detail.length > 0) {
+          const first = d.detail[0];
+          errMsg = `Lỗi dữ liệu: ${first.loc?.join('.')} - ${first.msg}`;
         } else {
-          errMsg = `Lỗi máy chủ: ${err.response.data.message || err.response.data.detail || 'Không xác định'}`;
+          errMsg = `Lỗi máy chủ: ${d.message || d.detail || 'Không xác định'}`;
         }
-      } else if (err.message) {
+      } else if (err instanceof Error) {
         errMsg = `Lỗi mạng: ${err.message}`;
       }
       setError(errMsg);
