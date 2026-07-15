@@ -194,6 +194,18 @@ After each feature/phase ships, verify these items that are easy to miss:
    with PR number + version after merge.
 
 
+### Post-release (after merging to master)
+
+After a release PR is merged to `master`, ALWAYS merge `master` back to
+`dev` so both branches have the same version:
+```bash
+git checkout dev
+git merge origin/master
+git push origin dev
+```
+Without this, `dev` keeps the old version number while `master` has the
+new one.
+
 ## BEFORE EVERY COMMIT
 
 1. `pytest tests/ -v` — must pass
