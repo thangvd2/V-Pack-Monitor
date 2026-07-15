@@ -64,6 +64,165 @@ PLAN → git checkout -b feature/xxx dev → IMPLEMENT → TEST → COMMIT → g
 - NEVER squash or rebase dev → master — this destroys shared history and causes permanent conflicts
 - Full process: see `CONTRIBUTING.md` → "Release Process (dev → master)"
 
+## PHASE/FEATURE DEVELOPMENT WORKFLOW (MANDATORY)
+
+Every new feature or phase follows this 5-step workflow. Do NOT skip steps.
+
+### Step 1: Consult Gemini on direction
+
+Before creating any plan files, ask Gemini to evaluate the proposed direction.
+Present 3-4 candidate options with trade-offs. Gemini's evaluation informs
+the choice — the user makes the final decision.
+
+### Step 2: Create plan files (if applicable)
+
+For multi-step features, create a plan directory with:
+- `INDEX.md` — overview, architecture, sub-task table, design decisions
+- Sub-task files — one per sub-task (interface, behavior, constraints,
+  completion criteria as checkboxes, target files)
+
+For single-step features, document the approach in the PR description.
+
+Branch: `docs/feature-N-plans` or `feature/feature-name` from `dev`.
+
+### Step 3: Gemini review of plan (multiple rounds)
+
+Gemini reviews the plan PR. Fix all REAL issues. Re-review until Gemini
+confirms all fixes (CONFIRMED verdict). Merge the plan PR only after
+Gemini confirmation.
+
+### Step 4: Implement
+
+Create branch from `dev`. Implement all sub-tasks. Run lint + tests before
+committing. Push and create PR.
+
+### Step 5: Gemini review of implementation (multiple rounds)
+
+Gemini reviews the implementation PR using the review prompt pattern (see
+GEMINI CONSULTATION PROTOCOL below). Fix all REAL issues (FALSE POSITIVE
+issues may be skipped with justification). Re-review until Gemini gives
+CONFIRMED verdict with 0 REAL issues. Ask the user for merge confirmation.
+
+**Anti-false-positive rules:** For each Gemini finding, classify as:
+- REAL → fix it
+- SPECULATIVE → consider fixing if low-cost
+- FALSE POSITIVE → skip, note in response
+
+## MANUAL VS AI-AGENT DECISION
+
+For each feature, decide whether to implement manually or delegate to an
+AI agent (OpenCode/GLM, agy/Gemini, etc.).
+
+### 3-Question Checklist (ask in order)
+
+1. **Does it modify core control flow or state management?**
+   → If YES: implement manually (bugs here cause loops, silent skips, corruption)
+2. **Does it run `git`/`gh`/`subprocess` commands that could fail silently?**
+   → If YES: implement manually (LLM agents miss edge cases)
+3. **Is it a safety-critical gate?** (test skip, merge gate, auth check)
+   → If YES: implement manually (wrong skip ships untested code)
+   → If NO to all: AI agent is fine
+
+### What each method is good for
+
+**Manual (direct implementation + Gemini review):**
+- Core control flow, state management, security logic
+- Subprocess/git logic (file detection, branch operations)
+- Safety gates (test skip, merge decisions)
+- New architectural patterns
+
+**AI Agent (builder implements + Gemini reviews + fix loop):**
+- Config fields + docs (mechanical)
+- Isolated utility modules (pure functions, no side effects)
+- Test coverage expansion
+- CRUD-style features
+
+### Default rule
+
+**Manual implementation is the default** for core/safety-critical changes.
+AI agents are reserved for mechanical/doc/test work.
+
+## GEMINI CONSULTATION PROTOCOL
+
+### When to consult Gemini (3 mandatory points)
+
+| Point | When | What for |
+|-------|------|----------|
+| **Before planning** | After choosing a direction | Design evaluation — present options, get recommendation |
+| **After planning** | Plan/PR created, before implementation | Plan review — catch design flaws before coding |
+| **After implementation** | Implementation PR created, before merge | Code review — fresh-context verification |
+
+### Review prompt generation (MANDATORY pattern)
+
+> **Note:** This pattern complements the EXTERNAL REVIEWER INTEGRATION section
+> below — same two-part prompt structure. Keep both in sync if either changes.
+
+Always use a **two-part** prompt: (1) base rules context, (2) specific
+verification instructions.
+
+**Step 1:** Build the base prompt with project rules + context.
+
+**Step 2:** Append specific context + verification steps, then invoke agy:
+
+```bash
+agy -p "<base prompt with project rules>
+
+CONTEXT: <what this PR does and why — 2-3 sentences>
+
+Files changed:
+- <file1> — <what changed>
+- <file2> — <what changed>
+
+YOUR TASK — fresh-context verification per project rules. READ-ONLY: do NOT
+modify files or commit.
+
+1. READ <specific files + line numbers to check>
+2. READ <the code the PR claims to fix/modify>
+3. VERIFY <each factual claim — with how to check>
+4. CHECK <for regressions / scope / completeness>
+
+Report as CONFIRMED / CHALLENGE / ADDITIONAL CONCERN. 2-pass review." \
+  --model "Gemini 3.5 Flash (High)" \
+  --dangerously-skip-permissions --add-dir "$(pwd)" --print-timeout 3600s
+```
+
+**Why two-part:** The base prompt injects project rules consistently. The
+appended section adds PR-specific targets that change every review.
+
+Key: "fresh-context" + "READ-ONLY" frames independent check; numbered READ
+steps prevent skimming; VERIFY forces claim-checking before flagging.
+
+### Multi-round review pattern
+
+Gemini reviews are iterative. Continue fixing + re-reviewing until:
+- Plan review: Gemini confirms all fixes (CONFIRMED verdict)
+- Implementation review: Gemini gives CONFIRMED with 0 REAL issues
+  (FALSE POSITIVE issues may be skipped with justification)
+
+### Issue tracing rules
+
+Before fixing any Gemini finding:
+1. Trace each issue to the actual code (read the file + line)
+2. Classify: REAL / SPECULATIVE / FALSE POSITIVE
+3. Fix only REAL issues
+4. Note skipped issues in the response
+5. After fixing, re-request Gemini review
+
+## POST-FEATURE CHECKLIST (MANDATORY)
+
+After each feature/phase ships, verify these items that are easy to miss:
+
+1. **`--help` on every new CLI command** — Run `<command> --help` and verify
+   it produces valid output (not an error).
+2. **Write a learnings doc** — After complex work, write a reference doc to
+   `docs/learnings/` with format `YYYY-MM-DD-short-description.md`. Document
+   what was learned, what went wrong, and what to do differently next time.
+3. **Check docs/learnings/ at session start** — Before starting a new task,
+   read relevant learnings per the MEMORY SYSTEM quick router table.
+4. **Update INDEX.md** — If using phase files, mark sub-tasks as Shipped
+   with PR number + version after merge.
+
+
 ## BEFORE EVERY COMMIT
 
 1. `pytest tests/ -v` — must pass
