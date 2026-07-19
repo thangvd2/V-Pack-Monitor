@@ -170,14 +170,22 @@ Gemini reviews are iterative. Continue fixing + re-reviewing until:
 - Implementation review: Gemini gives CONFIRMED with 0 REAL issues
   (FALSE POSITIVE issues may be skipped with justification)
 
-### Issue tracing rules
+### Issue tracing rules (MANDATORY — ALL severities)
 
-Before fixing any Gemini finding:
-1. Trace each issue to the actual code (read the file + line)
-2. Classify: REAL / SPECULATIVE / FALSE POSITIVE
-3. Fix only REAL issues
-4. Note skipped issues in the response
-5. After fixing, re-request Gemini review
+Before fixing or dismissing ANY Gemini finding (including MINOR):
+1. **Trace each issue to the actual code** — READ the file + line number.
+   Do NOT classify from the summary alone.
+2. **Classify: REAL / SPECULATIVE / FALSE POSITIVE** — with evidence.
+3. **For MINOR issues: do NOT auto-dismiss.** Trace the code path, search
+   for similar patterns in other locations. If ANY doubt → fix it.
+4. **Search for similar patterns** — if one location has a bug, grep for
+   the same pattern elsewhere. Fix ALL instances.
+5. **Fix REAL issues** (and SPECULATIVE if low-cost).
+6. **Note ALL skipped issues** with justification.
+7. **After fixing, re-request Gemini review** until APPROVED with 0 issues.
+
+**Anti-skip rule:** Do NOT dismiss a MINOR issue with "low impact" or
+"cosmetic" without first tracing the actual code path and verifying.
 
 ## POST-FEATURE CHECKLIST (MANDATORY)
 
