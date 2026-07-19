@@ -206,6 +206,18 @@ git push origin dev
 Without this, `dev` keeps the old version number while `master` has the
 new one.
 
+## PRE-RELEASE STALE DOC SCAN (MANDATORY)
+
+Before creating ANY release PR to master, scan for stale documentation.
+Do NOT wait for the user to ask — do this automatically as part of the
+release process.
+
+Check: CHANGELOG version entry, pyproject.toml version, PHASE_N/INDEX.md
+sub-task status, architecture map (run sync.py), README commands/config
+tables, .env.example, docs/learnings/INDEX.md, docs/failure-modes.md.
+
+If any item is stale, fix it BEFORE creating the release PR.
+
 ## BEFORE EVERY COMMIT
 
 1. `pytest tests/ -v` — must pass
