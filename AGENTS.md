@@ -34,6 +34,44 @@ Hệ thống giám sát đóng hàng và lưu trữ tự động tối ưu hóa 
 - Single developer (sole GitHub account)
 - Branch and release rules: see RULES.md
 
+## MEMORY SYSTEM
+
+To prevent cross-phase regressions caused by context changes, the memory
+system enforces two context-loading protocols.
+
+**Grep-based approaches are prohibited for phase planning** — they miss
+latent dependencies the agent doesn't know to search for.
+
+### Protocol A: Routine Task Memory (Quick Router)
+
+Use for routine coding, implementing subtasks, and PR code reviews.
+
+On starting a new session or task, check `docs/learnings/` for relevant
+reference docs before asking questions.
+
+### Protocol B: Phase Planning Memory (MANDATORY)
+
+Use ONLY during phase planning and plan review.
+
+Before ANY new phase is planned, you must unconditionally read:
+
+1. **ALL `PHASE_N/INDEX.md` files** — every phase, not just "recent"
+   or "relevant" ones. This is the only way to catch long-distance
+   regressions.
+
+2. **`docs/learnings/INDEX.md`** — index of all lessons learned.
+
+3. **`docs/failure-modes.md`** — catalog of known failure modes.
+
+4. **Full text of `docs/learnings/*.md` docs** matching the scope of
+   the proposed phase.
+
+Cost: ~50K tokens, ~5% of context. Acceptable — planning sessions are
+infrequent and correctness >> token cost.
+
+- After completing complex work, write a reference doc to `docs/learnings/`
+- Format: `YYYY-MM-DD-short-description.md` with context, problem, root cause, solution
+
 ## BRANCH RULES (MANDATORY)
 
 - NEVER commit directly to `master` or `dev`. Both are protected.
