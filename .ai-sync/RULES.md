@@ -224,6 +224,8 @@ Check: CHANGELOG version entry, pyproject.toml version, PHASE_N/INDEX.md
 sub-task status, architecture map (run sync.py), README commands/config
 tables, .env.example, docs/learnings/INDEX.md, docs/failure-modes.md.
 
+Check for user guide: If the release includes a new user-facing feature (CLI command, UI, workflow), is there a guide in `docs/` or equivalent?
+
 If any item is stale, fix it BEFORE creating the release PR.
 
 ## BEFORE EVERY COMMIT
