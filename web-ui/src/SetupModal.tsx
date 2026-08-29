@@ -49,6 +49,10 @@ const isValidIPv6 = (ip: string): boolean => {
 
 const isValidIP = (ip: string): boolean => isValidIPv4(ip) || isValidIPv6(ip);
 
+function isAxiosError(err: unknown): err is { response?: { data?: { detail?: string | { loc?: string[]; msg?: string }[]; message?: string } }; message?: string } {
+  return typeof err === 'object' && err !== null && 'response' in err;
+}
+
 const isReservedIP = (ip: string): boolean => {
   if (isValidIPv4(ip)) {
     const [a] = ip.split('.').map(Number);
@@ -92,9 +96,9 @@ const SetupModal: React.FC<SetupModalProps> = ({
   isOpen,
   onSaved,
   onCancel,
-  currentStation = {},
+  currentStation,
   isNewStation = false,
-  initialSettings = {},
+  initialSettings,
 }) => {
   const [name, setName] = useState<string>(currentStation?.name || '');
   const [ip1, setIp1] = useState(currentStation?.ip_camera_1 || '');
@@ -109,8 +113,8 @@ const SetupModal: React.FC<SetupModalProps> = ({
   const [cloudProvider, setCloudProvider] = useState(initialSettings?.CLOUD_PROVIDER || 'NONE');
   const [cloudSyncScheduled, setCloudSyncScheduled] = useState(initialSettings?.CLOUD_SYNC_SCHEDULED === 'true');
   const [cloudSyncTime, setCloudSyncTime] = useState(initialSettings?.CLOUD_SYNC_TIME || '02:00');
-  const [cameraHealthCheckInterval, setCameraHealthCheckInterval] = useState<number>(initialSettings?.CAMERA_HEALTH_CHECK_INTERVAL || 60);
-  const [cameraDownAlertMinutes, setCameraDownAlertMinutes] = useState<number>(initialSettings?.CAMERA_DOWN_ALERT_MINUTES || 5);
+  const [cameraHealthCheckInterval, setCameraHealthCheckInterval] = useState<number>(Number(initialSettings?.CAMERA_HEALTH_CHECK_INTERVAL || 60));
+  const [cameraDownAlertMinutes, setCameraDownAlertMinutes] = useState<number>(Number(initialSettings?.CAMERA_DOWN_ALERT_MINUTES || 5));
   const [gDriveFolderId, setGDriveFolderId] = useState(initialSettings?.GDRIVE_FOLDER_ID || '');
   const [gDriveCreds, setGDriveCreds] = useState('');
   const [s3Endpoint, setS3Endpoint] = useState(initialSettings?.S3_ENDPOINT || '');
@@ -278,8 +282,21 @@ const SetupModal: React.FC<SetupModalProps> = ({
       }
 
       onSaved();
-    } catch {
-      setError('Lỗi kết nối tới Server. Vui lòng thử lại.');
+    } catch (err: unknown) {
+      console.error('Save Station Error:', err);
+      let errMsg = 'Lỗi kết nối tới Server. Vui lòng thử lại.';
+      if (isAxiosError(err) && err.response?.data) {
+        const d = err.response.data;
+        if (Array.isArray(d.detail) && d.detail.length > 0) {
+          const first = d.detail[0];
+          errMsg = `Lỗi dữ liệu: ${first.loc?.join('.')} - ${first.msg}`;
+        } else {
+          errMsg = `Lỗi máy chủ: ${d.message || d.detail || 'Không xác định'}`;
+        }
+      } else if (err instanceof Error) {
+        errMsg = `Lỗi mạng: ${err.message}`;
+      }
+      setError(errMsg);
     } finally {
       setLoading(false);
     }

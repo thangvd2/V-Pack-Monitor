@@ -259,8 +259,7 @@ const App: React.FC = () => {
   });
   const { currentUser, setCurrentUser, authLoading, loginError, loginForm, setLoginForm, handleLogin, handleLogout } = authState;
 
-  useEffect(() => {
-    if (!currentUser) return;
+  const checkMtxStatus = useCallback(() => {
     let active = true;
     axios
       .get(`${API_BASE}/api/mtx-status`)
@@ -273,7 +272,12 @@ const App: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [currentUser]);
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    return checkMtxStatus();
+  }, [currentUser, checkMtxStatus]);
 
   useEffect(() => {
     if (!activeSessionId || currentUser?.role === 'ADMIN') return;
@@ -1395,7 +1399,7 @@ const App: React.FC = () => {
                               allow="autoplay"
                             />
                           ) : (
-                            <MtxFallback />
+                            <MtxFallback onRetry={checkMtxStatus} />
                           )}
                           {station.id === activeStationId && reconnectInfo && reconnectInfo.status === 'searching' && (
                             <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-amber-500/90 text-white text-xs font-semibold px-3 py-1 rounded-full animate-pulse">
@@ -1518,7 +1522,7 @@ const App: React.FC = () => {
                       )}
 
                       {!mtxAvailable ? (
-                        <MtxFallback />
+                        <MtxFallback onRetry={checkMtxStatus} />
                       ) : hasCam2 && cameraMode === 'dual' ? (
                         <div className="flex gap-1 w-full h-full">
                           <div className="flex-1 relative">

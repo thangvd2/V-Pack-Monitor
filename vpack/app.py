@@ -35,6 +35,23 @@ from fastapi.staticfiles import StaticFiles
 from vpack import cloud_sync, database, network, recorder, state, telegram_bot, video_worker
 
 
+def _ensure_mtx_api_enabled():
+    """Ensure MediaMTX config has API listener enabled for existing installations."""
+    mtx_yml = os.path.join("bin", "mediamtx", "mediamtx.yml")
+    if not os.path.exists(mtx_yml):
+        return
+    try:
+        with open(mtx_yml) as f:
+            content = f.read()
+        if "api: false" in content or "api: 'false'" in content:
+            content = content.replace("api: false", "api: yes").replace("api: 'false'", "api: yes")
+            with open(mtx_yml, "w") as f:
+                f.write(content)
+            logger.info("[STARTUP] MediaMTX config patched: api enabled")
+    except Exception as e:
+        logger.debug(f"[STARTUP] MediaMTX config patch skipped: {e}")
+
+
 def _mtx_cleanup_orphaned_paths(station_ids):
     """Remove MediaMTX paths for stations that no longer exist in DB."""
     import re
@@ -173,11 +190,23 @@ async def lifespan(app: FastAPI):
     loop.set_exception_handler(_suppress_conn_reset)
 
     database.init_db()
+
+    try:
+        keep_days = int(database.get_setting("RECORD_KEEP_DAYS", 365))
+        if keep_days > 0:
+            logger.info(f"[STARTUP] Auto-cleanup: removing records older than {keep_days} days")
+            database.cleanup_old_records(keep_days)
+        else:
+            logger.info("[STARTUP] Auto-cleanup: disabled (keep_days=0, never delete)")
+    except Exception as e:
+        logger.warning(f"[STARTUP] Auto-cleanup skipped: {e}")
+
     recovery_thread = threading.Thread(target=_recover_pending_records, daemon=True)
     recovery_thread.start()
     stations = database.get_stations()
 
-    # Cleanup orphaned MediaMTX paths from previous sessions
+    _ensure_mtx_api_enabled()
+
     station_ids = {st["id"] for st in stations}
     _mtx_cleanup_orphaned_paths(station_ids)
 
@@ -397,18 +426,6 @@ app.add_middleware(
 
 if not os.path.exists("recordings"):
     os.makedirs("recordings")
-
-# Tự động dọn dẹp các video cũ
-database.init_db()
-try:
-    keep_days = int(database.get_setting("RECORD_KEEP_DAYS", 365))
-    if keep_days > 0:
-        logger.info(f"[STARTUP] Auto-cleanup: removing records older than {keep_days} days")
-        database.cleanup_old_records(keep_days)
-    else:
-        logger.info("[STARTUP] Auto-cleanup: disabled (keep_days=0, never delete)")
-except Exception:
-    pass
 
 
 # --- REGISTER ROUTE MODULES ---

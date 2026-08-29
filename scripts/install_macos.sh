@@ -154,6 +154,8 @@ if [ ! -f "bin/mediamtx/mediamtx" ]; then
     tar xzf /tmp/mediamtx.tar.gz -C bin/mediamtx mediamtx mediamtx.yml LICENSE
     rm -f /tmp/mediamtx.tar.gz
     chmod +x bin/mediamtx/mediamtx
+    echo "       Dang cau hinh MediaMTX API..."
+    sed -i '' 's/api: false/api: yes/g' bin/mediamtx/mediamtx.yml
     echo "       Da cai dat MediaMTX v${MTX_VERSION}."
     log "MediaMTX v${MTX_VERSION} installed"
 else

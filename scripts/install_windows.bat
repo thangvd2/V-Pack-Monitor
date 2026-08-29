@@ -205,6 +205,8 @@ if not exist "bin\mediamtx.zip" (
 echo Dang giai nen MediaMTX...
 powershell -command "Expand-Archive -Path 'bin\mediamtx.zip' -DestinationPath 'bin\mediamtx' -Force"
 del bin\mediamtx.zip
+echo Dang cau hinh MediaMTX API...
+powershell -command "(Get-Content 'bin\mediamtx\mediamtx.yml') -replace 'api: false', 'api: yes' | Set-Content 'bin\mediamtx\mediamtx.yml'"
 echo [3.5/7] MediaMTX... Hoan tat!
 echo [%date% %time%] MediaMTX installed OK >> "%LOG%"
 goto :mtx_next
